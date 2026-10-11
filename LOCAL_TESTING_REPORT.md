@@ -453,3 +453,21 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 - `railway service restart -y` قد يتعطّل بلا output؛ `railway up -d` من الكود المحلي أسرع وأضمن (بناء مخزّن).
 
 **ملاحظات متبقية:** متغيرات عتيقة بلا أثر تشغيلي: `VITE_API_URL=placeholder.invalid` على frontend (runtime فقط، لا يبث في بناء Vite — لا يحتاج حذفًا عاجلًا)، `SEED_PLAYGROUND` (غير مستخدم في الكود). قاعدة staging فارغة عمداً — الإختبار التفاعلي لكل دور (إنشاء صالة من الـ onboarding ثم دخول) متروك للمستخدم كما هو متفق.
+
+---
+
+## 22) دمج صفحات الفريق — TeamPage بتبويبات (2026-10-12)
+
+**الهدف (من §18/§19 ديbt):** أربع صفحات مكررة في مجال الموظفين → صفحة «الفريق» واحدة على `/admin/users`.
+
+**ما تم:**
+1. **`src/pages/gym-admin/team/TeamPage.tsx`** — الهيكل + رأس الصفحة + شريط تبويبات (الموظفون / سجل الدوام / الموارد البشرية) عبر `?tab=` deep-link بـ `useSearchParams` (تبديل التبويب ينظّف `?role=`).
+2. **`team/StaffDirectory.tsx`** — كل CRUD الذي كان في UsersPage + **chips فلترة بالدور** (الكل/المديرون/المدربون/الاستقبال) — هذه الاستبدال الكامل لـ TrainersPage (كان شبكة بطاقات read-only للمدربين فقط فوق نفس `listStaff`)؛ `?role=coach` يدعم الرابط القديم.
+3. **`team/ShiftsLog.tsx`** — قسم سجل الدوام من StaffManagement (clock in/out + الجدول). جدول الموظفين+نموذجه في StaffManagement كان تكراراً لـ UsersPage فذاب في تبويب الموظفين.
+4. **`team/HrOverview.tsx`** — محتوى HRDashboard كاملاً (مؤشرات + ملخص حضور + صرف رواتب) بلا عنوان مستقل؛ استُبدلت أصناف `surface-variant` غير المعرّومة بـ gray-100/50 وأنماط البطاقات المعتمدة في التصميم الجديد، وأُضيفت تسميات EN للـ rtl-ternary.
+5. **المسارات:** `/admin/shifts` → `?tab=shifts`، `/admin/hr` → `?tab=hr`، `/admin/trainers` → `?tab=staff&role=coach` (كلها Navigate replace)؛ `/reception/shifts` → `/reception/dashboard` (StaffManagement كانت manager-onlyEndpoints → ضجيج 403 للاستقبال).
+6. **حُذفت الملفات:** UsersPage/TrainersPage/StaffManagement/HRDashboard (لا مستوردين متبقين — verify grep)؛ تحديث تعليقات AppLayout لتعكس الواقع.
+
+**التحقق:** `tsc --noEmit` EXIT=0 · `vite build` ✓ 4.49s (تحذير chunk size سابق قائم) · chunk `team` موجود في dist · لا مراجعات كودية للأسماء المحذوفة. **يتبقى تفاعلي:** دخول مدير صالة وتجربة التبويبات الثلاثة والـ deep-links (بيانات المستخدم).
+
+**ملاحظة listTrainers:** بقيت في `services/api.ts` — لا تزال مستخدمة في `trainer/PersonalTraining.tsx` (اختيار مدرب لجلسة PT)، وليست dead code.

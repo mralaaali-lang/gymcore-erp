@@ -1,12 +1,12 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useApp } from '../../context/GymBrandContext';
-import { listStaff, createStaff, updateStaff, type StaffData } from '../../services/api';
-import PageHeader from '../../components/shared/PageHeader';
-import PageLoader from '../../components/shared/PageLoader';
-import Button from '../../components/ui/Button';
-import Card from '../../components/ui/Card';
-import StatusBadge from '../../components/ui/StatusBadge';
+import { useApp } from '../../../context/GymBrandContext';
+import { listStaff, createStaff, updateStaff, type StaffData } from '../../../services/api';
+import PageLoader from '../../../components/shared/PageLoader';
+import Button from '../../../components/ui/Button';
+import Card from '../../../components/ui/Card';
+import StatusBadge from '../../../components/ui/StatusBadge';
 
 const roleLabels: Record<string, string> = {
   manager: 'مدير',
@@ -26,10 +26,25 @@ const roleOptions = [
   { value: 'receptionist', label: 'استقبال' },
 ];
 
-export default function UsersPage() {
+const FILTERS = [
+  { value: 'all', labelAr: 'الكل', labelEn: 'All' },
+  { value: 'manager', labelAr: 'المديرون', labelEn: 'Managers' },
+  { value: 'coach', labelAr: 'المدربون', labelEn: 'Trainers' },
+  { value: 'receptionist', labelAr: 'الاستقبال', labelEn: 'Reception' },
+];
+
+// Staff directory tab — full CRUD (was UsersPage). The role filter chips
+// replace TrainersPage, which was a read-only coach-only card grid over the
+// same listStaff data.
+export default function StaffDirectory() {
   const { language } = useApp();
   const rtl = language === 'ar';
   const queryClient = useQueryClient();
+  const [params] = useSearchParams();
+  const initialRole = params.get('role');
+  const [roleFilter, setRoleFilter] = useState(
+    FILTERS.some((f) => f.value === initialRole) ? (initialRole as string) : 'all'
+  );
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<StaffData | null>(null);
   const [name, setName] = useState('');
@@ -45,7 +60,8 @@ export default function UsersPage() {
     staleTime: 30_000,
   });
 
-  const staff: StaffData[] = data?.data || [];
+  const allStaff: StaffData[] = data?.data || [];
+  const staff = roleFilter === 'all' ? allStaff : allStaff.filter((s) => s.role === roleFilter);
 
   const createMutation = useMutation({
     mutationFn: () => createStaff({
@@ -103,6 +119,17 @@ export default function UsersPage() {
     setShowForm(true);
   };
 
+  const openCreate = () => {
+    setEditingUser(null);
+    setName('');
+    setEmail('');
+    setPassword('');
+    setRole('manager');
+    setPhone('');
+    setSalary('');
+    setShowForm(true);
+  };
+
   const handleSubmit = () => {
     if (editingUser) {
       updateMutation.mutate();
@@ -114,40 +141,41 @@ export default function UsersPage() {
   const isPending = createMutation.isPending || updateMutation.isPending;
   const inputCls = 'w-full px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none bg-white';
 
-  if (isLoading) {
-    return (
-      <div dir={rtl ? 'rtl' : 'ltr'} className="bg-gray-50 min-h-screen -m-6 p-6">
-        <PageLoader />
-      </div>
-    );
-  }
-
+  if (isLoading) return <PageLoader message={rtl ? 'جاري التحميل...' : 'Loading...'} />;
   if (error) {
     return (
-      <div dir={rtl ? 'rtl' : 'ltr'} className="bg-gray-50 min-h-screen -m-6 p-6">
-        <div className="bg-red-50 border border-red-200 rounded-3xl p-6 text-center text-red-700">
-          {rtl ? 'فشل تحميل بيانات المستخدمين' : 'Failed to load users'}
-        </div>
+      <div className="bg-red-50 border border-red-200 rounded-3xl p-6 text-center text-red-700">
+        {rtl ? 'فشل تحميل بيانات الموظفين' : 'Failed to load staff'}
       </div>
     );
   }
 
   return (
-    <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6 bg-gray-50 min-h-screen -m-6 p-6">
-      <PageHeader
-        title="المستخدمين"
-        subtitle={rtl ? 'إدارة مستخدمي النظام وصلاحياتهم' : 'Manage system users and roles'}
-        icon="group"
-        actions={
-          <Button
-            variant="primary"
-            onClick={() => { setEditingUser(null); setName(''); setEmail(''); setPassword(''); setRole('manager'); setPhone(''); setSalary(''); setShowForm(true); }}
-          >
-            <span className="material-symbols-outlined text-lg">add</span>
-            إضافة مستخدم
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-1.5 bg-white border border-gray-100 rounded-2xl p-1 shadow-sm">
+          {FILTERS.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setRoleFilter(f.value)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                roleFilter === f.value ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              {rtl ? f.labelAr : f.labelEn}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
+            {staff.length} {rtl ? 'موظف' : 'staff'}
+          </span>
+          <Button variant="primary" onClick={openCreate}>
+            <span className="material-symbols-outlined text-lg">person_add</span>
+            {rtl ? 'إضافة موظف' : 'Add staff'}
           </Button>
-        }
-      />
+        </div>
+      </div>
 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -171,7 +199,7 @@ export default function UsersPage() {
                     <span className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
                       <span className="material-symbols-outlined text-3xl text-gray-400">group</span>
                     </span>
-                    <p className="text-gray-400 text-sm">{rtl ? 'لا يوجد مستخدمون' : 'No users found'}</p>
+                    <p className="text-gray-400 text-sm">{rtl ? 'لا يوجد موظفون' : 'No staff found'}</p>
                   </td>
                 </tr>
               )}
@@ -193,7 +221,7 @@ export default function UsersPage() {
                   <td className="p-4 text-gray-500" dir="ltr">{u.phone || '—'}</td>
                   <td className="p-4 font-medium text-gray-900">{u.salary ? `${u.salary.toLocaleString()} ر.س` : '—'}</td>
                   <td className="p-4">
-                    <StatusBadge status={u.is_active ? 'نشط' : 'غير نشط'} variant={u.is_active ? 'success' : 'error'} />
+                    <StatusBadge status={u.is_active ? (rtl ? 'نشط' : 'Active') : (rtl ? 'غير نشط' : 'Inactive')} variant={u.is_active ? 'success' : 'error'} />
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-3">
@@ -223,7 +251,7 @@ export default function UsersPage() {
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <Card className="shadow-xl">
             <h2 className="text-lg font-bold text-gray-900 mb-4">
-              {editingUser ? (rtl ? 'تعديل مستخدم' : 'Edit User') : (rtl ? 'إضافة مستخدم' : 'Add User')}
+              {editingUser ? (rtl ? 'تعديل موظف' : 'Edit staff') : (rtl ? 'إضافة موظف' : 'Add staff')}
             </h2>
             <div className="space-y-4">
               <div>

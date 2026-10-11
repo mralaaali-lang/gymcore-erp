@@ -84,7 +84,7 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
 2. **فجوات EN** في صفحات (SetupChecklist/TrainerDashboard/FinancialReports/LeadKanban/useGymDashboard) — عربية فقط حالياً.
 3. **توحيد الأيقونات** لنظام واحد (13 ملفاً يخلط) + إزالة `Plus` المكرر مع `add`.
 4. **`DataTable` المشتركة** لا تدعم خلايا مخصصة — توسيعها أو توثيق الاستثناء.
-5. **Staging (Railway):** متوقف مؤقتاً — المشروع `gymcore-staging` + أدلة `RAILWAY_*.md` جاهزة عند العودة.
+5. **Staging (Railway):** ✅ يعمل (2026-10-12 §21) — backend+frontend Online من `railway up`؛ الدومينات `frontend-production-abdd`/`backend-production-9b567`. **ديون دمج صفحات متبقية:** purchases/suppliers→المتجر، debts، announcements، backup، migration (الفريق اكتمل §22).
 6. **مؤجل بقرار:** ZATCA، استشارة قانونية، بوابات دفع حقيقية (نقدي/يدوي أولاً — راجع `PAYMENT_COLLECTION_STRATEGY.md`).
 7. **ديون تقنية:** `routeConfigs/` قديم، `UIContext` غير مُmount، `superAdminUtils.tr` مكرر، تحذير حجم chunks في البناء.
 

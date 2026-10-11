@@ -88,10 +88,10 @@ export default function AppRouter() {
         <Route path="/admin/marketing" element={lazyLoad(() => import('../pages/gym-admin/MarketingAutomation'), ['gym-admin'])} />
         <Route path="/admin/website" element={lazyLoad(() => import('../pages/gym-admin/WebsiteGenerator'), ['gym-admin'])} />
         <Route path="/admin/gym" element={lazyLoad(() => import('../pages/gym-admin/GymCalendar'), ['gym-admin'])} />
-        <Route path="/admin/shifts" element={lazyLoad(() => import('../pages/gym-admin/StaffManagement'), ['gym-admin'])} />
+        <Route path="/admin/shifts" element={<Navigate to="/admin/users?tab=shifts" replace />} />
         <Route path="/admin/reports" element={lazyLoad(() => import('../pages/gym-admin/FinancialReports'), ['gym-admin'])} />
         <Route path="/admin/analytics" element={lazyLoad(() => import('../pages/gym-admin/BranchAnalytics'), ['gym-admin'])} />
-        <Route path="/admin/hr" element={lazyLoad(() => import('../pages/gym-admin/HRDashboard'), ['gym-admin'])} />
+        <Route path="/admin/hr" element={<Navigate to="/admin/users?tab=hr" replace />} />
         <Route path="/admin/crm" element={lazyLoad(() => import('../pages/gym-admin/CrmPage'), ['gym-admin'])} />
         <Route path="/admin/customer360/:id" element={lazyLoad(() => import('../pages/gym-admin/Customer360Page'), ['gym-admin'])} />
         <Route path="/admin/settings" element={lazyLoad(() => import('../pages/settings/SettingsPage'), ['gym-admin'])} />
@@ -107,8 +107,9 @@ export default function AppRouter() {
         <Route path="/admin/cashbox" element={lazyLoad(() => import('../pages/gym-admin/CashboxPage'), ['gym-admin'])} />
         <Route path="/admin/cashbox/shifts" element={lazyLoad(() => import('../pages/gym-admin/CashboxShiftsPage'), ['gym-admin'])} />
         <Route path="/admin/announcements" element={lazyLoad(() => import('../pages/gym-admin/AnnouncementsPage'), ['gym-admin'])} />
-        <Route path="/admin/trainers" element={lazyLoad(() => import('../pages/gym-admin/TrainersPage'), ['gym-admin'])} />
-        <Route path="/admin/users" element={lazyLoad(() => import('../pages/gym-admin/UsersPage'), ['gym-admin'])} />
+        {/* Team hub — merged trainers/shifts/hr/users pages into one tabbed page (§22). */}
+        <Route path="/admin/trainers" element={<Navigate to="/admin/users?tab=staff&role=coach" replace />} />
+        <Route path="/admin/users" element={lazyLoad(() => import('../pages/gym-admin/team/TeamPage'), ['gym-admin'])} />
         {/* Legacy aliases — one canonical URL per page */}
         <Route path="/admin/payments" element={<Navigate to="/admin/reports" replace />} />
         <Route path="/admin/retention" element={<Navigate to="/admin/crm" replace />} />
@@ -142,7 +143,9 @@ export default function AppRouter() {
         <Route path="/reception/members" element={lazyLoad(() => import('../pages/gym-admin/MemberList'), ['reception'])} />
         <Route path="/reception/attendance" element={lazyLoad(() => import('../pages/gym-admin/AttendanceRecords'), ['reception'])} />
         <Route path="/reception/products" element={lazyLoad(() => import('../pages/gym-admin/InventoryManagement'), ['reception'])} />
-        <Route path="/reception/shifts" element={lazyLoad(() => import('../pages/gym-admin/StaffManagement'), ['reception'])} />
+        {/* StaffManagement merged into the manager-only Team hub; reception has
+            no staff-shifts access (manager-only endpoints → was 403 noise). */}
+        <Route path="/reception/shifts" element={<Navigate to="/reception/dashboard" replace />} />
         <Route path="/reception/settings" element={lazyLoad(() => import('../pages/super-admin/SystemSettings'), ['reception'])} />
 
         {/* ============================================

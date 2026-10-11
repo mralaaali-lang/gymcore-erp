@@ -47,10 +47,10 @@ function buildNavItems(base: string, role: UserRole): NavItem[] {
   if (role === 'gym-admin') {
     // Gym workspace IA — mirrors the product tree one-to-one:
     // members lifecycle → money → operations → growth → team & settings.
-    // Every path must be a real route (no dead links); secondary pages
-    // (trainers, shifts, hr, purchases, suppliers, debts, announcements,
-    // analytics, backup, migration) stay routed and get merged into these
-    // pages in later milestones.
+    // Every path must be a real route (no dead links); trainers/shifts/hr
+    // were merged into the TeamPage tabs (§22). Remaining secondary pages
+    // (purchases, suppliers, debts, announcements, analytics, backup,
+    // migration) stay routed and get merged into these pages later.
     return [
       { label: i18n.t('sidebar.dashboard'), icon: 'dashboard', path: `${base}/dashboard`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionHome') },
       // ── الأعضاء ──
@@ -96,8 +96,8 @@ function buildNavItems(base: string, role: UserRole): NavItem[] {
     // Front-desk IA: home → members & attendance → store → settings.
     // No duplicate check-in entry: /reception/checkin rendered the same
     // AttendanceRecords page as /reception/attendance (now a redirect).
-    // No shifts entry: /reception/shifts renders StaffManagement, which is
-    // built on manager-only staff endpoints (403s for reception) — a real
+    // No shifts entry: staff shifts live in the manager-only Team hub;
+    // /reception/shifts now redirects to the reception dashboard — a real
     // my-shifts page for staff is a later milestone.
     return [
       { label: i18n.t('nav.dashboard'), icon: 'dashboard', path: `${base}/dashboard`, roles: ['reception'], section: i18n.t('nav.sectionMain') },
