@@ -424,3 +424,32 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 ### نطاق Railway/GitHub المرتبط (نفس اليوم)
 - **gymcore-staging:** قاعدة الـ staging مُسحت كلياً (DROP SCHEMA public CASCADE → 0 tables) عبر SSH tunnel (`railway connect Postgres --tunnel-only`)، والمُشروع أُعيد ربطه. Redis التبعي لم يُمسح (كاشيات TTL — يمسحها الزمن أو تُطلَب صراحة). الخدمةان backend/frontend بحالة Failed وستُعادا من كود المستودع الجديد.
 - **GitHub:** استُبدلتHistory القديمة بدفعة نظيفة واحدة عبر orphan force-push (تكافئ حذف المستودع وإعادة رفعه دون الحاجة لـ gh CLI أو حذف فعلي). **تم التنفيذ فعلياً:** `main` = commit واحد `ccc7287` على origin، وحُذف فرع `railway-staging` البعيد، و`git ls-remote` يؤكد فرعاً واحداً فقط. الفروع المحلية القديمة (master/railway-staging/codex/feature) باقية كأرشيف.
+
+---
+
+## 21) نشر backend+frontend على Railway من الكود المحلي (2026-10-11/12)
+
+**السياق:** بعد استبدال history غيت‌وب، أتموت-ديبloys علقت على commit محذوف والخدمتان Failed. النشر تم بـ `railway up` (رفع الكود المحلي) — والـ lockfiles (`package-lock.json` جذر + server) تجعل `npm ci` في Dockerfile.prod قابلاً للتكرار؛ أخطاء البناء القديمة (Duplex/req.admin/axios) كانت من كود قديم وليست من environment ريلوي.
+
+**تغييرات الكود:**
+1. **nginx.conf → قالب envsubst:** `proxy_pass http://${API_UPSTREAM};` بدل `backend:4000` الثابت؛ يُسلَخ عند إقلاع الحاوية عبر `/etc/nginx/templates/default.conf.template` (آلية image nginx الرسمية). `ENV API_UPSTREAM=backend:4000` افتراضياً للـ compose المحلي، ومتغير Railway `API_UPSTREAM=backend.railway.internal:4000` للـ staging. (حُذف `http://backend:4000` من CSP connect-src — الاستدعاءات same-origin عبر البروكسي.)
+2. **nginx يستمع على 80 و8080:** اكتشاف حاسم من `--network` flow logs — بروكسي Railway يتصل بالـ replica على **8080** افتراضياً (لا يوجد Application Port مضبوط في dashboard)، فالبقاء على 80 فقط = healthcheck «service unavailable» للأبد. نفس الصورة تخدم الآن compose (:80) وRailway (:8080).
+3. **Dockerfile (compose) + Dockerfile.prod (Railway):** نسخ nginx.conf إلى مجلد templates بدل conf.d.
+
+**النشر:**
+- backend: `railway up --service backend` من جذر المستودع (سياق البناء root، `server/Dockerfile.prod`) — بناء ناجح، migrations 001→056 أُنشئت على قاعدة staging الفارغة، «All migrations complete»، Online.
+- frontend: `railway up --service frontend` (الجذر `Dockerfile.prod`) — بعد إصلاح 8080: Online.
+- دومينات Railway: `frontend-production-abdd.up.railway.app` / `backend-production-9b567.up.railway.app`؛ حُدّثت متغيرات backend `CORS_ORIGIN`/`FRONTEND_URL` للدومين الحقيقي وأُعيد النشر (restart عن طريق CLI كان يتعطّل — `railway up` مجددًا أنظف).
+- دومين الـ frontend خُصّص على Target port 80 عبر `railway domain update` (لم يكن سبب العطل لكنه ضبط صحيح الآن).
+
+**التحقق الحي:**
+- `GET /` على دومين frontend → 200
+- `GET /health` عبر بروكسي nginx (frontend → backend.railway.internal:4000) → 200
+- `GET /api/v1/auth/me` بلا جلسة → 401 «Access denied. No token provided.»
+- `OPTIONS /api/v1/auth/login` بـ Origin حقيقي → 204 مع `access-control-allow-origin=https://frontend-production-abdd.up.railway.app` و`allow-credentials=true`
+
+**مزالق جديدة موثقة:**
+- بعد كل `railway up` للـ backend (replica بـ IP جديد) يلزم **إعادة نشر الـ frontend** — nginx يظلّم DNS للـ upstream عند الإقلاع، فالاتصالات القديمة تتجمّد (timeout على البروكسي بينما_direct_ سليم).
+- `railway service restart -y` قد يتعطّل بلا output؛ `railway up -d` من الكود المحلي أسرع وأضمن (بناء مخزّن).
+
+**ملاحظات متبقية:** متغيرات عتيقة بلا أثر تشغيلي: `VITE_API_URL=placeholder.invalid` على frontend (runtime فقط، لا يبث في بناء Vite — لا يحتاج حذفًا عاجلًا)، `SEED_PLAYGROUND` (غير مستخدم في الكود). قاعدة staging فارغة عمداً — الإختبار التفاعلي لكل دور (إنشاء صالة من الـ onboarding ثم دخول) متروك للمستخدم كما هو متفق.

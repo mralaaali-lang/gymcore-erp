@@ -23,7 +23,11 @@ FROM nginx:alpine AS production
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# nginx.conf is an envsubst template: ${API_UPSTREAM} is resolved at container
+# start by the official nginx entrypoint (20-envsubst-on-templates.sh).
+# Local compose → API_UPSTREAM=backend:4000; Railway → backend.railway.internal:4000.
+ENV API_UPSTREAM=backend:4000
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 

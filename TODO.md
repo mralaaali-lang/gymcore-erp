@@ -76,7 +76,8 @@
 
 - 2026-10-11: جلسات كوكيز HttpOnly كاملة (`/auth/me` + 401 semantics + refresh interceptor) + داشبوردات الأدوار ببيانات حقيقية + IA نظيفة + seedDefaultOffers للـ wizard + migration 056 (§19)
 - 2026-10-11: **توحيد قواعد البيانات** — المحلي (native PG17) استُورد إلى Docker 17 وصار المصدر الوحيد؛ Native موقوف؛ reset-local.ps1 و.env أُعيد توجيههما (§20)
-- 2026-10-11: **Railway staging** — قاعدة الـ staging مُسحت (0 tables) والم-project أعيد ربطه؛ **GitHub** — استُبدلت history بدفعة نظيفة (orphan force-push). **التالي:** نشر backend/frontend من الكود الجديد على Railway
+- 2026-10-11: **Railway staging** — قاعدة الـ staging مُسحت (0 tables) والم-project أعيد ربطه؛ **GitHub** — استُبدلت history بدفعة نظيفة (orphan force-push)
+- 2026-10-12: **نشر Railway من الكود المحلي** — backend+frontend Online عبر `railway up`؛ nginx قالب `${API_UPSTREAM}` + استماع 80/8080؛ CORS/FRONTEND_URL على الدومين الحقيقي (§21). **التالي:** دمج الصفحات المكررة + تحقق تفاعلي بدخول كل دور على staging
 - 2026-10-10: إعادة هيكلة كاملة لوحات السوبر أدمن (9 صفحات) — التفاصيل `LOCAL_TESTING_REPORT.md` §5-§6
 - 2026-10-11: حفظ المرحلة الثانية في git + تنظيف الملفات القديمة والمكررة من الجذر
 - 2026-10-11: تدقيق 16 صفحة سوبر أدمن + إصلاحات (§13) ثم إعادة بناء الداشبورد كمركز SaaS (§14)
