@@ -203,12 +203,15 @@ export const closeCashbox = async (req: Request, res: Response) => {
 export const getFinanceSummary = async (req: Request, res: Response) => {
   const gym_id = req.staff?.gym_id;
   try {
-    const [revenue, expenses, debtsTotal, salesCount] = await Promise.all([
+    const [revenue, expenses, debtsTotal, salesCount, todayRev, yesterdayRev] = await Promise.all([
       query(`SELECT COALESCE(SUM(amount),0) AS total FROM financial_transactions WHERE gym_id=$1 AND type='payment' AND created_at >= DATE_TRUNC('month', CURRENT_DATE)`, [gym_id]),
       query(`SELECT COALESCE(SUM(amount),0) AS total FROM financial_transactions WHERE gym_id=$1 AND type='expense' AND created_at >= DATE_TRUNC('month', CURRENT_DATE)`, [gym_id]),
       query(`SELECT COALESCE(SUM(remaining_amount),0) AS total FROM member_debts WHERE gym_id=$1 AND status='active'`, [gym_id]),
       query(`SELECT COUNT(*) AS count FROM pos_orders WHERE gym_id=$1 AND created_at >= DATE_TRUNC('month', CURRENT_DATE)`, [gym_id]),
+      // §24 today-strip: payments collected today vs the same figure yesterday
+      query(`SELECT COALESCE(SUM(amount),0) AS total FROM financial_transactions WHERE gym_id=$1 AND type='payment' AND created_at >= CURRENT_DATE`, [gym_id]),
+      query(`SELECT COALESCE(SUM(amount),0) AS total FROM financial_transactions WHERE gym_id=$1 AND type='payment' AND created_at >= CURRENT_DATE - INTERVAL '1 day' AND created_at < CURRENT_DATE`, [gym_id]),
     ]);
-    res.json({ data: { monthly_revenue: revenue.rows[0].total, monthly_expenses: expenses.rows[0].total, outstanding_debts: debtsTotal.rows[0].total, monthly_sales: salesCount.rows[0].count } });
+    res.json({ data: { monthly_revenue: revenue.rows[0].total, monthly_expenses: expenses.rows[0].total, outstanding_debts: debtsTotal.rows[0].total, monthly_sales: salesCount.rows[0].count, today_revenue: todayRev.rows[0].total, yesterday_revenue: yesterdayRev.rows[0].total } });
   } catch (e: any) { logger.error('getFinanceSummary failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };

@@ -2,13 +2,20 @@ import { useTranslation } from 'react-i18next';
 import Chart from './Chart';
 import type { RevenueBreakdown } from '../../services/analytics';
 
-const COLORS = ['#114b5f', '#f97316', '#22c55e', '#ef4444', '#f59e0b', '#8b5cf6'];
+const COLORS = ['#114b5f', '#f97316', '#22c55e', '#8b5cf6'];
 
 interface Props {
   data: RevenueBreakdown;
+  /** ISO code from the tenant's currency setting (§24). */
+  currency?: string;
 }
 
-export default function RevenueBreakdownChart({ data }: Props) {
+/**
+ * Revenue sources pie. The aging-receivables pie that used to sit here was
+ * removed in §24 — it duplicated the overdue card title and the real overdue
+ * list now lives in its own action card (/api/dashboard/overdue-debts).
+ */
+export default function RevenueBreakdownChart({ data, currency }: Props) {
   const { t } = useTranslation();
   const pieData = [
     { name: t('dashboard.revenueMemberships'), value: data.memberships },
@@ -16,50 +23,22 @@ export default function RevenueBreakdownChart({ data }: Props) {
     { name: t('dashboard.revenuePt'), value: data.personal_training },
   ].filter((d) => d.value > 0);
 
-  const aging = data.aging_receivables;
-  const agingData = [
-    { name: t('dashboard.agingCurrent'), value: aging.current },
-    { name: t('dashboard.aging30'), value: aging.aging_1_30 },
-    { name: t('dashboard.aging60'), value: aging.aging_31_60 },
-    { name: t('dashboard.aging90'), value: aging.aging_60_plus },
-  ].filter((d) => d.value > 0);
-
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <h3 className="text-sm font-bold text-gray-900 mb-4">{t('dashboard.revenueTitle')}</h3>
-          {pieData.length === 0 ? (
-            <div className="flex items-center justify-center h-48 text-sm text-gray-400">{t('dashboard.noData')}</div>
-          ) : (
-            <Chart
-              type="pie"
-              height={220}
-              series={pieData.map(d => d.value)}
-              categories={pieData.map(d => d.name)}
-              colors={COLORS}
-              currency="EGP"
-              showLegend
-            />
-          )}
-        </div>
-        <div>
-          <h3 className="text-sm font-bold text-gray-900 mb-4">{t('dashboard.agingReceivablesTitle')}</h3>
-          {agingData.length === 0 ? (
-            <div className="flex items-center justify-center h-48 text-sm text-gray-400">{t('dashboard.noOverduePayments')}</div>
-          ) : (
-            <Chart
-              type="pie"
-              height={220}
-              series={agingData.map(d => d.value)}
-              categories={agingData.map(d => d.name)}
-              colors={COLORS.slice(3)}
-              currency="EGP"
-              showLegend
-            />
-          )}
-        </div>
-      </div>
+      <h3 className="text-sm font-bold text-gray-900 mb-4">{t('dashboard.revenueTitle')}</h3>
+      {pieData.length === 0 ? (
+        <div className="flex items-center justify-center h-48 text-sm text-gray-400">{t('dashboard.noData')}</div>
+      ) : (
+        <Chart
+          type="donut"
+          height={260}
+          series={pieData.map(d => d.value)}
+          categories={pieData.map(d => d.name)}
+          colors={COLORS}
+          currency={currency}
+          showLegend
+        />
+      )}
     </div>
   );
 }

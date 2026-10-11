@@ -90,13 +90,28 @@ export async function getRevenueForecast(req: Request, res: Response): Promise<v
 export async function getEnrollmentTrend(req: Request, res: Response): Promise<void> {
   const gym_id = req.staff?.gym_id;
   try {
+    // Two series for the dashboard chart (§24): new signups by start month
+    // vs ended subscriptions (expired/cancelled/suspended) by end month.
     const result = await query(`
+      WITH new_by_month AS (
+        SELECT DATE_TRUNC('month', start_date) AS month, COUNT(*) AS new_members
+        FROM member_subscriptions
+        WHERE gym_id = $1 AND start_date >= CURRENT_DATE - INTERVAL '6 months'
+        GROUP BY DATE_TRUNC('month', start_date)
+      ),
+      ended_by_month AS (
+        SELECT DATE_TRUNC('month', end_date) AS month, COUNT(*) AS cancellations
+        FROM member_subscriptions
+        WHERE gym_id = $1 AND status IN ('expired','cancelled','suspended')
+          AND end_date >= CURRENT_DATE - INTERVAL '6 months'
+        GROUP BY DATE_TRUNC('month', end_date)
+      )
       SELECT
-        DATE_TRUNC('month', start_date) AS month,
-        COUNT(*) AS new_members
-      FROM member_subscriptions
-      WHERE gym_id = $1 AND start_date >= CURRENT_DATE - INTERVAL '6 months'
-      GROUP BY DATE_TRUNC('month', start_date)
+        COALESCE(n.month, e.month) AS month,
+        COALESCE(n.new_members, 0) AS new_members,
+        COALESCE(e.cancellations, 0) AS cancellations
+      FROM new_by_month n
+      FULL JOIN ended_by_month e ON n.month = e.month
       ORDER BY month
     `, [gym_id]);
     res.status(200).json({ data: result.rows });

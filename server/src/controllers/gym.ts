@@ -74,7 +74,9 @@ export const updateSettings = async (req: Request, res: Response) => {
       time_format: 'time_format',
       first_day_of_week: 'first_day_of_week',
       language_setting: 'language',
-      units_system: 'units_system',
+      // units_system intentionally unmapped: the gyms.units_system column was
+      // dropped in migration 040_tenant_schema_cleanup — mapping it here would
+      // emit `UPDATE gyms SET units_system=…` and 500 the whole settings save.
       logo_url: 'logo_url',
       currency: 'currency',
     };

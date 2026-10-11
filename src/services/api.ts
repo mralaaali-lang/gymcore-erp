@@ -259,10 +259,24 @@ export function getStoredRole(): string | null {
   return localStorage.getItem('app_role') || sessionStorage.getItem('app_role') || null;
 }
 
+/** Minimal tenant block returned by /auth/me (§24) — replaces the platform-only
+ *  /platform/gyms/:id call that 403s for gym managers. */
+export interface GymBrief {
+  id: string;
+  name: string;
+  subdomain: string;
+  plan_tier?: string;
+  currency?: string;
+  subscription_status?: string;
+  is_active?: boolean;
+}
+
 export interface RestoredSession {
   role: string;
   gym_id: string | null;
   full_name?: string;
+  email?: string;
+  gym?: GymBrief | null;
 }
 
 export function tryRestoreSession(): Promise<RestoredSession | null> {
@@ -293,7 +307,13 @@ export function tryRestoreSession(): Promise<RestoredSession | null> {
       .then((res) => {
         const u = res.data?.user;
         return u
-          ? { role: String(u.role), gym_id: (u.gym_id as string) || null, full_name: u.full_name }
+          ? {
+              role: String(u.role),
+              gym_id: (u.gym_id as string) || null,
+              full_name: u.full_name,
+              email: u.email,
+              gym: (res.data?.gym as GymBrief) || null,
+            }
           : null;
       });
 
@@ -1049,7 +1069,45 @@ export async function closeCashbox(id: string, closing_balance: number, notes?: 
 }
 export async function getFinanceSummary() {
   const res = await api.get('/api/finance/summary');
-  return res.data as { data: { monthly_revenue: number; monthly_expenses: number; outstanding_debts: number; monthly_sales: number } };
+  return res.data as { data: { monthly_revenue: number; monthly_expenses: number; outstanding_debts: number; monthly_sales: number; today_revenue: number; yesterday_revenue: number } };
+}
+
+// ====================================================================
+// MANAGER DASHBOARD — "needs your action" feeds (§24, read-only)
+// ====================================================================
+export interface ExpiringSoonRow {
+  member_id: string;
+  member_name: string;
+  end_date: string;
+  days_left: number;
+  price_paid: number;
+}
+export interface InactiveMemberRow {
+  member_id: string;
+  member_name: string;
+  last_check_in: string | null;
+  days_since: number;
+}
+export interface OverdueDebtRow {
+  id: string;
+  member_id: string;
+  member_name: string;
+  remaining_amount: number;
+  due_date: string;
+  days_overdue: number;
+}
+
+export async function getExpiringSoon(days = 7) {
+  const res = await api.get('/api/dashboard/expiring-soon', { params: { days } });
+  return res.data as { data: ExpiringSoonRow[]; total: number; days: number };
+}
+export async function getInactiveMembers(days = 14) {
+  const res = await api.get('/api/dashboard/inactive-members', { params: { days } });
+  return res.data as { data: InactiveMemberRow[]; total: number; days: number };
+}
+export async function getOverdueDebts() {
+  const res = await api.get('/api/dashboard/overdue-debts');
+  return res.data as { data: OverdueDebtRow[]; total_amount: number };
 }
 
 // ====================================================================

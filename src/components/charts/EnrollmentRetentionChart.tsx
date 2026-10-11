@@ -18,9 +18,15 @@ export default function EnrollmentRetentionChart({ data }: Props) {
           type="bar"
           height={280}
           categories={data.map(d => d.month?.slice(0, 7))}
-          series={[{ name: t('dashboard.newMembers'), data: data.map(d => d.new_members) }]}
-          colors={['#114b5f']}
+          series={[
+            { name: t('dashboard.newMembers'), data: data.map(d => d.new_members) },
+            // §24: second series from the extended enrollment-trend endpoint —
+            // the chart title promised "vs cancellations" but only one series existed.
+            { name: t('dashboard.cancellations'), data: data.map(d => d.cancellations ?? 0) },
+          ]}
+          colors={['#114b5f', '#ef4444']}
           barRadius={4}
+          showLegend
         />
       )}
     </div>

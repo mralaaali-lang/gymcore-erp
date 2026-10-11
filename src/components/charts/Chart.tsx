@@ -104,6 +104,9 @@ export default function Chart({
         labels: { style: { fontSize: '11px' } },
       };
       base.yaxis = {
+        // §24: counts on these dashboards are small integers — without this
+        // apexcharts renders 0.5/1.5 ticks that look broken to an owner.
+        forceNiceScale: true,
         labels: {
           formatter: yFormatter ?? ((v) => v.toLocaleString()),
           style: { fontSize: '11px' },

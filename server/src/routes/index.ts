@@ -113,6 +113,7 @@ import {
   listLeads, getLeadById, createLead, updateLead, deleteLead, getLeadStats,
 } from '../controllers/crm';
 import { getRetentionRate, getPeakHours, getRevenueForecast, getEnrollmentTrend, getRevenueBreakdown } from '../controllers/analytics';
+import { getExpiringSoon, getInactiveMembers, getOverdueDebts } from '../controllers/dashboard';
 import { handlePaymentWebhook } from '../controllers/webhooks';
 import { webhookIdempotency } from '../middleware/webhookIdempotency';
 import { verifyPaymentWebhookSignature } from '../middleware/webhookAuth';
@@ -279,6 +280,13 @@ router.get('/api/analytics/peak-hours', requireRole('manager'), getPeakHours);
 router.get('/api/analytics/revenue-forecast', requireRole('manager'), getRevenueForecast);
 router.get('/api/analytics/enrollment-trend', requireRole('manager'), getEnrollmentTrend);
 router.get('/api/analytics/revenue-breakdown', requireRole('manager'), getRevenueBreakdown);
+
+// ====================================================================
+// MANAGER DASHBOARD — "needs your action" feeds (§24, read-only)
+// ====================================================================
+router.get('/api/dashboard/expiring-soon', requireRole('manager'), getExpiringSoon);
+router.get('/api/dashboard/inactive-members', requireRole('manager'), getInactiveMembers);
+router.get('/api/dashboard/overdue-debts', requireRole('manager'), getOverdueDebts);
 
 // ====================================================================
 // LOYALTY POINTS & REWARDS

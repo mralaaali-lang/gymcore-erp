@@ -1,7 +1,7 @@
 ﻿import { createContext, useContext, useReducer, useEffect, useState, ReactNode } from 'react';
 import type { GymBranding, AppState, AppAction, UserRole } from '../types';
 import { ROLE_MAP } from '../types';
-import { tryRestoreSession, logout as apiLogout } from '../services/api';
+import { tryRestoreSession, logout as apiLogout, type GymBrief } from '../services/api';
 import i18n from '../i18n';
 
 interface AppContextProps extends AppState {
@@ -12,6 +12,11 @@ interface AppContextProps extends AppState {
   toggleSidebar: () => void;
   login: (role: UserRole, tenantId: string) => void;
   logout: () => void;
+  /** Tenant block from /auth/me (§24): name/subdomain/plan/currency — tenant
+   *  pages no longer call the platform-only /platform/gyms/:id (403 for managers). */
+  gymProfile: GymBrief | null;
+  /** Logged-in staff identity from /auth/me. */
+  account: { full_name?: string; email?: string } | null;
 }
 
 const initialState: AppState = {
@@ -62,6 +67,8 @@ const AppContext = createContext<AppContextProps | undefined>(undefined);
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
   const [sessionReady, setSessionReady] = useState(false);
+  const [gymProfile, setGymProfile] = useState<GymBrief | null>(null);
+  const [account, setAccount] = useState<{ full_name?: string; email?: string } | null>(null);
 
   useEffect(() => {
     tryRestoreSession().then((restored) => {
@@ -70,6 +77,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           ? 'super-admin'
           : ROLE_MAP[restored.role] || 'gym-admin';
         dispatch({ type: 'LOGIN', payload: { role: mappedRole, tenantId: restored.gym_id || '' } });
+        if (restored.gym) {
+          setGymProfile(restored.gym);
+          // Sidebar/header brand shows the actual gym name once known.
+          if (restored.gym.name) {
+            dispatch({ type: 'UPDATE_BRANDING', payload: { name: restored.gym.name } });
+          }
+        }
+        if (restored.full_name || restored.email) {
+          setAccount({ full_name: restored.full_name, email: restored.email });
+        }
       }
       setSessionReady(true);
     }).catch(() => setSessionReady(true));
@@ -100,6 +117,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: 'LOGIN', payload: { role, tenantId } });
   const logout = () => {
     apiLogout();
+    setGymProfile(null);
+    setAccount(null);
     dispatch({ type: 'LOGOUT' });
   };
 
@@ -124,6 +143,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         toggleSidebar,
         login,
         logout,
+        gymProfile,
+        account,
       }}
     >
       <div className={state.language === 'ar' ? 'font-arabic' : 'font-sans'}>

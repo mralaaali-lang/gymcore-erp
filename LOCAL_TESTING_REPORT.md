@@ -487,3 +487,35 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 6. **حُذفت الملفات:** InventoryManagement.tsx / PurchasesPage.tsx / SuppliersPage.tsx — grep أكد أن المراجع الوحيدة المتبقية هي redirects مقصودة في routes. المبيعات (SalesPage/POS) لا تستورد أيّاً منها.
 
 **التحقق:** `tsc --noEmit` EXIT=0 · `vite build` ✓ 4.95s (تحذير chunk size قائم سابق) · لا مستوردين متبقين للمحذوفات. **يتبقى تفاعلي:** دخول مدير صالة وتجربة التبويبات الثلاثة والـ deep-links + دخول استقبال والتأكد أن التبويبات المخفية لا تظهر (بيانات المستخدم — كما هو متفق لا ينفذه الوكيل).
+
+---
+
+## 24) إعادة تصميم داشبورد مدير الصالة — «مهام اليوم أولاً» (2026-10-12)
+
+**المشكلة (رُصدت حياً في المتصفح على :9000):** اسم الصالة معلق على «جاري التحميل…» + كل الحقول «—» لأن الصفحة تستدعي `GET /platform/gyms/:id` وهو platform-only (403 للمدير)؛ ترحيب مكرر مرتين؛ «المستحقات المتأخرة» مكررة؛ شريط إعداد 4/8 يستهلك أعلى الشاشة لصالة عاملة؛ عملة `$` ثابتة؛ محاور رسوم بكسور (0.5/1.5)؛ رسم «الاشتراكات مقابل الإلغاءات» بسلسلة واحدة فقط؛ أوقات ذروة/باي فارغ تُعرض كإطارات فارغة؛ أزرار header بلا وظيفة.
+
+**مرجع المنافسين:** Mindbody / Glofox / Wodify / Zen Planner / Virtuagym — داشبورد المالك عندهم «اليوم أولاً»: حضور/مبيعات اليوم + قوائم ما يحتاج إجراء (اشتراكات تنتهي، leads، متأخرات، أعضاء غير نشطين) مع زر علاج مباشر، والتحليلات تحتها.
+
+**القرارات (من المستخدم):** مهام اليوم أولاً · إخفاء الـ onboarding بعد أول نشاط · إضافة endpoints للسيرفر · العملة من إعدادات الصالة.
+
+**Backend:**
+1. `GET /auth/me` صار يرجع كتلة `gym` (id/name/subdomain/plan_tier/currency/subscription_status/is_active) من جدول gyms — بدل استدعاء platform 403. (controllers/auth.ts)
+2. `server/src/controllers/dashboard.ts` جديد + 3 routes بموازاة analytics، كلها `requireRole('manager')` + tenant-scoping:
+   - `GET /api/dashboard/expiring-soon?days=7` — اشتراكات active تنتهي خلال N أيام (شاملة المتأخرة) مع days_left.
+   - `GET /api/dashboard/inactive-members?days=14` — أعضاء على اشتراك نشط بلا check-in منذ N يوم (LATERAL على attendance_logs؛ بلا حضور يُحسب من start_date).
+   - `GET /api/dashboard/overdue-debts` — ديون active بـ due_date ماضٍ + إجمالي المتأخر. (member_debts بلا deleted_at — صححته أثناء الكتابة)
+3. `enrollment-trend` أضاف سلسلة `cancellations` (expired/cancelled/suspended بشهر end_date، FULL JOIN مع الجديد).
+4. `finance/summary` أضاف `today_revenue` + `yesterday_revenue` لشريط اليوم.
+5. إصلاح bug مؤجل: `updateSettings` كان يربط `units_system` بعمود محذوف منذ migration 040 → أي حفظ إعدادات يرسل المفتاح يفجر 500؛ أُلغيت الربطة (gym.ts).
+   **لا migration جديدة** — `gyms.currency` موجود منذ 020 و`PUT /api/settings` يحفظه أصلاً.
+
+**Frontend:**
+1. `GymBrandContext`: حالة `gymProfile` + `account` من tryRestoreSession/`/auth/me`، وتسمية الـ branding تصبح اسم الصالة الحقيقي؛ تُنظف عند logout.
+2. `src/utils/currency.ts`: رموز العملات (EGP→ج.م، SAR→ر.س…) + `formatMoney`؛ تُقرأ من `gymProfile.currency`.
+3. `GymAdminDashboard.tsx` من الصفر بترتيب: عنوان = اسم الصالة + تاريخ اليوم + الباقة وزر «إضافة عضو» حقيقي → Banner الإعداد **فقط عند isZeroState** → شريط اليوم (حضور/مبيعات اليوم بمقارنة أمس/إيراد الشهر/نشطون — كلها clickable لمسارها) → «يحتاج إجراءك»: 4 كروت (تنتهي 7 أيام، متأخرات، غائبون 14+، leads بحالة new) بعدّاد وصفوف مختصرة وزر «عرض الكل» → الرسوم: سلسلتان للاشتراكات/الإلغاءات، وأوقات الذروة ومصادر الإيرادات **تُخفى إن بلا بيانات**. حُذفت: كروت الأعياد/الإشعارات الساكنة، لوحتا «معلومات الصالة/إعدادات الحساب» الكبيرتان، الاستدعاء 403، الترحيب المكرر.
+4. `Chart.tsx`: `forceNiceScale` على المحور الصادي (لا أكثر من 0.5/1.5)؛ `RevenueBreakdownChart`: حذف باي المتأخرات المكرر + عملة من tenant؛ `EnrollmentRetentionChart`: سلسلتان + legend.
+5. i18n: 17 مفتاحاً جديداً في ar/en.
+
+**التحقق الحي (docker :9000، جلسة مدير صالة قائمة):** الشبكة — `/auth/me 200` (بعد refresh متوقع)، الـ3 endpoints الجديدة 200، leads 200، **صفر 403**؛ البنية — العنوان «الصالة الأولى»، «ج.م» بدل `$`، شريط اليوم 2 حضور/0 إيراد (حقيقي)، 4 كروت إجراء بحالتها الفارغة الصادقة، الرسم بسلسلتين ومحاور 0/1/2، لا تكرار ترحيب/متأخرات، footer «Alaa Ali · manager@first-gym.com» من /auth/me. `tsc` سيرفر+فرونت EXIT=0 · `vite build` ✓ 3.77s.
+
+**ملاحظات:** banner «تبقّى 31 يوماً» ما زال يظهر (مكوّن AppLayout/اشتراك SaaS — خارج نطاق الداشبورد، قرار عرض منفصل). صفحات أخرى ما زالت تعرض عملات ثابتة (SalesPage/ج.م في useGymDashboard…) — تعميم `formatMoney(gymProfile.currency)` عليها مهمة تالية صغيرة. التحقق التفاعلي ببقية الأدوار يبقى للمستخدم.

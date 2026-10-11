@@ -159,7 +159,22 @@
     "phone": "الهاتف",
     "address": "العنوان",
     "editSettings": "تعديل الإعدادات",
-    "billing": "الفواتير والاشتراكات"
+    "billing": "الفواتير والاشتراكات",
+    "todayRevenue": "مبيعات اليوم",
+    "needsAction": "يحتاج إجراءك",
+    "expiringSoon": "اشتراكات تنتهي خلال 7 أيام",
+    "inDays": "خلال {n} يوم",
+    "lateBy": "متأخر {n} يوم",
+    "overdueDebts": "مستحقات متأخرة",
+    "inactiveMembers": "أعضاء غائبون 14+ يوم",
+    "lastSeen": "آخر حضور",
+    "neverCheckedIn": "لم يحضر قط",
+    "allClear": "لا شيء هنا — كل الاشتراكات بعيدة عن الانتهاء",
+    "allClearInactive": "كل الأعضاء النشطين يحضرون بانتظام",
+    "newLeads": "عملاء محتملون بحاجة لمتابعة",
+    "noNewLeads": "لا يوجد عملاء محتملون جدد",
+    "addMember": "إضافة عضو",
+    "viewAll": "عرض الكل"
   },
   "scheduleDemo": {
     "title": "الجدول الزمني اليومي",

@@ -18,7 +18,19 @@ const REFRESH_TOKEN_EXPIRY = '7d';
  * The web clients hold only HttpOnly cookies, so session restore after a
  * page reload must ask the server who is logged in instead of decoding a
  * storage token (there is none by design).
+ * Includes a minimal `gym` block (name/subdomain/plan/currency) so tenant
+ * pages never need the platform-only /platform/gyms/:id endpoint (403 for
+ * managers — dashboard GymInfo card was stuck on loading because of it).
  */
+const gymBrief = async (gymId: string) => {
+  const g = await query(
+    `SELECT id, name, subdomain, plan_tier, currency, subscription_status, is_active
+     FROM gyms WHERE id = $1`,
+    [gymId]
+  );
+  return g.rows[0] ?? null;
+};
+
 export const getAuthMe = async (req: Request, res: Response): Promise<void> => {
   const s = req.staff!;
   try {
@@ -31,7 +43,8 @@ export const getAuthMe = async (req: Request, res: Response): Promise<void> => {
         res.status(401).json({ error: 'Session no longer valid.' });
         return;
       }
-      res.json({ user: { id: r.rows[0].id, full_name: r.rows[0].full_name, role: 'member', gym_id: r.rows[0].gym_id } });
+      const gym = await gymBrief(r.rows[0].gym_id);
+      res.json({ user: { id: r.rows[0].id, full_name: r.rows[0].full_name, role: 'member', gym_id: r.rows[0].gym_id }, gym });
       return;
     }
     const r = await query(
@@ -42,7 +55,8 @@ export const getAuthMe = async (req: Request, res: Response): Promise<void> => {
       res.status(401).json({ error: 'Session no longer valid.' });
       return;
     }
-    res.json({ user: r.rows[0] });
+    const gym = await gymBrief(r.rows[0].gym_id);
+    res.json({ user: r.rows[0], gym });
   } catch (error) {
     logger.error('auth/me failed', { error: (error as Error).message });
     res.status(500).json({ error: 'Internal server error.' });

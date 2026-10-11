@@ -146,7 +146,22 @@
     "phone": "Phone",
     "address": "Address",
     "editSettings": "Edit Settings",
-    "billing": "Billing & Subscriptions"
+    "billing": "Billing & Subscriptions",
+    "todayRevenue": "Today's sales",
+    "needsAction": "Needs your action",
+    "expiringSoon": "Subscriptions ending within 7 days",
+    "inDays": "in {n} days",
+    "lateBy": "{n} days late",
+    "overdueDebts": "Overdue debts",
+    "inactiveMembers": "Members absent 14+ days",
+    "lastSeen": "Last visit",
+    "neverCheckedIn": "Never checked in",
+    "allClear": "All clear — no subscriptions near expiry",
+    "allClearInactive": "All active members attend regularly",
+    "newLeads": "Leads needing follow-up",
+    "noNewLeads": "No new leads",
+    "addMember": "Add member",
+    "viewAll": "View all"
   },
   "scheduleDemo": {
     "title": "Daily Schedule",

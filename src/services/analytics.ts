@@ -3,6 +3,8 @@ import api from './api';
 export interface EnrollmentTrendRow {
   month: string;
   new_members: number;
+  /** Subscriptions that ended (expired/cancelled/suspended) that month (§24). */
+  cancellations?: number;
 }
 
 export interface PeakHourRow {
