@@ -423,4 +423,4 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 
 ### نطاق Railway/GitHub المرتبط (نفس اليوم)
 - **gymcore-staging:** قاعدة الـ staging مُسحت كلياً (DROP SCHEMA public CASCADE → 0 tables) عبر SSH tunnel (`railway connect Postgres --tunnel-only`)، والمُشروع أُعيد ربطه. Redis التبعي لم يُمسح (كاشيات TTL — يمسحها الزمن أو تُطلَب صراحة). الخدمةان backend/frontend بحالة Failed وستُعادا من كود المستودع الجديد.
-- **GitHub:** استُبدلتHistory القديمة بدفعة نظيفة واحدة عبر orphan force-push (تكافئ حذف المستودع وإعادة رفعه دون الحاجة لـ gh CLI أو حذف فعلي).
+- **GitHub:** استُبدلتHistory القديمة بدفعة نظيفة واحدة عبر orphan force-push (تكافئ حذف المستودع وإعادة رفعه دون الحاجة لـ gh CLI أو حذف فعلي). **تم التنفيذ فعلياً:** `main` = commit واحد `ccc7287` على origin، وحُذف فرع `railway-staging` البعيد، و`git ls-remote` يؤكد فرعاً واحداً فقط. الفروع المحلية القديمة (master/railway-staging/codex/feature) باقية كأرشيف.
