@@ -1,0 +1,88 @@
+# ====================================================================
+# GymCore ERP — CI Pipeline
+# Triggers: push to main, pull requests to main
+# Purpose: Quality checks, tests, and builds for frontend and backend
+# ====================================================================
+
+name: GymCore CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ==================================================================
+  # Job 1: Quality & Tests
+  # ==================================================================
+  quality:
+    name: Quality & Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: gymcore_test
+          POSTGRES_USER: gymcore
+          POSTGRES_PASSWORD: gymcore_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: ./server
+        run: npm ci
+
+      - name: Run database migrations
+        working-directory: ./server
+        env:
+          DATABASE_URL: postgres://gymcore:gymcore_test@localhost:5432/gymcore_test
+          JWT_SECRET: test-jwt-secret-for-ci
+          QR_SECRET_SALT: test-qr-salt-for-ci
+        run: npm run migrate
+
+      - name: Run backend tests
+        working-directory: ./server
+        env:
+          DATABASE_URL: postgres://gymcore:gymcore_test@localhost:5432/gymcore_test
+          JWT_SECRET: test-jwt-secret-for-ci
+          QR_SECRET_SALT: test-qr-salt-for-ci
+          NODE_ENV: test
+        run: npm test
+
+      - name: Install frontend dependencies
+        working-directory: ./
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: ./
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Build frontend
+        working-directory: ./
+        run: npm run build
+
+      - name: TypeScript check (backend)
+        working-directory: ./server
+        run: npx tsc --noEmit --pretty

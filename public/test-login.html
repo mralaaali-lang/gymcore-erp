@@ -1,0 +1,99 @@
+﻿<!DOCTYPE html>
+<html dir="rtl">
+<head><meta charset="UTF-8"><title>اختبار تسجيل الدخول</title>
+<style>
+  body { font-family: system-ui; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #0c1f28; color: #fff; }
+  .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 32px; width: 400px; }
+  input { width: 100%; padding: 12px; margin: 8px 0 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: #fff; font-size: 16px; box-sizing: border-box; }
+  button { width: 100%; padding: 14px; border-radius: 16px; border: none; background: #06b6d4; color: #fff; font-weight: bold; font-size: 16px; cursor: pointer; }
+  button:disabled { opacity: 0.5; }
+  pre { background: #000; padding: 12px; border-radius: 8px; font-size: 12px; overflow-x: auto; margin-top: 16px; }
+  .error { color: #ff6b6b; }
+  .success { color: #51cf66; }
+  label { font-size: 14px; opacity: 0.8; }
+</style></head>
+<body>
+<div class="card">
+  <h2 style="margin-top:0">🔐 اختبار تسجيل الدخول</h2>
+  
+  <label>البريد الإلكتروني</label>
+  <input id="email" value="a@a.com" dir="ltr">
+  
+  <label>كلمة المرور</label>
+  <input id="password" type="password" value="12345678" dir="ltr">
+  
+  <button id="loginBtn" onclick="testLogin()">تسجيل الدخول</button>
+  
+  <pre id="result">اضغط "تسجيل الدخول" للاختبار...</pre>
+
+  <hr style="border-color: rgba(255,255,255,0.1); margin: 16px 0;">
+  <button id="platformBtn" onclick="testPlatformLogin()" style="background:#114b5f">تسجيل دخول السوبر أدمن</button>
+</div>
+
+<script>
+async function testLogin() {
+  const btn = document.getElementById('loginBtn');
+  const result = document.getElementById('result');
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  
+  btn.disabled = true;
+  btn.textContent = 'جاري الاتصال...';
+  result.className = '';
+  result.textContent = 'جاري إرسال الطلب...';
+  
+  try {
+    const res = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    
+    const data = await res.text();
+    
+    if (res.ok) {
+      result.className = 'success';
+      result.textContent = '✅ نجاح! الرمز: ' + data.substring(0, 50) + '...';
+    } else {
+      result.className = 'error';
+      result.textContent = '❌ فشل (HTTP ' + res.status + '): ' + data;
+    }
+  } catch (err) {
+    result.className = 'error';
+    result.textContent = '❌ خطأ في الشبكة: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'تسجيل الدخول';
+  }
+}
+
+async function testPlatformLogin() {
+  const result = document.getElementById('result');
+  result.className = '';
+  result.textContent = 'جاري إرسال طلب السوبر أدمن...';
+  
+  try {
+    const res = await fetch('/platform/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@gymcore.app', password: 'SuperAdmin@2026' })
+    });
+    
+    const data = await res.text();
+    
+    if (res.ok) {
+      result.className = 'success';
+      result.textContent = '✅ نجاح السوبر أدمن! الرمز: ' + data.substring(0, 50) + '...';
+    } else {
+      result.className = 'error';
+      result.textContent = '❌ فشل السوبر أدمن (HTTP ' + res.status + '): ' + data;
+    }
+  } catch (err) {
+    result.className = 'error';
+    result.textContent = '❌ خطأ في الشبكة: ' + err.message;
+  }
+}
+</script>
+</body>
+</html>
+

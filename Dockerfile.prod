@@ -1,0 +1,65 @@
+# ====================================================================
+# GymCore ERP Frontend — Production Dockerfile (Multi-Stage: Vite + Nginx)
+# ====================================================================
+# Build:
+#   docker build -f Dockerfile.prod -t gymcore-frontend:prod .
+# Run:
+#   docker run -p 80:80 gymcore-frontend:prod
+#
+# Notes:
+# - Uses nginx.conf from project root for reverse proxy + static serving
+# - Includes gzip pre-compression for static assets
+# - Security headers via nginx.conf
+# ====================================================================
+
+# ---- Stage 1: Build ----
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+ENV NODE_OPTIONS=--openssl-legacy-provider
+ENV npm_config_fund=false
+ENV npm_config_audit=false
+
+# Install build dependencies for native modules if any
+RUN apk add --no-cache python3 make g++
+
+# Copy package files first for better layer caching
+COPY package.json package-lock.json* ./
+
+# Install all deps (including dev for build)
+RUN npm ci --no-audit --no-fund
+
+# Copy config and source
+COPY tsconfig.json vite.config.ts postcss.config.js tailwind.config.js index.html ./
+COPY src/ ./src/
+COPY public/ ./public/
+
+# Build production assets
+RUN npm run build
+
+# ---- Stage 2: Nginx Runtime ----
+FROM nginx:alpine AS production
+
+# Copy custom nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy built assets from builder stage
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Pre-compress static assets with gzip (nginx will serve .gz files directly if client supports it)
+RUN find /usr/share/nginx/html -type f \( -name "*.js" -o -name "*.css" -o -name "*.html" -o -name "*.svg" -o -name "*.json" -o -name "*.xml" \) \
+    -exec gzip -9 -k {} \;
+
+# Nginx uses a root master to bind port 80, then runs worker processes as nginx.
+RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx
+
+# Expose port
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || exit 1
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]

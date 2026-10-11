@@ -1,0 +1,95 @@
+# ====================================================================
+# GymCore ERP Backend — Production Dockerfile (Multi-Stage)
+# ====================================================================
+# Build:
+#   docker build -f server/Dockerfile.prod -t gymcore-backend:prod .
+# Build context is the repository root (Railway Root Directory stays blank).
+# Run:
+#   docker run --env-file .env.production -p 4000:4000 gymcore-backend:prod
+#
+# Required at runtime (via --env-file or platform secrets):
+#   DATABASE_URL, JWT_SECRET, QR_SECRET_SALT, CORS_ORIGIN, NODE_ENV=production
+#   Optional: ENCRYPTION_KEY, SENTRY_DSN, SMS_API_KEY, PAYMENT_WEBHOOK_SECRET
+# ====================================================================
+
+# ---- Stage 1: Builder ----
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Enable better build cache and avoid OpenSSL legacy provider issues
+ENV NODE_OPTIONS=--openssl-legacy-provider
+ENV npm_config_fund=false
+ENV npm_config_audit=false
+
+# Install build dependencies for native modules (bcrypt, sharp, etc.)
+RUN apk add --no-cache python3 make g++
+
+# Copy package files first for better layer caching
+COPY server/package.json server/package-lock.json* ./
+
+# Install all deps (including dev for build)
+RUN npm ci --no-audit --no-fund
+
+# Copy source and build
+COPY server/tsconfig.json ./
+COPY server/src/ ./src/
+COPY server/migrations/ ./migrations/
+
+# Build TypeScript
+RUN npm run build
+
+# ---- Stage 2: Production Dependencies Only ----
+FROM node:20-alpine AS prod-deps
+
+WORKDIR /app
+
+ENV npm_config_fund=false
+ENV npm_config_audit=false
+
+COPY server/package.json server/package-lock.json* ./
+# Install ONLY production dependencies
+RUN npm ci --omit=dev --no-audit --no-fund
+
+# ---- Stage 3: Runtime ----
+FROM node:20-alpine AS production
+
+# Install dumb-init for proper signal handling and wget for healthcheck
+RUN apk add --no-cache dumb-init wget curl
+
+WORKDIR /app
+
+# Create non-root user and group
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Copy production node_modules from prod-deps stage
+COPY --from=prod-deps /app/node_modules ./node_modules
+
+# Copy built application from builder stage
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/migrations ./migrations
+
+# Create required directories with correct ownership
+RUN mkdir -p /app/logs /app/uploads/members /app/uploads/branding /backups && \
+    chown -R appuser:appgroup /app/logs /app/uploads /app/migrations /backups
+
+# Switch to non-root user
+USER appuser
+
+# Expose application port
+EXPOSE 4000
+
+# Environment defaults (override at runtime via --env-file or platform)
+ENV NODE_ENV=production
+ENV PORT=4000
+
+# Health check — uses the /health endpoint (no auth required)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:4000/health || exit 1
+
+# Use dumb-init to handle signals properly (SIGTERM, SIGINT)
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
+CMD ["node", "dist/app.js"]

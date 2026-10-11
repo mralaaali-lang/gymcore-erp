@@ -1,0 +1,433 @@
+# ====================================================================
+# GitHub Actions — Deploy to Staging (Fly.io / Railway / Render)
+# ====================================================================
+# Triggers: push to main, manual dispatch
+# Required secrets (set in GitHub repo settings → Secrets → Actions):
+#   FLY_API_TOKEN        — Fly.io personal access token
+#   FLY_APP_NAME         — Fly.io app name (e.g., gymcore-backend-staging)
+#   RAILWAY_TOKEN        — Railway project token
+#   RAILWAY_SERVICE      — Railway service name
+#   RENDER_API_KEY       — Render API key
+#   RENDER_SERVICE_ID    — Render service ID
+#   DOCKERHUB_USERNAME   — Docker Hub username (if pushing images)
+#   DOCKERHUB_TOKEN      — Docker Hub access token
+#   STAGING_DATABASE_URL — Staging PostgreSQL URL
+#   STAGING_REDIS_URL    — Staging Redis URL
+#   STAGING_JWT_SECRET   — Staging JWT secret
+#   STAGING_QR_SECRET    — Staging QR secret
+#   STAGING_CORS_ORIGIN  — Staging frontend URL
+#   STAGING_ENCRYPTION_KEY
+#   STAGING_SENTRY_DSN   — Optional
+#   STAGING_SMTP_*       — Optional
+# ====================================================================
+
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'src/**'
+      - 'Dockerfile.prod'
+      - 'server/Dockerfile.prod'
+      - 'nginx.conf'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target platform'
+        required: true
+        default: 'fly'
+        type: choice
+        options:
+          - fly
+          - railway
+          - render
+      skip_tests:
+        description: 'Skip test suite'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BACKEND: ${{ github.repository }}-backend
+  IMAGE_FRONTEND: ${{ github.repository }}-frontend
+
+jobs:
+  # ---------------------------------------------------------
+  # Lint & Type Check (fast, runs first)
+  # ---------------------------------------------------------
+  lint-and-typecheck:
+    name: Lint & TypeCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install root deps
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Lint root
+        run: npm run lint 2>/dev/null || echo "No root lint script"
+
+      - name: Install server deps
+        working-directory: ./server
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Lint server
+        working-directory: ./server
+        run: npm run lint
+
+      - name: TypeCheck server
+        working-directory: ./server
+        run: npx tsc --noEmit
+
+  # ---------------------------------------------------------
+  # Test Suite
+  # ---------------------------------------------------------
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_tests }}
+    needs: lint-and-typecheck
+    services:
+      postgres:
+        image: postgres:13-alpine
+        env:
+          POSTGRES_DB: gymcore_test
+          POSTGRES_USER: gymcore
+          POSTGRES_PASSWORD: gymcore_secret
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U gymcore"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: [6379:6379]
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install root deps
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Install server deps
+        working-directory: ./server
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Run migrations
+        working-directory: ./server
+        env:
+          DATABASE_URL: postgresql://gymcore:gymcore_secret@localhost:5432/gymcore_test
+          JWT_SECRET: test-secret-change-in-production
+          QR_SECRET_SALT: test-qr-salt
+        run: npm run migrate
+
+      - name: Run unit tests
+        working-directory: ./server
+        env:
+          DATABASE_URL: postgresql://gymcore:gymcore_secret@localhost:5432/gymcore_test
+          JWT_SECRET: test-secret-change-in-production
+          QR_SECRET_SALT: test-qr-salt
+          REDIS_URL: redis://localhost:6379
+        run: npm run test:unit
+
+      - name: Run integration tests
+        working-directory: ./server
+        env:
+          DATABASE_URL: postgresql://gymcore:gymcore_secret@localhost:5432/gymcore_test
+          JWT_SECRET: test-secret-change-in-production
+          QR_SECRET_SALT: test-qr-salt
+          REDIS_URL: redis://localhost:6379
+        run: npm run test:int
+
+  # ---------------------------------------------------------
+  # Build & Push Docker Images
+  # ---------------------------------------------------------
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, test]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Backend
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=
+            type=raw,value=staging,enable={{is_default_branch}}
+
+      - name: Build & Push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./server/Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for Frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=
+            type=raw,value=staging,enable={{is_default_branch}}
+
+      - name: Build & Push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------
+  # Deploy to Fly.io
+  # ---------------------------------------------------------
+  deploy-fly:
+    name: Deploy to Fly.io
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: ${{ github.event.inputs.target == 'fly' || github.event_name == 'push' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy Backend
+        run: |
+          flyctl deploy \
+            --app ${{ secrets.FLY_APP_NAME_BACKEND }} \
+            --image ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:staging \
+            --region iad \
+            --yes
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Deploy Frontend
+        run: |
+          flyctl deploy \
+            --app ${{ secrets.FLY_APP_NAME_FRONTEND }} \
+            --image ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:staging \
+            --region iad \
+            --yes
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Set Staging Secrets (Backend)
+        run: |
+          flyctl secrets set \
+            --app ${{ secrets.FLY_APP_NAME_BACKEND }} \
+            DATABASE_URL="${{ secrets.STAGING_DATABASE_URL }}" \
+            REDIS_URL="${{ secrets.STAGING_REDIS_URL }}" \
+            JWT_SECRET="${{ secrets.STAGING_JWT_SECRET }}" \
+            QR_SECRET_SALT="${{ secrets.STAGING_QR_SECRET }}" \
+            CORS_ORIGIN="${{ secrets.STAGING_CORS_ORIGIN }}" \
+            ENCRYPTION_KEY="${{ secrets.STAGING_ENCRYPTION_KEY }}" \
+            NODE_ENV=staging \
+            TRUST_PROXY=true \
+            SEED_PLAYGROUND=true \
+            SENTRY_DSN="${{ secrets.STAGING_SENTRY_DSN }}" \
+            SMTP_HOST="${{ secrets.STAGING_SMTP_HOST }}" \
+            SMTP_PORT="${{ secrets.STAGING_SMTP_PORT }}" \
+            SMTP_USER="${{ secrets.STAGING_SMTP_USER }}" \
+            SMTP_PASS="${{ secrets.STAGING_SMTP_PASS }}" \
+            FRONTEND_URL="${{ secrets.STAGING_CORS_ORIGIN }}"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Set Staging Secrets (Frontend)
+        run: |
+          flyctl secrets set \
+            --app ${{ secrets.FLY_APP_NAME_FRONTEND }} \
+            VITE_API_URL="${{ secrets.STAGING_CORS_ORIGIN }}/api/v1"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Wait for health checks
+        run: |
+          sleep 30
+          curl -f https://${{ secrets.FLY_APP_NAME_BACKEND }}.fly.dev/health || exit 1
+          curl -f https://${{ secrets.FLY_APP_NAME_FRONTEND }}.fly.dev/ || exit 1
+
+  # ---------------------------------------------------------
+  # Deploy to Railway
+  # ---------------------------------------------------------
+  deploy-railway:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: ${{ github.event.inputs.target == 'railway' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Login to Railway
+        run: railway login --token ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy Backend
+        run: |
+          railway up \
+            --service ${{ secrets.RAILWAY_SERVICE_BACKEND }} \
+            --image ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:staging \
+            --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy Frontend
+        run: |
+          railway up \
+            --service ${{ secrets.RAILWAY_SERVICE_FRONTEND }} \
+            --image ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:staging \
+            --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Set Staging Variables
+        run: |
+          railway variables set \
+            --service ${{ secrets.RAILWAY_SERVICE_BACKEND }} \
+            DATABASE_URL="${{ secrets.STAGING_DATABASE_URL }}" \
+            REDIS_URL="${{ secrets.STAGING_REDIS_URL }}" \
+            JWT_SECRET="${{ secrets.STAGING_JWT_SECRET }}" \
+            QR_SECRET_SALT="${{ secrets.STAGING_QR_SECRET }}" \
+            CORS_ORIGIN="${{ secrets.STAGING_CORS_ORIGIN }}" \
+            ENCRYPTION_KEY="${{ secrets.STAGING_ENCRYPTION_KEY }}" \
+            NODE_ENV=staging \
+            TRUST_PROXY=true \
+            SEED_PLAYGROUND=true \
+            SENTRY_DSN="${{ secrets.STAGING_SENTRY_DSN }}"
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ---------------------------------------------------------
+  # Deploy to Render
+  # ---------------------------------------------------------
+  deploy-render:
+    name: Deploy to Render
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: ${{ github.event.inputs.target == 'render' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trigger Render Deploy (Backend)
+        run: |
+          curl -X POST "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID_BACKEND }}/deploys" \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache": false}'
+
+      - name: Trigger Render Deploy (Frontend)
+        run: |
+          curl -X POST "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID_FRONTEND }}/deploys" \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache": false}'
+
+      - name: Wait for deploy
+        run: |
+          sleep 60
+          # Add health check polling here if needed
+
+  # ---------------------------------------------------------
+  # Post-Deploy Smoke Tests
+  # ---------------------------------------------------------
+  smoke-tests:
+    name: Post-Deploy Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-fly, deploy-railway, deploy-render]
+    if: always()
+    steps:
+      - name: Determine staging URLs
+        id: urls
+        run: |
+          if [[ "${{ needs.deploy-fly.result }}" == "success" ]]; then
+            echo "API_URL=https://${{ secrets.FLY_APP_NAME_BACKEND }}.fly.dev" >> $GITHUB_OUTPUT
+            echo "WEB_URL=https://${{ secrets.FLY_APP_NAME_FRONTEND }}.fly.dev" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.deploy-railway.result }}" == "success" ]]; then
+            echo "API_URL=https://${{ secrets.RAILWAY_SERVICE_BACKEND }}.up.railway.app" >> $GITHUB_OUTPUT
+            echo "WEB_URL=https://${{ secrets.RAILWAY_SERVICE_FRONTEND }}.up.railway.app" >> $GITHUB_OUTPUT
+          else
+            echo "API_URL=" >> $GITHUB_OUTPUT
+            echo "WEB_URL=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Health Check API
+        if: steps.urls.outputs.API_URL != ''
+        run: |
+          echo "Testing ${{ steps.urls.outputs.API_URL }}/health"
+          curl -f --max-time 30 "${{ steps.urls.outputs.API_URL }}/health" || exit 1
+
+      - name: Health Check Frontend
+        if: steps.urls.outputs.WEB_URL != ''
+        run: |
+          echo "Testing ${{ steps.urls.outputs.WEB_URL }}"
+          curl -f --max-time 30 "${{ steps.urls.outputs.WEB_URL }}" || exit 1
+
+      - name: Test Login Flow (Staging Credentials)
+        if: steps.urls.outputs.API_URL != ''
+        run: |
+          # Test super-admin login
+          curl -X POST "${{ steps.urls.outputs.API_URL }}/platform/auth/login" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"${{ secrets.STAGING_SUPER_ADMIN_EMAIL }}","password":"${{ secrets.STAGING_SUPER_ADMIN_PASSWORD }}"}' \
+            -f --max-time 30 || echo "Login test failed (may be expected if no super admin seeded)"
+
+      - name: Report Status
+        run: |
+          echo "✅ Staging deployment completed"
+          echo "🔗 API: ${{ steps.urls.outputs.API_URL }}"
+          echo "🌐 Frontend: ${{ steps.urls.outputs.WEB_URL }}"

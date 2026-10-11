@@ -1,0 +1,35 @@
+import type { ElementType, ReactNode } from 'react';
+import { Package } from 'lucide-react';
+import { ACCENTS, type AccentName } from './tokens';
+
+interface EmptyStateProps {
+  title: string;
+  description?: string;
+  icon?: ElementType;
+  accent?: AccentName;
+  actions?: ReactNode;
+}
+
+/** Muted empty state for lists/tables. */
+export default function EmptyState({
+  title,
+  description,
+  icon: Icon = Package,
+  accent = 'gray',
+  actions,
+}: EmptyStateProps) {
+  const a = ACCENTS[accent];
+  return (
+    <div className="flex flex-col items-center justify-center text-center py-12 px-6">
+      <div
+        className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+        style={{ backgroundColor: a.soft }}
+      >
+        <Icon size={26} strokeWidth={1.75} style={{ color: a.solid }} />
+      </div>
+      <p className="text-base font-bold text-gray-900">{title}</p>
+      {description && <p className="text-sm text-gray-500 mt-1 max-w-md">{description}</p>}
+      {actions && <div className="flex items-center gap-2 mt-4">{actions}</div>}
+    </div>
+  );
+}

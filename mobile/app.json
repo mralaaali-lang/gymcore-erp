@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "جيماوي",
+    "slug": "gimawi-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#f97316"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.gimawi.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#f97316"
+      },
+      "package": "com.gimawi.mobile"
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#f97316"
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "http://10.0.2.2:4000"
+    }
+  }
+}

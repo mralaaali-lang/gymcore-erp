@@ -1,0 +1,57 @@
+# ====================================================================
+# Fly.io Configuration — GymCore ERP Staging (Backend)
+# ====================================================================
+# Usage:
+#   fly apps create gymcore-backend-staging --org personal
+#   fly secrets set KEY=value  (see staging.env.template)
+#   fly deploy --config fly.backend.toml
+#
+# For Frontend, use fly.frontend.toml (separate app)
+# ====================================================================
+
+app = "gymcore-backend-staging"
+primary_region = "iad"
+
+[build]
+  dockerfile = "server/Dockerfile.prod"
+  context = "server"
+
+[env]
+  NODE_ENV = "staging"
+  PORT = "4000"
+  TRUST_PROXY = "true"
+  SEED_PLAYGROUND = "true"
+  LOG_LEVEL = "info"
+
+# Secrets are set via `fly secrets set` — NOT in this file
+# DATABASE_URL, REDIS_URL, JWT_SECRET, QR_SECRET_SALT, CORS_ORIGIN,
+# ENCRYPTION_KEY, SENTRY_DSN, SMTP_*, etc.
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = false  # Staging: keep running for demos
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+[vm]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "512MB"
+
+# Volume for uploads (optional - prefer S3/R2 for production)
+# [mounts]
+#   source = "gymcore_uploads"
+#   destination = "/app/uploads"
+
+# Scale settings
+[metrics]
+  port = 9091
+  path = "/metrics"

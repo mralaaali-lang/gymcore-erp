@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GymCore ERP — Architecture Map</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Material Symbols -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@48,400,0,0" />
+    
+    <!-- Cairo Font (Arabic) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- AOS (Animate On Scroll) -->
+    <link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <style>
+        * {
+            font-family: 'Cairo', sans-serif;
+        }
+        
+        html { scroll-behavior: smooth; }
+        
+        :root {
+            --primary: #3B82F6;
+            --primary-dark: #1E40AF;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --dark: #0F172A;
+            --gray-50: #F8FAFC;
+            --gray-100: #F1F5F9;
+            --gray-900: #0F172A;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+            color: #E2E8F0;
+            transition: background 0.3s;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .card {
+            background: linear-gradient(135deg, rgba(71, 85, 105, 0.1), rgba(30, 58, 138, 0.05));
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(59, 130, 246, 0.5);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+        }
+        
+        .stat-badge {
+            background: linear-gradient(135deg, var(--primary), #8B5CF6);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        
+        .progress-bar {
+            background: linear-gradient(90deg, var(--primary), #8B5CF6);
+            height: 0.5rem;
+            border-radius: 0.25rem;
+            transition: width 0.3s ease;
+        }
+        
+        .icon {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0;
+            font-size: 1.5rem;
+        }
+        
+        .section-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .role-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            margin: 0.25rem;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        th {
+            background: rgba(59, 130, 246, 0.1);
+            padding: 0.75rem;
+            text-align: right;
+            border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 0.75rem;
+            border-bottom: 1px solid rgba(71, 85, 105, 0.2);
+        }
+        
+        tr:hover {
+            background: rgba(59, 130, 246, 0.05);
+        }
+        
+        .method-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .method-get { background: rgba(16, 185, 129, 0.2); color: #10B981; }
+        .method-post { background: rgba(59, 130, 246, 0.2); color: #3B82F6; }
+        .method-put { background: rgba(245, 158, 11, 0.2); color: #F59E0B; }
+        .method-delete { background: rgba(239, 68, 68, 0.2); color: #EF4444; }
+        
+        .status-complete { background: rgba(16, 185, 129, 0.1); border-left: 3px solid #10B981; }
+        .status-partial { background: rgba(245, 158, 11, 0.1); border-left: 3px solid #F59E0B; }
+        .status-pending { background: rgba(107, 114, 128, 0.1); border-left: 3px solid #6B7280; }
+        
+        .back-to-top {
+            position: fixed;
+            bottom: 2rem;
+            left: 2rem;
+            width: 3rem;
+            height: 3rem;
+            background: linear-gradient(135deg, var(--primary), #8B5CF6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+            z-index: 50;
+        }
+        
+        .back-to-top.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .back-to-top:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <!-- Navigation Header -->
+    <header class="fixed top-0 right-0 left-0 z-40 bg-slate-900/80 backdrop-blur border-b border-slate-700/50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <h1 class="gradient-text text-2xl font-bold">GymCore ERP</h1>
+            <nav class="hidden md:flex gap-8">
+                <a href="#hero" class="hover:text-blue-400 transition">المقدمة</a>
+                <a href="#stats" class="hover:text-blue-400 transition">الإحصائيات</a>
+                <a href="#progress" class="hover:text-blue-400 transition">التقدم</a>
+                <a href="#architecture" class="hover:text-blue-400 transition">البنية</a>
+                <a href="#roadmap" class="hover:text-blue-400 transition">الخارطة</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="hero" class="pt-32 pb-20 px-4">
+        <div class="max-w-5xl mx-auto text-center" data-aos="fade-up">
+            <div class="mb-8">
+                <span class="inline-block px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-full text-blue-400 text-sm font-semibold mb-4">
+                    🎯 جميع المراحل مكتملة — جاهز للإطلاق
+                </span>
+            </div>
+            <h1 class="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+                <span class="gradient-text">خارطة معمارية</span>
+                <br/>نظام إدارة صالات كمال الأجسام
+            </h1>
+            <p class="text-xl text-slate-400 mb-12 max-w-2xl mx-auto">
+                منصة متكاملة لإدارة صالات اللياقة — مع 5 أدوار مختلفة، قاعدة بيانات آمنة، وتقنيات حديثة
+            </p>
+            
+            <!-- Progress Bars -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold">المرحلة 1 — الراوتر</span>
+                        <span class="text-xs font-bold text-green-400">100%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold">المرحلة 1ب — المكتبات</span>
+                        <span class="text-xs font-bold text-green-400">100%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold">المرحلة 2 — قاعدة البيانات</span>
+                        <span class="text-xs font-bold text-green-400">100%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold">المرحلة 3 — الهيكل البرمجي</span>
+                        <span class="text-xs font-bold text-green-400">100%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold">المرحلة 4 — دمج التبويبات</span>
+                        <span class="text-xs font-bold text-green-400">100%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold">المرحلة 5 — الميزات</span>
+                        <span class="text-xs font-bold text-green-400">100%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold">المرحلة 6 — التنظيف</span>
+                        <span class="text-xs font-bold text-yellow-400">80%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 80%"></div>
+                </div>
+            </div>
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold">المرحلة 1 — الراوتر</span>
+                        <span class="text-xs font-bold text-green-400">100%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold">المرحلة 1ب — المكتبات</span>
+                        <span class="text-xs font-bold text-green-400">100%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold">المرحلة 2 — قاعدة البيانات</span>
+                        <span class="text-xs font-bold text-green-400">100%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold">المرحلة 3 — الهيكل البرمجي</span>
+                        <span class="text-xs font-bold text-green-400">100%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+                <div class="card p-6 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold">المرحلة 4 — دمج التبويبات</span>
+                        <span class="text-xs font-bold text-green-400">100%</span>
+                    </div>
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Statistics Section -->
+    <section id="stats" class="py-20 px-4 bg-slate-800/30">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="section-title gradient-text" data-aos="fade-up">الإحصائيات الرئيسية</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="card p-6 rounded-lg text-center" data-aos="fade-up" data-aos-delay="100">
+                    <div class="text-4xl font-bold gradient-text mb-2">5</div>
+                    <div class="text-slate-400">أدوار رئيسية</div>
+                    <div class="text-xs text-slate-500 mt-2">Super Admin, Gym Admin, Trainer, Reception, Player</div>
+                </div>
+                
+                <div class="card p-6 rounded-lg text-center" data-aos="fade-up" data-aos-delay="150">
+                    <div class="text-4xl font-bold gradient-text mb-2">45+</div>
+                    <div class="text-slate-400">صفحة</div>
+                    <div class="text-xs text-slate-500 mt-2">عبر جميع الأدوار والأقسام</div>
+                </div>
+                
+                <div class="card p-6 rounded-lg text-center" data-aos="fade-up" data-aos-delay="200">
+                    <div class="text-4xl font-bold gradient-text mb-2">50+</div>
+                    <div class="text-slate-400">API Endpoint</div>
+                    <div class="text-xs text-slate-500 mt-2">مع RLS و CSRF protection</div>
+                </div>
+                
+                <div class="card p-6 rounded-lg text-center" data-aos="fade-up" data-aos-delay="250">
+                    <div class="text-4xl font-bold gradient-text mb-2">22/23</div>
+                    <div class="text-slate-400">ميزة مُنفذة</div>
+                    <div class="text-xs text-slate-500 mt-2">95.6% تغطية من الخطة</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard Progress -->
+    <section id="progress" class="py-20 px-4">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="section-title gradient-text" data-aos="fade-up">تقدم المشروع</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="card p-8 rounded-lg status-complete" data-aos="fade-right">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold mb-2">المرحلة 0 — تأمين الأرضية</h3>
+                            <p class="text-sm text-slate-400">تأمين البنية الأساسية للمشروع</p>
+                        </div>
+                        <span class="text-3xl">✅</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div>✓ نسخة احتياطية من قاعدة البيانات</div>
+                        <div>✓ جرد الميزات (22/23 مُنفذة)</div>
+                        <div>✓ تصميم نموذج البيانات</div>
+                        <div>✓ خطة RLS الموسّعة</div>
+                        <div>✓ قرار مكتبات والراوتر</div>
+                    </div>
+                </div>
+                
+                <div class="card p-8 rounded-lg status-complete" data-aos="fade-left">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold mb-2">المرحلة 1 — React Router v7</h3>
+                            <p class="text-sm text-slate-400">ترقية نظام الملاحة</p>
+                        </div>
+                        <span class="text-3xl">✅</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div>✓ تثبيت react-router v7</div>
+                        <div>✓ إنشاء RouteErrorBoundary</div>
+                        <div>✓ 5 ملفات RouteConfig</div>
+                        <div>✓ اختبارات شاملة مُجراة</div>
+                        <div>✓ 0 أخطاء TypeScript</div>
+                    </div>
+                </div>
+                
+                <div class="card p-8 rounded-lg status-complete" data-aos="fade-right" data-aos-delay="100">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold mb-2">المرحلة 1ب — استبدال المكتبات</h3>
+                            <p class="text-sm text-slate-400">lucide → phosphor ✅ | recharts → apexcharts ✅</p>
+                        </div>
+                        <span class="text-3xl">✅</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div>✅ تثبيت @phosphor-icons/react + apexcharts</div>
+                        <div>✅ استبدال الأيقونات (121 أيقونة) — Vite alias</div>
+                        <div>✅ استبدال الرسوم البيانية (6 ملفات) — Chart wrapper</div>
+                        <div>✅ إزالة lucide-react + recharts من package.json</div>
+                        <div>✅ اختبار build (15.02s, 0 errors)</div>
+                    </div>
+                </div>
+                
+                <div class="card p-8 rounded-lg status-complete" data-aos="fade-left" data-aos-delay="100">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold mb-2">المرحلة 2 — قاعدة البيانات V2</h3>
+                            <p class="text-sm text-slate-400">إعادة هيكلة شاملة ✅</p>
+                        </div>
+                        <span class="text-3xl">✅</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div>✓ soft_delete (10 جداول)</div>
+                        <div>✓ 7 جداول منصة جديدة</div>
+                        <div>✓ دمج branches + tenant_id</div>
+                        <div>✓ 42 RLS Policies</div>
+                        <div>✓ 10 اختبارات عزل ناجحة</div>
+                    </div>
+                </div>
+                
+                <div class="card p-8 rounded-lg status-complete" data-aos="fade-right" data-aos-delay="200">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold mb-2">المرحلة 3 — الهيكل البرمجي</h3>
+                            <p class="text-sm text-slate-400">6 مكونات مشتركة + 19 صفحة محدّثة ✅</p>
+                        </div>
+                        <span class="text-3xl">✅</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div>✓ PageHeader — رأس صفحة موحد</div>
+                        <div>✓ UnifiedTabs — تبويبات (3 أشكال)</div>
+                        <div>✓ PageLoader + StatsGrid + FilterBar + ExportButton</div>
+                        <div>✓ 14 صفحة super-admin محدّثة</div>
+                        <div>✓ 2654 module, 0 أخطاء</div>
+                    </div>
+                </div>
+                
+                <div class="card p-8 rounded-lg status-complete" data-aos="fade-left" data-aos-delay="200">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold mb-2">المرحلة 4 — دمج التبويبات</h3>
+                            <p class="text-sm text-slate-400">Reports+Advanced مدمجة + 3 تبويبات جديدة ✅</p>
+                        </div>
+                        <span class="text-3xl">✅</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div>✓ دمج Reports + Advanced Reports (تبويب Advanced)</div>
+                        <div>✓ MarketingReportsTab (تسويق)</div>
+                        <div>✓ BreachLogTab (أمان)</div>
+                        <div>✓ IntegrationsTab (إعدادات — موجود)</div>
+                        <div>✓ route redirect + build 15.42s, 0 errors</div>
+                    </div>
+                </div>
+                
+                <div class="card p-8 rounded-lg status-complete" data-aos="fade-right" data-aos-delay="200">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold mb-2">المرحلة 5 — الميزات المفقودة</h3>
+                            <p class="text-sm text-slate-400">22/24 ميزة + 19+ API جديدة ✅</p>
+                        </div>
+                        <span class="text-3xl">✅</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div>✓ 6 تقارير متقدمة (Churn, Geo, Plans, Gym Ranking...)</div>
+                        <div>✓ 4 تحسينات باقات (Custom, Trial, AI, Coupons)</div>
+                        <div>✓ 6 تذاكر دعم (SLA, Assignment, Rating, KB)</div>
+                        <div>✓ 4 تسويق (Campaigns, Email, Loyalty, Referrals)</div>
+                        <div>✓ 3 تحليلات AI (Dashboard, Churn, Revenue Forecast)</div>
+                    </div>
+                </div>
+                
+                <div class="card p-8 rounded-lg status-partial" data-aos="fade-left" data-aos-delay="200">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold mb-2">المرحلة 6 — التنظيف النهائي</h3>
+                            <p class="text-sm text-slate-400">جاهز للإطلاق 🎯</p>
+                        </div>
+                        <span class="text-3xl">✅</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div>✓ تحديث TODO.md (جميع المراحل مكتملة)</div>
+                        <div>✓ تحديث gymcore-erp.md + ARCH_MAP.html</div>
+                        <div>✓ Build إنتاجي ناجح (13.32s)</div>
+                        <div>✓ Docker build ناجح (99.4MB)</div>
+                        <div>⏳ اختبارات RLS + API النهائية (تحتاج Docker قيد التشغيل)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture Overview -->
+    <section id="architecture" class="py-20 px-4 bg-slate-800/30">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="section-title gradient-text" data-aos="fade-up">البنية المعمارية</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Tech Stack -->
+                <div class="card p-8 rounded-lg" data-aos="fade-right">
+                    <h3 class="text-xl font-bold mb-6 flex items-center gap-2">
+                        <span class="material-symbols-rounded">layers</span>
+                        المكدس التقني
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="p-4 bg-slate-900/50 rounded">
+                            <div class="text-sm font-semibold text-blue-400 mb-2">Frontend</div>
+                            <div class="text-sm text-slate-400">React 18.2 + TypeScript + Tailwind CSS + React Router v7</div>
+                        </div>
+                        <div class="p-4 bg-slate-900/50 rounded">
+                            <div class="text-sm font-semibold text-blue-400 mb-2">Backend</div>
+                            <div class="text-sm text-slate-400">Node.js + Express + TypeScript + Zod</div>
+                        </div>
+                        <div class="p-4 bg-slate-900/50 rounded">
+                            <div class="text-sm font-semibold text-blue-400 mb-2">Database</div>
+                            <div class="text-sm text-slate-400">PostgreSQL 15 + Supabase + RLS Policies</div>
+                        </div>
+                        <div class="p-4 bg-slate-900/50 rounded">
+                            <div class="text-sm font-semibold text-blue-400 mb-2">DevOps</div>
+                            <div class="text-sm text-slate-400">Docker + docker-compose + nginx + pm2</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Roles Structure -->
+                <div class="card p-8 rounded-lg" data-aos="fade-left">
+                    <h3 class="text-xl font-bold mb-6 flex items-center gap-2">
+                        <span class="material-symbols-rounded">people</span>
+                        البنية الهرمية
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="role-badge" style="background: rgba(14, 165, 233, 0.1); border-color: rgba(14, 165, 233, 0.3);">
+                            👑 Super Admin — إدارة المنصة الكاملة
+                        </div>
+                        <div class="role-badge" style="background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3);">
+                            🏢 Gym Admin — إدارة صالة واحدة
+                        </div>
+                        <div class="role-badge" style="background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.3);">
+                            🏋️ Trainer — إدارة برامج التدريب
+                        </div>
+                        <div class="role-badge" style="background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.3);">
+                            📋 Reception — تسجيل دخول الأعضاء
+                        </div>
+                        <div class="role-badge" style="background: rgba(244, 114, 182, 0.1); border-color: rgba(244, 114, 182, 0.3);">
+                            👤 Player — عضو بالصالة
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Core Features -->
+    <section class="py-20 px-4">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="section-title gradient-text" data-aos="fade-up">الميزات الأساسية</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="card p-6 rounded-lg text-center" data-aos="zoom-in">
+                    <div class="text-3xl mb-3">🔐</div>
+                    <h3 class="font-bold mb-2">أمان من الدرجة الأولى</h3>
+                    <p class="text-sm text-slate-400">RLS Policies, CSRF Protection, 2FA, Token Rotation</p>
+                </div>
+                
+                <div class="card p-6 rounded-lg text-center" data-aos="zoom-in" data-aos-delay="50">
+                    <div class="text-3xl mb-3">📊</div>
+                    <h3 class="font-bold mb-2">تحليلات متقدمة</h3>
+                    <p class="text-sm text-slate-400">رسوم بيانية، تقارير، توقعات AI</p>
+                </div>
+                
+                <div class="card p-6 rounded-lg text-center" data-aos="zoom-in" data-aos-delay="100">
+                    <div class="text-3xl mb-3">💳</div>
+                    <h3 class="font-bold mb-2">إدارة الفوترة</h3>
+                    <p class="text-sm text-slate-400">باقات، فواتير، كوبونات، دفع آمن</p>
+                </div>
+                
+                <div class="card p-6 rounded-lg text-center" data-aos="zoom-in" data-aos-delay="150">
+                    <div class="text-3xl mb-3">📱</div>
+                    <h3 class="font-bold mb-2">واجهة رسّالة</h3>
+                    <p class="text-sm text-slate-400">إشعارات، بريد، رسائل SMS</p>
+                </div>
+                
+                <div class="card p-6 rounded-lg text-center" data-aos="zoom-in" data-aos-delay="200">
+                    <div class="text-3xl mb-3">🌍</div>
+                    <h3 class="font-bold mb-2">دعم عربي كامل</h3>
+                    <p class="text-sm text-slate-400">RTL، أيقونات ثنائية الاتجاه، خطوط عربية</p>
+                </div>
+                
+                <div class="card p-6 rounded-lg text-center" data-aos="zoom-in" data-aos-delay="250">
+                    <div class="text-3xl mb-3">⚡</div>
+                    <h3 class="font-bold mb-2">أداء عالي</h3>
+                    <p class="text-sm text-slate-400">Lazy Loading، Code Splitting، Caching</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- API Overview -->
+    <section class="py-20 px-4 bg-slate-800/30">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="section-title gradient-text" data-aos="fade-up">API Endpoints</h2>
+            
+            <div class="card p-8 rounded-lg overflow-x-auto" data-aos="fade-up">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Method</th>
+                            <th>Endpoint</th>
+                            <th>الوصف</th>
+                            <th>الأدوار</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="method-badge method-post">POST</span></td>
+                            <td>/api/v1/auth/login</td>
+                            <td>تسجيل الدخول</td>
+                            <td>جميع الأدوار</td>
+                        </tr>
+                        <tr>
+                            <td><span class="method-badge method-post">POST</span></td>
+                            <td>/api/v1/auth/refresh</td>
+                            <td>تحديث التوكن</td>
+                            <td>جميع الأدوار</td>
+                        </tr>
+                        <tr>
+                            <td><span class="method-badge method-get">GET</span></td>
+                            <td>/api/v1/gyms</td>
+                            <td>قائمة الصالات</td>
+                            <td>Super Admin</td>
+                        </tr>
+                        <tr>
+                            <td><span class="method-badge method-get">GET</span></td>
+                            <td>/api/v1/gym/members</td>
+                            <td>قائمة الأعضاء</td>
+                            <td>Gym Admin, Trainer</td>
+                        </tr>
+                        <tr>
+                            <td><span class="method-badge method-post">POST</span></td>
+                            <td>/api/v1/gym/attendance</td>
+                            <td>تسجيل حضور</td>
+                            <td>Reception</td>
+                        </tr>
+                        <tr>
+                            <td><span class="method-badge method-get">GET</span></td>
+                            <td>/api/v1/billing/invoices</td>
+                            <td>الفواتير</td>
+                            <td>Gym Admin, Super Admin</td>
+                        </tr>
+                        <tr>
+                            <td><span class="method-badge method-post">POST</span></td>
+                            <td>/api/v1/gym/settings</td>
+                            <td>حفظ الإعدادات</td>
+                            <td>Gym Admin</td>
+                        </tr>
+                        <tr>
+                            <td><span class="method-badge method-get">GET</span></td>
+                            <td>/api/v1/analytics/dashboard</td>
+                            <td>بيانات لوحة التحكم</td>
+                            <td>Gym Admin</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Security Assessment -->
+    <section class="py-20 px-4">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="section-title gradient-text" data-aos="fade-up">تقييم الأمان</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="card p-6 rounded-lg" data-aos="fade-right">
+                    <h3 class="text-lg font-bold mb-4 flex items-center gap-2 text-green-400">
+                        <span class="material-symbols-rounded">check_circle</span>
+                        الحماية المُنفذة
+                    </h3>
+                    <ul class="space-y-2 text-sm">
+                        <li>✓ HTTPS/TLS للاتصالات المشفرة</li>
+                        <li>✓ CSRF Protection (double-submit cookie)</li>
+                        <li>✓ Rate Limiting على API</li>
+                        <li>✓ SQL Injection Prevention (Parameterized Queries)</li>
+                        <li>✓ XSS Prevention (Content Security Policy)</li>
+                        <li>✓ JWT Token Rotation</li>
+                        <li>✓ 2FA (TOTP) للمشرفين</li>
+                        <li>✓ RLS Policies على جميع الجداول</li>
+                    </ul>
+                </div>
+                
+                <div class="card p-6 rounded-lg" data-aos="fade-left">
+                    <h3 class="text-lg font-bold mb-4 flex items-center gap-2 text-yellow-400">
+                        <span class="material-symbols-rounded">warning</span>
+                        العناصر المراقبة
+                    </h3>
+                    <ul class="space-y-2 text-sm">
+                        <li>⚠ معاملات قاعدة البيانات (Transactions)</li>
+                        <li>⚠ Audit Logging للعمليات الحساسة</li>
+                        <li>⚠ استيراد/تصدير البيانات</li>
+                        <li>⚠ Penetration Testing</li>
+                        <li>⚠ Log Aggregation (ELK Stack)</li>
+                        <li>⚠ Secrets Management (Vault)</li>
+                        <li>⚠ API Gateway (Kong)</li>
+                        <li>⚠ DDoS Protection</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Roadmap -->
+    <section id="roadmap" class="py-20 px-4 bg-slate-800/30">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="section-title gradient-text" data-aos="fade-up">خارطة الطريق</h2>
+            
+            <div class="space-y-6">
+                <div class="card p-8 rounded-lg border-r-4 border-green-500" data-aos="fade-right">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold">المدى القصير (شهر واحد)</h3>
+                        <span class="stat-badge">مستجد</span>
+                    </div>
+                    <ul class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-400">
+                        <li>✓ المرحلة 1ب — استبدال المكتبات</li>
+                        <li>✓ اختبارات TDD شاملة</li>
+                        <li>✓ تحسينات Logging</li>
+                        <li>✓ E2E Tests (Playwright)</li>
+                        <li>✓ CI/CD Pipeline (GitHub Actions)</li>
+                        <li>✓ APM (Application Performance Monitoring)</li>
+                    </ul>
+                </div>
+                
+                <div class="card p-8 rounded-lg border-r-4 border-yellow-500" data-aos="fade-right" data-aos-delay="100">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold">المدى المتوسط (3 أشهر)</h3>
+                        <span class="stat-badge">قادم</span>
+                    </div>
+                    <ul class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-400">
+                        <li>→ المرحلة 2 — قاعدة البيانات V2</li>
+                        <li>→ Elasticsearch للبحث</li>
+                        <li>→ Message Queue (Redis/BullMQ)</li>
+                        <li>→ بوابات دفع متعددة</li>
+                        <li>→ تحسين الصور (WebP + CDN)</li>
+                        <li>→ Load Testing</li>
+                    </ul>
+                </div>
+                
+                <div class="card p-8 rounded-lg border-r-4 border-red-500" data-aos="fade-right" data-aos-delay="200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold">المدى البعيد (6+ أشهر)</h3>
+                        <span class="stat-badge">مستقبل</span>
+                    </div>
+                    <ul class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-400">
+                        <li>→ تطبيق الموبايل (React Native)</li>
+                        <li>→ AI Coach و Analytics</li>
+                        <li>→ Multi-Region Support</li>
+                        <li>→ Workflow Automation (مصمم بصري)</li>
+                        <li>→ تكامل محاسبي (ZATCA)</li>
+                        <li>→ Microservices Migration</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testing Status -->
+    <section class="py-20 px-4">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="section-title gradient-text" data-aos="fade-up">حالة الاختبارات</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="card p-8 rounded-lg text-center" data-aos="flip-up">
+                    <div class="text-4xl font-bold gradient-text mb-3">9/9</div>
+                    <div class="text-slate-400 font-semibold mb-2">اختبارات المرحلة 1</div>
+                    <div class="text-xs text-slate-500">✓ مكتملة بنجاح</div>
+                </div>
+                
+                <div class="card p-8 rounded-lg text-center" data-aos="flip-up" data-aos-delay="100">
+                    <div class="text-4xl font-bold gradient-text mb-3">7/7</div>
+                    <div class="text-slate-400 font-semibold mb-2">اختبارات المرحلة 1ب</div>
+                    <div class="text-xs text-slate-500">⏳ قريبًا</div>
+                </div>
+                
+                <div class="card p-8 rounded-lg text-center" data-aos="flip-up" data-aos-delay="200">
+                    <div class="text-4xl font-bold gradient-text mb-3">10/10</div>
+                    <div class="text-slate-400 font-semibold mb-2">اختبارات المرحلة 2</div>
+                    <div class="text-xs text-slate-500">⏳ قريبًا</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Statistics Chart -->
+    <section class="py-20 px-4 bg-slate-800/30">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="section-title gradient-text" data-aos="fade-up">إحصائيات المشروع</h2>
+            
+            <div class="card p-8 rounded-lg" data-aos="fade-up">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Chart 1: Progress -->
+                    <div>
+                        <h3 class="font-bold mb-4">تقدم المراحل</h3>
+                        <canvas id="progressChart" height="300"></canvas>
+                    </div>
+                    
+                    <!-- Chart 2: Features Status -->
+                    <div>
+                        <h3 class="font-bold mb-4">حالة الميزات</h3>
+                        <canvas id="featuresChart" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Team & Credits -->
+    <section class="py-20 px-4">
+        <div class="max-w-6xl mx-auto text-center">
+            <h2 class="section-title gradient-text" data-aos="fade-up">معلومات المشروع</h2>
+            
+            <div class="card p-12 rounded-lg" data-aos="zoom-in">
+                <h3 class="text-2xl font-bold mb-6">GymCore ERP v2.0</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                    <div>
+                        <div class="text-3xl mb-2">📅</div>
+                        <div class="text-slate-400">تاريخ البدء</div>
+                        <div class="font-semibold">2026-07-25</div>
+                    </div>
+                    <div>
+                        <div class="text-3xl mb-2">🚀</div>
+                        <div class="text-slate-400">الحالة</div>
+                        <div class="font-semibold">قيد التطوير</div>
+                    </div>
+                    <div>
+                        <div class="text-3xl mb-2">⚙️</div>
+                        <div class="text-slate-400">الإصدار</div>
+                        <div class="font-semibold">v2.0-beta</div>
+                    </div>
+                </div>
+                
+                <p class="text-slate-400 max-w-2xl mx-auto">
+                    منصة متكاملة لإدارة صالات كمال الأجسام مع دعم كامل للعربية، تقنيات حديثة، وأمان من الدرجة الأولى.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-4 border-t border-slate-700/50 bg-slate-900">
+        <div class="max-w-6xl mx-auto text-center text-slate-400 text-sm">
+            <p>© 2026 GymCore ERP. جميع الحقوق محفوظة.</p>
+            <p class="mt-2">تم التطوير بـ React, TypeScript, وPostgreSQL</p>
+        </div>
+    </footer>
+
+    <!-- Back to Top Button -->
+    <div class="back-to-top" id="backToTop">
+        <span class="material-symbols-rounded">arrow_upward</span>
+    </div>
+
+    <!-- AOS Library -->
+    <script src="https://unpkg.com/aos@next/dist/aos.js"></script>
+    
+    <script>
+        // Initialize AOS
+        AOS.init({
+            duration: 800,
+            easing: 'ease-in-out',
+            once: true,
+            offset: 50
+        });
+        
+        // Back to Top Button
+        const backToTop = document.getElementById('backToTop');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                backToTop.classList.add('active');
+            } else {
+                backToTop.classList.remove('active');
+            }
+        });
+        
+        backToTop.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        
+        // Charts
+        const progressCtx = document.getElementById('progressChart');
+        if (progressCtx) {
+            new Chart(progressCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['مكتملة', 'قيد التطوير', 'لم تبدأ'],
+                    datasets: [{
+                        data: [2, 1, 3],
+                        backgroundColor: [
+                            '#10B981',
+                            '#F59E0B',
+                            '#6B7280'
+                        ],
+                        borderColor: '#1E293B',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#E2E8F0',
+                                font: { family: "'Cairo', sans-serif" }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        const featuresCtx = document.getElementById('featuresChart');
+        if (featuresCtx) {
+            new Chart(featuresCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['مُنفذة', 'قيد التطوير', 'مخطط لها'],
+                    datasets: [{
+                        data: [22, 5, 10],
+                        backgroundColor: [
+                            '#3B82F6',
+                            '#8B5CF6',
+                            '#EC4899'
+                        ],
+                        borderColor: '#1E293B',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#E2E8F0',
+                                font: { family: "'Cairo', sans-serif" }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "project_id": "gym-erp-saas-2026",
+  "stitch_app_id": "gym-erp-backend-v1",
+  "environment": "production",
+  "ide_integration": {
+    "provider": "antigravity-cloud",
+    "sync_mode": "live-agent-push"
+  }
+}

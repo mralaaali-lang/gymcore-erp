@@ -1,0 +1,43 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Archives (do not commit large local zips)
+*.zip
+gym-erp-stitch.zip
+
+# Uploads (member photos, logos) — runtime data, not source
+server/uploads/
+uploads/
+
+# Backups (runtime dumps)
+backups/
+server/backups/
+
+# Server
+server/dist/
+server/node_modules/
+
+# Client
+.vite/
+tsconfig.tsbuildinfo
+
+# Local tooling & personal config (AI assistants, notes)
+.codex-worktrees/
+.kilo/
+.obsidian/
+*.canvas
+
+# Test runner output
+server/playwright-report/
+server/test-results/
+
+# Local backup copies
+*.bak
+

@@ -1,0 +1,274 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useApp } from '../../context/GymBrandContext';
+import { listStaff, createStaff, updateStaff, type StaffData } from '../../services/api';
+import PageHeader from '../../components/shared/PageHeader';
+import PageLoader from '../../components/shared/PageLoader';
+import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
+import StatusBadge from '../../components/ui/StatusBadge';
+
+const roleLabels: Record<string, string> = {
+  manager: 'مدير',
+  coach: 'مدرب',
+  receptionist: 'استقبال',
+};
+
+function roleVariant(role: string): 'success' | 'warning' | 'error' | 'neutral' {
+  if (role === 'manager') return 'warning';
+  if (role === 'receptionist') return 'success';
+  return 'neutral';
+}
+
+const roleOptions = [
+  { value: 'manager', label: 'مدير' },
+  { value: 'coach', label: 'مدرب' },
+  { value: 'receptionist', label: 'استقبال' },
+];
+
+export default function UsersPage() {
+  const { language } = useApp();
+  const rtl = language === 'ar';
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [editingUser, setEditingUser] = useState<StaffData | null>(null);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('manager');
+  const [phone, setPhone] = useState('');
+  const [salary, setSalary] = useState('');
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['staff'],
+    queryFn: () => listStaff(),
+    staleTime: 30_000,
+  });
+
+  const staff: StaffData[] = data?.data || [];
+
+  const createMutation = useMutation({
+    mutationFn: () => createStaff({
+      full_name: name,
+      email,
+      password,
+      role,
+      phone: phone || undefined,
+      salary: salary ? Number(salary) : undefined,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff'] });
+      resetForm();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: () => updateStaff(editingUser!.id, {
+      full_name: name,
+      email,
+      role,
+      phone: phone || undefined,
+      salary: salary ? Number(salary) : undefined,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff'] });
+      resetForm();
+    },
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: (user: StaffData) => updateStaff(user.id, { is_active: !user.is_active }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['staff'] }),
+  });
+
+  const resetForm = () => {
+    setShowForm(false);
+    setEditingUser(null);
+    setName('');
+    setEmail('');
+    setPassword('');
+    setRole('manager');
+    setPhone('');
+    setSalary('');
+  };
+
+  const openEdit = (user: StaffData) => {
+    setEditingUser(user);
+    setName(user.full_name);
+    setEmail(user.email);
+    setRole(user.role);
+    setPhone(user.phone || '');
+    setSalary(user.salary?.toString() || '');
+    setPassword('');
+    setShowForm(true);
+  };
+
+  const handleSubmit = () => {
+    if (editingUser) {
+      updateMutation.mutate();
+    } else {
+      createMutation.mutate();
+    }
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const inputCls = 'w-full px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none bg-white';
+
+  if (isLoading) {
+    return (
+      <div dir={rtl ? 'rtl' : 'ltr'} className="bg-gray-50 min-h-screen -m-6 p-6">
+        <PageLoader />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div dir={rtl ? 'rtl' : 'ltr'} className="bg-gray-50 min-h-screen -m-6 p-6">
+        <div className="bg-red-50 border border-red-200 rounded-3xl p-6 text-center text-red-700">
+          {rtl ? 'فشل تحميل بيانات المستخدمين' : 'Failed to load users'}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6 bg-gray-50 min-h-screen -m-6 p-6">
+      <PageHeader
+        title="المستخدمين"
+        subtitle={rtl ? 'إدارة مستخدمي النظام وصلاحياتهم' : 'Manage system users and roles'}
+        icon="group"
+        actions={
+          <Button
+            variant="primary"
+            onClick={() => { setEditingUser(null); setName(''); setEmail(''); setPassword(''); setRole('manager'); setPhone(''); setSalary(''); setShowForm(true); }}
+          >
+            <span className="material-symbols-outlined text-lg">add</span>
+            إضافة مستخدم
+          </Button>
+        }
+      />
+
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-gray-900">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="text-right p-4 text-xs font-semibold text-gray-500">#</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الاسم' : 'Name'}</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'البريد' : 'Email'}</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الدور' : 'Role'}</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الجوال' : 'Phone'}</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الراتب' : 'Salary'}</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الحالة' : 'Status'}</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الإجراءات' : 'Actions'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {staff.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="p-12 text-center">
+                    <span className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                      <span className="material-symbols-outlined text-3xl text-gray-400">group</span>
+                    </span>
+                    <p className="text-gray-400 text-sm">{rtl ? 'لا يوجد مستخدمون' : 'No users found'}</p>
+                  </td>
+                </tr>
+              )}
+              {staff.map((u, i) => (
+                <tr key={u.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
+                  <td className="p-4 text-gray-500">{i + 1}</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-3">
+                      <span className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm shrink-0">
+                        {u.full_name.charAt(0)}
+                      </span>
+                      <span className="font-medium text-gray-900">{u.full_name}</span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-gray-500">{u.email}</td>
+                  <td className="p-4">
+                    <StatusBadge status={roleLabels[u.role] || u.role} variant={roleVariant(u.role)} />
+                  </td>
+                  <td className="p-4 text-gray-500" dir="ltr">{u.phone || '—'}</td>
+                  <td className="p-4 font-medium text-gray-900">{u.salary ? `${u.salary.toLocaleString()} ر.س` : '—'}</td>
+                  <td className="p-4">
+                    <StatusBadge status={u.is_active ? 'نشط' : 'غير نشط'} variant={u.is_active ? 'success' : 'error'} />
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => openEdit(u)}
+                        className="text-emerald-600 hover:text-emerald-700 transition-colors text-sm font-medium"
+                      >
+                        {rtl ? 'تعديل' : 'Edit'}
+                      </button>
+                      <button
+                        onClick={() => toggleStatusMutation.mutate(u)}
+                        className={`text-sm font-medium transition-colors ${u.is_active ? 'text-red-600 hover:text-red-800' : 'text-emerald-600 hover:text-emerald-800'}`}
+                      >
+                        {u.is_active ? (rtl ? 'تعطيل' : 'Deactivate') : (rtl ? 'تفعيل' : 'Activate')}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={resetForm}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <Card className="shadow-xl">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">
+              {editingUser ? (rtl ? 'تعديل مستخدم' : 'Edit User') : (rtl ? 'إضافة مستخدم' : 'Add User')}
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الاسم' : 'Name'}</label>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'البريد الإلكتروني' : 'Email'}</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
+              </div>
+              {!editingUser && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'كلمة المرور' : 'Password'}</label>
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الدور' : 'Role'}</label>
+                <select value={role} onChange={(e) => setRole(e.target.value)} className={inputCls}>
+                  {roleOptions.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الجوال' : 'Phone'}</label>
+                <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الراتب' : 'Salary'}</label>
+                <input type="number" value={salary} onChange={(e) => setSalary(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button variant="outline" fullWidth onClick={resetForm} className="px-4 py-2 text-sm">
+                {rtl ? 'إلغاء' : 'Cancel'}
+              </Button>
+              <Button variant="primary" fullWidth onClick={handleSubmit} disabled={isPending || !name || !email || (!editingUser && !password)} className="px-4 py-2 text-sm">
+                {isPending ? '...' : (editingUser ? (rtl ? 'حفظ' : 'Save') : (rtl ? 'إضافة' : 'Add'))}
+              </Button>
+            </div>
+          </Card>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
