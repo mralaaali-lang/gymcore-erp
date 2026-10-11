@@ -1,7 +1,7 @@
-﻿import { useState } from 'react';
-import { useApp } from '../../context/GymBrandContext';
-import { useToast } from '../../context/ToastContext';
-import { useApiQuery } from '../../hooks/useApiQuery';
+import { useState } from 'react';
+import { useApp } from '../../../context/GymBrandContext';
+import { useToast } from '../../../context/ToastContext';
+import { useApiQuery } from '../../../hooks/useApiQuery';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   listPurchases,
@@ -9,13 +9,14 @@ import {
   listProducts,
   listSuppliers,
   type ProductData,
-} from '../../services/api';
-import PageHeader from '../../components/shared/PageHeader';
-import PageLoader from '../../components/shared/PageLoader';
-import Card from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
-import StatusBadge from '../../components/ui/StatusBadge';
+} from '../../../services/api';
+import PageLoader from '../../../components/shared/PageLoader';
+import Card from '../../../components/ui/Card';
+import Button from '../../../components/ui/Button';
+import StatusBadge from '../../../components/ui/StatusBadge';
 
+// Purchases panel — merged from PurchasesPage (§23), the "purchases" tab of the
+// Store hub. Manager-only: reception never renders this tab (endpoints 403).
 interface PurchaseRow {
   id: string;
   supplier_name?: string;
@@ -48,8 +49,9 @@ const statusVariant = (status: string): 'success' | 'warning' | 'error' | 'neutr
 const inputClass =
   'w-full px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400';
 
-export default function PurchasesPage() {
+export default function PurchasesPanel() {
   const { language } = useApp();
+  const rtl = language === 'ar';
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
@@ -80,14 +82,15 @@ export default function PurchasesPage() {
     mutationFn: (data: { supplier_id?: string | null; items: { product_id: string; quantity: number; unit_price: number }[]; payment_method?: string; notes?: string }) =>
       createPurchase(data),
     onSuccess: () => {
-      showToast(language === 'ar' ? 'تم إنشاء المشتريات' : 'Purchase created', 'success');
+      showToast(rtl ? 'تم إنشاء المشتريات' : 'Purchase created', 'success');
       setShowModal(false);
       resetForm();
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
       queryClient.invalidateQueries({ queryKey: ['products-all'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     },
     onError: () => {
-      showToast(language === 'ar' ? 'فشل إنشاء المشتريات' : 'Failed to create purchase', 'error');
+      showToast(rtl ? 'فشل إنشاء المشتريات' : 'Failed to create purchase', 'error');
     },
   });
 
@@ -127,7 +130,7 @@ export default function PurchasesPage() {
   const handleSubmit = () => {
     const validItems = items.filter((i) => i.product_id && i.quantity > 0);
     if (validItems.length === 0) {
-      showToast(language === 'ar' ? 'أضف منتجاً واحداً على الأقل' : 'Add at least one product', 'warning');
+      showToast(rtl ? 'أضف منتجاً واحداً على الأقل' : 'Add at least one product', 'warning');
       return;
     }
     createMutation.mutate({
@@ -141,18 +144,13 @@ export default function PurchasesPage() {
   const purchases = purchasesRes?.data || [];
 
   return (
-    <div dir={language === 'ar' ? 'rtl' : 'ltr'} className="space-y-6">
-      <PageHeader
-        title={language === 'ar' ? 'المشتريات' : 'Purchases'}
-        subtitle={language === 'ar' ? 'مشتريات المخزون من الموردين' : 'Inventory purchases from suppliers'}
-        icon="shopping_cart"
-        actions={
-          <Button variant="primary" onClick={() => setShowModal(true)}>
-            <span className="material-symbols-outlined text-lg">add</span>
-            {language === 'ar' ? 'إضافة مشتريات' : 'Add Purchase'}
-          </Button>
-        }
-      />
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button variant="primary" onClick={() => setShowModal(true)}>
+          <span className="material-symbols-outlined text-lg">add</span>
+          {rtl ? 'إضافة مشتريات' : 'Add Purchase'}
+        </Button>
+      </div>
 
       {isLoading ? (
         <PageLoader variant="skeleton" rows={5} />
@@ -163,12 +161,12 @@ export default function PurchasesPage() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="text-right p-4 text-xs font-semibold text-gray-500">#</th>
-                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{language === 'ar' ? 'المورد' : 'Supplier'}</th>
-                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
-                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{language === 'ar' ? 'طريقة الدفع' : 'Payment'}</th>
-                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{language === 'ar' ? 'الحالة' : 'Status'}</th>
-                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{language === 'ar' ? 'ملاحظات' : 'Notes'}</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'المورد' : 'Supplier'}</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الإجمالي' : 'Total'}</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'طريقة الدفع' : 'Payment'}</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الحالة' : 'Status'}</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'التاريخ' : 'Date'}</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'ملاحظات' : 'Notes'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -180,7 +178,7 @@ export default function PurchasesPage() {
                     <td className="p-4">
                       <StatusBadge
                         status={paymentMethods.find((pm) => pm.value === p.payment_method)
-                          ? language === 'ar'
+                          ? rtl
                             ? paymentMethods.find((pm) => pm.value === p.payment_method)!.labelAr
                             : paymentMethods.find((pm) => pm.value === p.payment_method)!.labelEn
                           : p.payment_method}
@@ -189,12 +187,12 @@ export default function PurchasesPage() {
                     </td>
                     <td className="p-4">
                       <StatusBadge
-                        status={language === 'ar' ? statusLabelsAr[p.status] || p.status : statusLabelsEn[p.status] || p.status}
+                        status={rtl ? statusLabelsAr[p.status] || p.status : statusLabelsEn[p.status] || p.status}
                         variant={statusVariant(p.status)}
                       />
                     </td>
                     <td className="p-4 text-gray-500 text-xs" dir="ltr">
-                      {new Date(p.created_at).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US')}
+                      {new Date(p.created_at).toLocaleDateString(rtl ? 'ar-EG' : 'en-US')}
                     </td>
                     <td className="p-4 text-gray-500 text-xs max-w-[120px] truncate">{p.notes || '-'}</td>
                   </tr>
@@ -202,7 +200,7 @@ export default function PurchasesPage() {
                 {purchases.length === 0 && (
                   <tr>
                     <td colSpan={7} className="p-8 text-center text-gray-400">
-                      {language === 'ar' ? 'لا توجد مشتريات' : 'No purchases found'}
+                      {rtl ? 'لا توجد مشتريات' : 'No purchases found'}
                     </td>
                   </tr>
                 )}
@@ -220,7 +218,7 @@ export default function PurchasesPage() {
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-gray-900">
-                {language === 'ar' ? 'مشتريات جديدة' : 'New Purchase'}
+                {rtl ? 'مشتريات جديدة' : 'New Purchase'}
               </h2>
               <button onClick={() => setShowModal(false)} className="w-9 h-9 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
                 <span className="material-symbols-outlined">close</span>
@@ -230,14 +228,14 @@ export default function PurchasesPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {language === 'ar' ? 'المورد' : 'Supplier'}
+                  {rtl ? 'المورد' : 'Supplier'}
                 </label>
                 <select
                   value={supplierId}
                   onChange={(e) => setSupplierId(e.target.value)}
                   className={inputClass}
                 >
-                  <option value="">{language === 'ar' ? 'اختر المورد' : 'Select supplier'}</option>
+                  <option value="">{rtl ? 'اختر المورد' : 'Select supplier'}</option>
                   {(suppliersRes?.data || []).map((s: any) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -247,14 +245,14 @@ export default function PurchasesPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-medium text-gray-700">
-                    {language === 'ar' ? 'المنتجات' : 'Products'}
+                    {rtl ? 'المنتجات' : 'Products'}
                   </label>
                   <button
                     onClick={addItemRow}
                     className="text-xs text-emerald-600 font-medium flex items-center gap-1"
                   >
                     <span className="material-symbols-outlined text-sm">add</span>
-                    {language === 'ar' ? 'إضافة صنف' : 'Add Item'}
+                    {rtl ? 'إضافة صنف' : 'Add Item'}
                   </button>
                 </div>
                 {items.map((item, idx) => (
@@ -265,10 +263,10 @@ export default function PurchasesPage() {
                         onChange={(e) => updateItem(idx, 'product_id', e.target.value)}
                         className={inputClass}
                       >
-                        <option value="">{language === 'ar' ? 'اختر منتجاً' : 'Select product'}</option>
+                        <option value="">{rtl ? 'اختر منتجاً' : 'Select product'}</option>
                         {(productsRes?.data || []).map((p: ProductData) => (
                           <option key={p.id} value={p.id}>
-                            {p.name} (شراء: {p.purchase_price})
+                            {p.name} ({rtl ? 'شراء' : 'cost'}: {p.purchase_price})
                           </option>
                         ))}
                       </select>
@@ -306,14 +304,14 @@ export default function PurchasesPage() {
 
               <div className="flex items-center justify-between bg-gray-50 border border-gray-100 p-3 rounded-2xl">
                 <span className="text-sm font-medium text-gray-900">
-                  {language === 'ar' ? 'الإجمالي' : 'Total'}
+                  {rtl ? 'الإجمالي' : 'Total'}
                 </span>
                 <span className="text-lg font-bold text-emerald-600">{totalAmount.toFixed(2)}</span>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {language === 'ar' ? 'طريقة الدفع' : 'Payment Method'}
+                  {rtl ? 'طريقة الدفع' : 'Payment Method'}
                 </label>
                 <select
                   value={paymentMethod}
@@ -322,7 +320,7 @@ export default function PurchasesPage() {
                 >
                   {paymentMethods.map((pm) => (
                     <option key={pm.value} value={pm.value}>
-                      {language === 'ar' ? pm.labelAr : pm.labelEn}
+                      {rtl ? pm.labelAr : pm.labelEn}
                     </option>
                   ))}
                 </select>
@@ -330,14 +328,14 @@ export default function PurchasesPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {language === 'ar' ? 'ملاحظات' : 'Notes'}
+                  {rtl ? 'ملاحظات' : 'Notes'}
                 </label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
                   className={`${inputClass} resize-none`}
-                  placeholder={language === 'ar' ? 'ملاحظات إضافية...' : 'Additional notes...'}
+                  placeholder={rtl ? 'ملاحظات إضافية...' : 'Additional notes...'}
                 />
               </div>
             </div>
@@ -350,13 +348,13 @@ export default function PurchasesPage() {
                 disabled={createMutation.isPending}
               >
                 {createMutation.isPending && <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>}
-                {language === 'ar' ? 'حفظ المشتريات' : 'Save Purchase'}
+                {rtl ? 'حفظ المشتريات' : 'Save Purchase'}
               </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowModal(false)}
               >
-                {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                {rtl ? 'إلغاء' : 'Cancel'}
               </Button>
             </div>
           </div>
@@ -365,4 +363,3 @@ export default function PurchasesPage() {
     </div>
   );
 }
-

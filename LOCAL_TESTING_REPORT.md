@@ -471,3 +471,19 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 **التحقق:** `tsc --noEmit` EXIT=0 · `vite build` ✓ 4.49s (تحذير chunk size سابق قائم) · chunk `team` موجود في dist · لا مراجعات كودية للأسماء المحذوفة. **يتبقى تفاعلي:** دخول مدير صالة وتجربة التبويبات الثلاثة والـ deep-links (بيانات المستخدم).
 
 **ملاحظة listTrainers:** بقيت في `services/api.ts` — لا تزال مستخدمة في `trainer/PersonalTraining.tsx` (اختيار مدرب لجلسة PT)، وليست dead code.
+
+---
+
+## 23) دمج صفحات المتجر — StorePage بتبويبات (2026-10-12)
+
+**الهدف (دفعة 2 من دمج المكرر):** ثلاث صفحات مخزون/مالية متداخلة → صفحة «المتجر» واحدة على `/admin/products`.
+
+**ما تم:**
+1. **`src/pages/gym-admin/store/StorePage.tsx`** — الهيكل + رأس «المتجر» (icon storefront) + شريط تبويبات (المنتجات / المشتريات / الموردون) عبر `?tab=` بـ `useSearchParams` — نفس نمط TeamPage (§22). **وعي بالأدوار:** `role === 'gym-admin'` فقط يرى شريط التبويبات؛ الاستقبال (`/reception/products`) يحصل على المنتجات فقط بلا تبويبات — لأن `listPurchases/listSuppliers` عليها `requireRole('manager')` في السيرفر (ضجيج 403 لو عُرضت).
+2. **`store/ProductCatalog.tsx`** — نقل InventoryManagement كاملاً (بحث بالاسم/الباركود + نموذج inline إنشاء/تعديل + حذف بتأكيد) مع تحديث الأنماط من `surface-variant/bg-surface/bg-petrol` القديمة إلى gray-100/50 + shadow-sm + emerald المعتمدة، وإضافة تسميات EN (الصفحة القديمة كانت عربياً فقط)، وtoasts نجاح/فشل، وإبطال `['products']` + `['products-all']` معاً (كان كل نظام يبطل مفتاحه فقط).
+3. **`store/PurchasesPanel.tsx`** — نقل PurchasesPage كاملاً (جدول + مودال متعدد الأصناف مع auto-fill سعر الشراء + إجمالي حي + طريقة دفع/حالة) باستثناء PageHeader؛ زر «إضافة مشتريات» انتقل لشريط أدوات فوق الجدول؛ أضفنا إبطال `['products']` بعد الشراء (المخزون يتغير عند دخول مشتريات — كان `['products']` قديماً).
+4. **`store/SuppliersPanel.tsx`** — نقل SuppliersPage (جدول + مودال الإضافة) باستثناء PageHeader. **إصلاح ثغرة UX كانت موجودة:** زر «تعديل» في الصفحة القديمة كان يفتح المودال ثم **يُنشئ سطراً جديداً دائماً** — لأن السيرفر لا يملك سوى `GET/POST /api/finance/suppliers` (لا PUT). أُزيلت واجهة التعديل الوهمية مع توثيق السبب في أعلى الملف؛ نقطة PUT الحقيقية تُطلب كمilestone سيرفر منفصل.
+5. **المسارات:** `/admin/products` → store/StorePage؛ `/admin/purchases` → `?tab=purchases`؛ `/admin/suppliers` → `?tab=suppliers` (Navigate replace — الروابط القديمة تظل شغالة)؛ `/reception/products` → store/StorePage (chunk reception)؛ `/admin/inventory` → `/admin/products` بلا تغيير.
+6. **حُذفت الملفات:** InventoryManagement.tsx / PurchasesPage.tsx / SuppliersPage.tsx — grep أكد أن المراجع الوحيدة المتبقية هي redirects مقصودة في routes. المبيعات (SalesPage/POS) لا تستورد أيّاً منها.
+
+**التحقق:** `tsc --noEmit` EXIT=0 · `vite build` ✓ 4.95s (تحذير chunk size قائم سابق) · لا مستوردين متبقين للمحذوفات. **يتبقى تفاعلي:** دخول مدير صالة وتجربة التبويبات الثلاثة والـ deep-links + دخول استقبال والتأكد أن التبويبات المخفية لا تظهر (بيانات المستخدم — كما هو متفق لا ينفذه الوكيل).

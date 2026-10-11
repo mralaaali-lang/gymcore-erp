@@ -82,7 +82,8 @@ export default function AppRouter() {
         <Route path="/admin/members/:id" element={lazyLoad(() => import('../pages/gym-admin/MemberProfileView'), ['gym-admin'])} />
         <Route path="/admin/subscriptions" element={lazyLoad(() => import('../pages/gym-admin/SubscriptionManagement'), ['gym-admin'])} />
         <Route path="/admin/attendance" element={lazyLoad(() => import('../pages/gym-admin/AttendanceRecords'), ['gym-admin'])} />
-        <Route path="/admin/products" element={lazyLoad(() => import('../pages/gym-admin/InventoryManagement'), ['gym-admin'])} />
+        {/* Store hub — merged products/purchases/suppliers pages into one tabbed page (§23). */}
+        <Route path="/admin/products" element={lazyLoad(() => import('../pages/gym-admin/store/StorePage'), ['gym-admin'])} />
         <Route path="/admin/inventory" element={<Navigate to="/admin/products" replace />} />
         <Route path="/admin/billing" element={lazyLoad(() => import('../pages/gym-admin/BillingOverview'), ['gym-admin'])} />
         <Route path="/admin/marketing" element={lazyLoad(() => import('../pages/gym-admin/MarketingAutomation'), ['gym-admin'])} />
@@ -100,8 +101,8 @@ export default function AppRouter() {
         <Route path="/admin/notifications" element={lazyLoad(() => import('../pages/super-admin/BroadcastEngine'), ['gym-admin'])} />
         {/* Sales, Purchases, Suppliers, Expenses, Debts, Cashbox */}
         <Route path="/admin/sales" element={lazyLoad(() => import('../pages/gym-admin/SalesPage'), ['gym-admin'])} />
-        <Route path="/admin/purchases" element={lazyLoad(() => import('../pages/gym-admin/PurchasesPage'), ['gym-admin'])} />
-        <Route path="/admin/suppliers" element={lazyLoad(() => import('../pages/gym-admin/SuppliersPage'), ['gym-admin'])} />
+        <Route path="/admin/purchases" element={<Navigate to="/admin/products?tab=purchases" replace />} />
+        <Route path="/admin/suppliers" element={<Navigate to="/admin/products?tab=suppliers" replace />} />
         <Route path="/admin/expenses" element={lazyLoad(() => import('../pages/gym-admin/ExpensesPage'), ['gym-admin'])} />
         <Route path="/admin/debts" element={lazyLoad(() => import('../pages/gym-admin/DebtsPage'), ['gym-admin'])} />
         <Route path="/admin/cashbox" element={lazyLoad(() => import('../pages/gym-admin/CashboxPage'), ['gym-admin'])} />
@@ -142,7 +143,9 @@ export default function AppRouter() {
         <Route path="/reception/checkin" element={<Navigate to="/reception/attendance" replace />} />
         <Route path="/reception/members" element={lazyLoad(() => import('../pages/gym-admin/MemberList'), ['reception'])} />
         <Route path="/reception/attendance" element={lazyLoad(() => import('../pages/gym-admin/AttendanceRecords'), ['reception'])} />
-        <Route path="/reception/products" element={lazyLoad(() => import('../pages/gym-admin/InventoryManagement'), ['reception'])} />
+        {/* Store hub rendered for reception with the tab bar hidden —
+            purchases/suppliers tabs are manager-only (§23). */}
+        <Route path="/reception/products" element={lazyLoad(() => import('../pages/gym-admin/store/StorePage'), ['reception'])} />
         {/* StaffManagement merged into the manager-only Team hub; reception has
             no staff-shifts access (manager-only endpoints → was 403 noise). */}
         <Route path="/reception/shifts" element={<Navigate to="/reception/dashboard" replace />} />
