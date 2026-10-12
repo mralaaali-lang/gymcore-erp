@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import api from '../../services/api';
 
 export default function BranchAnalytics() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
 
   const { data: retentionData, isLoading: retentionLoading } = useQuery({
     queryKey: ['retention-rate'],
@@ -40,7 +41,7 @@ export default function BranchAnalytics() {
   const statCards = [
     { label: 'معدل الاحتفاظ', value: retention.rate ? `${retention.rate}%` : '-', icon: 'group', color: 'primary', trend: retention.trend },
     { label: 'أوقات الذروة', value: Array.isArray(peakHours) ? `${peakHours.length} فترات` : '-', icon: 'schedule', color: '#006c49', trend: null },
-    { label: 'توقعات الإيرادات', value: forecast.current_month ? `${forecast.current_month.toLocaleString()} ر.س` : '-', icon: 'trending_up', color: '#8b5cf6', trend: null },
+    { label: 'توقعات الإيرادات', value: forecast.current_month ? formatMoney(forecast.current_month, gymProfile?.currency) : '-', icon: 'trending_up', color: '#8b5cf6', trend: null },
   ];
 
   return (

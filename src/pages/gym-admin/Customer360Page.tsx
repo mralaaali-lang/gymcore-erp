@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import { getCustomer360, searchMembers } from '../../services/api';
 import PageHeader from '../../components/shared/PageHeader';
 import StatsGrid from '../../components/shared/StatsGrid';
@@ -9,7 +10,9 @@ import Card from '../../components/ui/Card';
 import StatusBadge from '../../components/ui/StatusBadge';
 
 export default function Customer360Page() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const isRtl = language === 'ar';
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
@@ -199,7 +202,7 @@ export default function Customer360Page() {
                 <p className="text-sm text-gray-900">{p.description}</p>
                 <p className="text-xs text-gray-500">{p.payment_method}</p>
               </div>
-              <span className="text-sm font-bold text-gray-900">{p.amount} ج.م</span>
+              <span className="text-sm font-bold text-gray-900">{money(p.amount)}</span>
             </div>
           ))}
         </Section>

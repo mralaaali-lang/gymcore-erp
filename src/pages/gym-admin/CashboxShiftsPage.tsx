@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import { listCashboxSessions, openCashbox, closeCashbox, getFinanceSummary } from '../../services/api';
 import PageHeader from '../../components/shared/PageHeader';
 import PageLoader from '../../components/shared/PageLoader';
@@ -23,7 +24,7 @@ const inputClass =
   'w-full px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400';
 
 export default function CashboxShiftsPage() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
   const queryClient = useQueryClient();
   const [closingBalance, setClosingBalance] = useState('');
   const [shiftNotes, setShiftNotes] = useState('');
@@ -73,7 +74,7 @@ export default function CashboxShiftsPage() {
   };
 
   const formatCurrency = (v: number | null) =>
-    v != null ? `${v.toLocaleString()} ر.س` : '—';
+    v != null ? formatMoney(v, gymProfile?.currency) : '—';
 
   const formatDate = (d: string | null) =>
     d ? new Date(d).toLocaleString('ar-EG') : '—';
@@ -247,7 +248,7 @@ export default function CashboxShiftsPage() {
                     <td className="p-4">
                       {diff != null ? (
                         <span className={`font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                          {diff >= 0 ? '+' : ''}{diff.toLocaleString()} ر.س
+                          {diff >= 0 ? '+' : ''}{formatMoney(diff, gymProfile?.currency)}
                         </span>
                       ) : '—'}
                     </td>

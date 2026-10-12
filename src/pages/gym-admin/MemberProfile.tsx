@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import { getMember } from '../../services/api';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import PageHeader from '../../components/shared/PageHeader';
@@ -13,7 +14,9 @@ const typeLabels: Record<string, string> = { regular: 'عادي', pt: 'تدري�
 const initial = (name: string) => name.charAt(0);
 
 export default function MemberProfile() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const rtl = language === 'ar';
@@ -120,7 +123,7 @@ export default function MemberProfile() {
                   (data.payment_history as Array<Record<string, unknown>>).map((p, i) => (
                     <tr key={i} className="border-t border-gray-100">
                       <td className="p-3 text-gray-500">{String(p.date || '')}</td>
-                      <td className="p-3 font-medium text-gray-900">{String(p.amount || '')} ر.س</td>
+                      <td className="p-3 font-medium text-gray-900">{money(Number(p.amount))}</td>
                       <td className="p-3 text-gray-500">{String(p.description || '')}</td>
                     </tr>
                   ))

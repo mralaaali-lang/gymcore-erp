@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -30,7 +31,9 @@ const inputClass =
   'w-full px-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400';
 
 export default function ExpensesPage() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
@@ -106,7 +109,7 @@ export default function ExpensesPage() {
       <StatsGrid
         columns={4}
         stats={[
-          { key: 'monthly', label: language === 'ar' ? 'مصروفات الشهر' : 'Monthly Expenses', value: monthlyExpenses.toFixed(2), icon: 'receipt_long', color: 'error' },
+          { key: 'monthly', label: language === 'ar' ? 'مصروفات الشهر' : 'Monthly Expenses', value: money(monthlyExpenses), icon: 'receipt_long', color: 'error' },
         ]}
       />
 
@@ -135,7 +138,7 @@ export default function ExpensesPage() {
                 {expenses.map((e: ExpenseRow, i: number) => (
                   <tr key={e.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-gray-500">{i + 1}</td>
-                    <td className="px-4 py-3 font-medium text-red-500">{e.amount?.toFixed(2)}</td>
+                    <td className="px-4 py-3 font-medium text-red-500">{money(e.amount)}</td>
                     <td className="px-4 py-3 text-gray-900">{e.description}</td>
                     <td className="px-4 py-3">
                       <StatusBadge status={e.category_name || '-'} variant="neutral" />

@@ -572,3 +572,17 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 **التحقق الحي (docker :9000، جلسة مدير AMLGYM):** `/admin/backup` حُوّل إلى `settings?tab=backup` والشريط الجانبي يعرض 13 تبويبا (النسخ الاحتياطي فاعل، حالة «لا توجد نسخ احتياطية بعد» صادقة)؛ `/admin/settings/migration` → لوحة الترحيل بكل الكروت؛ الرابط العميق `?tab=billing` (المكسور سابقاً) يفتح حقول الفواتير؛ الضغط على «الترحيل» يحدّث الـURL إلى `?tab=migration`. `tsc` EXIT=0 · `vite build` ✓ 4.6s · حاوية frontend معاد بناؤها تعمل.
 
 **ملاحظات:** لم نُنشئ نسخة احتياطية فعلية من الواجهة (الزر موجود والـendpoint مُختبَر سابقاً في جلسات backup)؛ `/admin/branding` ما زال redirect عام للإعدادات (بدون تبويب — مقصود). **سلسلة دمج الصفحات المتكررة اكتملت: لا توجد صفحات منفردة خارج الـhubs الآن إلا ما له طبيعة صفحة كاملة (تقارير، CRM، 360…).**
+
+---
+
+## 28) تعميم عملة الصالة + شريط تجربة حقيقي (2026-10-12)
+
+**(أ) formatMoney على صفحات gym-admin (15 ملفًا):** كل التنسيق الثابت (`ج.م`/`ر.س`/`EGP`/`toFixed(2)`) استُبدل بـ `money(v) = formatMoney(Number(v), gymProfile?.currency)` من `utils/currency.ts` (§24): BillingOverview، SalesPage، ExpensesPage، CashboxPage، CashboxShiftsPage، SubscriptionManagement، FinancialReports، BranchAnalytics، GymCalendar، Customer360Page، MemberProfile، MemberRegistration، store/PurchasesPanel، team/HrOverview، team/StaffDirectory. نُفذت بعديل آلي (codemod) مع تحقق أن كل مستبدَل كان موجودًا مرة واحدة بالضبط. **تعمد** ترك `dashboards/SuperAdminDashboard.tsx` على J.M ثابتة — أسعار المنصة للسوق المصري لا تتبع عملة الصالة. صفحات المدرب/الاستقبال الداخلية إن بقيت فيها تنسيقات قديمة فهي دفعة تالية صغيرة.
+
+**(ب) Discovery خطير-lطيف:** جدول `gym_trials` الذي تستخدمه نقاط `/platform/billing/trials` (setTrialPeriod/listTrials) **لم يكن موجودًا أصلاً** — لا في الميجريشنات ولا في أي DB؛ أي استدعاء كان 500. أُنشئت `server/migrations/057_gym_trials.sql` (gym_id UNIQUE — مطلوب لـ ON CONFLICT، plan_id→billing_plans، trial_days/start/end) وطُبقت على DB Docker.
+
+**(ج) TrialBanner حقيقي بدل «31» المكذوبة:** `/auth/me` (gymBrief) صار يرجع `trial_end` + `trial_days_remaining` (حساب ceil من الفرق عن NOW، NULL خارج التجربة)؛ الشريط يعرض الرقم الحقيقي، يختفي إذا لا تجربة/انتهت، و«ترقية الآن» يذهب `/admin/settings?tab=billing` (الرابط القديم كان يشير إعدادات عامة بدون تبويب — صار deep link يعمل لأن §27 أضاف دعم `?tab=`).
+
+**التحقق الحي (docker :9000، مدير AMLGYM):** `tsc` سيرفر EXIT=0 · `tsc` فرونت EXIT=0 · `vite build` ✓ · إعادة بناء backend+frontend containers. `/auth/me` أرجع `trial_days_remaining: null` والشريط **مخفي** (صادق: AMLGYM بلا سجل تجربة). ثم أدراج تجربة 20 يومًا مؤقتة → الشريط ظهر بنص «تبقّى 20 يوماً على الفترة التجريبية المجانية» مع زر الترقية → حذف السجل → اختفى مجددًا (الـ DB تُرك كما كان). عيّنة المبيعات تعرض «… ج.م» بصيغة العملة و0 مواضع «EGP» نصية.
+
+**ملاحظة قرار:** إظهار/إخفاء الشريط صار حكمه بيانات لا ذوقًا — المنصة تتحكم في الترقية/المدة؛ يبقى قرار «مهلة انتهاء التجربة» (إخفاء الصالة عند 0 يومًا) مربوطًا بـ gracePeriod middleware الموجود على السيرفر إن رُبط بتجربة فعلية لاحقًا.

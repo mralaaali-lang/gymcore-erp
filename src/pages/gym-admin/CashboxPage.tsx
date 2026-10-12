@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import { listCashboxSessions, openCashbox, closeCashbox } from '../../services/api';
 import Button from '../../components/ui/Button';
 import PageHeader from '../../components/shared/PageHeader';
@@ -24,7 +25,7 @@ const inputClass =
   'w-full px-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400';
 
 export default function CashboxPage() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
   const queryClient = useQueryClient();
   const [openModal, setOpenModal] = useState(false);
   const [closeModal, setCloseModal] = useState<CashboxSession | null>(null);
@@ -63,7 +64,7 @@ export default function CashboxPage() {
   const openSessionsToday = sessions.filter((s) => s.status === 'open');
 
   const formatCurrency = (v: number | null) =>
-    v != null ? `${v.toLocaleString()} ر.س` : '—';
+    v != null ? formatMoney(v, gymProfile?.currency) : '—';
 
   const formatDate = (d: string | null) =>
     d ? new Date(d).toLocaleString('ar-EG') : '—';

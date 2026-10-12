@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import { useToast } from '../../context/ToastContext';
 import { createMember, listOffers } from '../../services/api';
 import Spinner from '../../components/ui/Spinner';
@@ -17,7 +18,9 @@ interface Offer {
 }
 
 export default function MemberRegistration() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const { showToast } = useToast();
   const navigate = useNavigate();
   const rtl = language === 'ar';
@@ -165,7 +168,7 @@ export default function MemberRegistration() {
                     <option value="">{rtl ? 'لا توجد خطط متاحة' : 'No plans available'}</option>
                   )}
                   {offers.map((p) => (
-                    <option key={p.id} value={p.id}>{p.title} - {p.price} ر.س</option>
+                    <option key={p.id} value={p.id}>{p.title} - {money(p.price)}</option>
                   ))}
                 </select>
               )}

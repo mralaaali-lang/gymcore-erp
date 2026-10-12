@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import { getFinanceSummary, listPayments, createPayment, listMembers } from '../../services/api';
 import PageHeader from '../../components/shared/PageHeader';
 import StatsGrid from '../../components/shared/StatsGrid';
@@ -15,7 +16,9 @@ const inputClass =
   'w-full px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400';
 
 export default function FinancialReports() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<'payments' | 'summary'>('payments');
   const [showForm, setShowForm] = useState(false);
@@ -81,9 +84,9 @@ export default function FinancialReports() {
         <StatsGrid
           columns={4}
           stats={[
-            { key: 'revenue', label: 'إيرادات الشهر', value: `${summary.monthly_revenue?.toLocaleString()} ر.س`, icon: 'wallet', color: 'primary' },
-            { key: 'expenses', label: 'مصروفات الشهر', value: `${summary.monthly_expenses?.toLocaleString()} ر.س`, icon: 'receipt_long', color: 'error' },
-            { key: 'debts', label: 'الديون المستحقة', value: `${summary.outstanding_debts?.toLocaleString()} ر.س`, icon: 'credit_card', color: 'info' },
+            { key: 'revenue', label: 'إيرادات الشهر', value: money(summary.monthly_revenue), icon: 'wallet', color: 'primary' },
+            { key: 'expenses', label: 'مصروفات الشهر', value: money(summary.monthly_expenses), icon: 'receipt_long', color: 'error' },
+            { key: 'debts', label: 'الديون المستحقة', value: money(summary.outstanding_debts), icon: 'credit_card', color: 'info' },
             { key: 'sales', label: 'عدد المبيعات', value: summary.monthly_sales || 0, icon: 'shopping_bag', color: 'secondary' },
           ]}
         />
@@ -169,7 +172,7 @@ export default function FinancialReports() {
                         <td className="px-4 py-3 text-gray-500">{i + 1}</td>
                         <td className="px-4 py-3 text-gray-500">{p.created_at ? new Date(p.created_at).toLocaleDateString('ar-EG') : '-'}</td>
                         <td className="px-4 py-3 font-medium text-gray-900">{p.member_name || p.member?.full_name || '-'}</td>
-                        <td className="px-4 py-3 font-medium text-gray-900">{p.amount?.toLocaleString()} ر.س</td>
+                        <td className="px-4 py-3 font-medium text-gray-900">{money(p.amount)}</td>
                         <td className="px-4 py-3">
                           <span className="flex items-center gap-1 text-gray-500">
                             <span className="material-symbols-outlined text-sm">{methodIcons[p.payment_method] || 'payments'}</span>
@@ -200,15 +203,15 @@ export default function FinancialReports() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-5 rounded-2xl bg-gray-50 border border-gray-100">
               <p className="text-sm font-medium text-gray-500 mb-1">الإيرادات</p>
-              <p className="text-2xl font-bold text-emerald-600">{summary.monthly_revenue?.toLocaleString()} ر.س</p>
+              <p className="text-2xl font-bold text-emerald-600">{money(summary.monthly_revenue)}</p>
             </div>
             <div className="p-5 rounded-2xl bg-gray-50 border border-gray-100">
               <p className="text-sm font-medium text-gray-500 mb-1">المصروفات</p>
-              <p className="text-2xl font-bold text-red-500">{summary.monthly_expenses?.toLocaleString()} ر.س</p>
+              <p className="text-2xl font-bold text-red-500">{money(summary.monthly_expenses)}</p>
             </div>
             <div className="p-5 rounded-2xl bg-gray-50 border border-gray-100">
               <p className="text-sm font-medium text-gray-500 mb-1">الديون</p>
-              <p className="text-2xl font-bold text-emerald-600">{summary.outstanding_debts?.toLocaleString()} ر.س</p>
+              <p className="text-2xl font-bold text-emerald-600">{money(summary.outstanding_debts)}</p>
             </div>
             <div className="p-5 rounded-2xl bg-gray-50 border border-gray-100">
               <p className="text-sm font-medium text-gray-500 mb-1">المبيعات</p>

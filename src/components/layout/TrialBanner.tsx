@@ -5,11 +5,14 @@ import { useApp } from '../../context/GymBrandContext';
 const STORAGE_KEY = 'gymcore-trial-banner-dismissed';
 
 export default function TrialBanner() {
-  const { language, role } = useApp();
+  const { language, role, gymProfile } = useApp();
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState(() => localStorage.getItem(STORAGE_KEY) === '1');
 
-  if (dismissed) return null;
+  // §29 — real trial data only: show when gym_trials says days remain
+  // (from /auth/me). No trial record / expired → no banner.
+  const days = gymProfile?.trial_days_remaining;
+  if (dismissed || !days || days <= 0) return null;
 
   const roleBase = role === 'super-admin' ? '/super-admin' : '/admin';
 
@@ -18,11 +21,11 @@ export default function TrialBanner() {
       <span className="flex items-center gap-1.5">
         <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80] inline-block animate-pulse shrink-0" />
         {language === 'ar'
-          ? 'تبقّى 31 يوماً على الفترة التجريبية المجانية — '
-          : '31 days left on your free trial — '}
+          ? `تبقّى ${days} يوماً على الفترة التجريبية المجانية — `
+          : `${days} days left on your free trial — `}
         <button
           type="button"
-          onClick={() => navigate(`${roleBase}/settings`)}
+          onClick={() => navigate(`${roleBase}/settings?tab=billing`)}
           className="text-[#4ade80] hover:text-[#86efac] underline underline-offset-2 font-semibold transition-colors"
         >
           {language === 'ar' ? 'ترقية الآن' : 'Upgrade now'}

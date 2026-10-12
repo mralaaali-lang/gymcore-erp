@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -56,7 +57,9 @@ const inputClass =
   'w-full px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400';
 
 export default function SalesPage() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const rtl = language === 'ar';
@@ -156,13 +159,13 @@ export default function SalesPage() {
                 <select value={item.product_id} onChange={(e) => updateItem(idx, 'product_id', e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                   <option value="">{rtl ? 'اختر منتجاً' : 'Select product'}</option>
-                  {products.map((p: ProductData) => <option key={p.id} value={p.id}>{p.name} — {p.selling_price} EGP</option>)}
+                  {products.map((p: ProductData) => <option key={p.id} value={p.id}>{p.name} — {money(p.selling_price)}</option>)}
                 </select>
               </div>
               <input type="number" min="1" value={item.quantity}
                 onChange={(e) => updateItem(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
                 className="w-16 px-2 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 text-center focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-              <span className="w-20 text-left text-sm font-semibold text-gray-900">{(item.quantity * item.unit_price).toFixed(2)}</span>
+              <span className="w-20 text-left text-sm font-semibold text-gray-900">{money(item.quantity * item.unit_price)}</span>
               {items.length > 1 && (
                 <button onClick={() => removeItemRow(idx)} className="text-red-500 p-1"><span className="material-symbols-outlined text-lg">remove_circle</span></button>
               )}
@@ -172,7 +175,7 @@ export default function SalesPage() {
 
         <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-2xl p-3">
           <span className="text-sm font-semibold text-gray-900">{rtl ? 'الإجمالي' : 'Total'}</span>
-          <span className="text-xl font-bold text-emerald-600">{totalAmount.toFixed(2)} EGP</span>
+          <span className="text-xl font-bold text-emerald-600">{money(totalAmount)}</span>
         </div>
 
         <div>
@@ -224,7 +227,7 @@ export default function SalesPage() {
                     <td className="p-4 text-gray-500">{(page - 1) * 20 + i + 1}</td>
                     <td className="p-4 font-medium text-gray-900">{s.member_name || '-'}</td>
                     <td className="p-4 text-gray-500">{s.staff_name || '-'}</td>
-                    <td className="p-4 font-bold text-emerald-600">{(s.total_amount || 0).toFixed(2)}</td>
+                    <td className="p-4 font-bold text-emerald-600">{money(s.total_amount)}</td>
                     <td className="p-4">
                       <StatusBadge
                         status={paymentMethods.find((pm) => pm.value === s.payment_method) ? (rtl ? paymentMethods.find((pm) => pm.value === s.payment_method)!.labelAr : paymentMethods.find((pm) => pm.value === s.payment_method)!.labelEn) : s.payment_method}
@@ -265,7 +268,7 @@ export default function SalesPage() {
             <div key={p.id} className="border border-gray-100 rounded-2xl p-4 hover:shadow-sm transition bg-gray-50">
               <p className="text-sm font-semibold text-gray-900">{p.name}</p>
               <p className="text-xs text-gray-500 mt-1">{rtl ? 'المخزون' : 'Stock'}: {p.stock_quantity}</p>
-              <p className="text-sm font-bold text-emerald-600 mt-2">{p.selling_price} EGP</p>
+              <p className="text-sm font-bold text-emerald-600 mt-2">{money(p.selling_price)}</p>
             </div>
           ))}
         </div>
@@ -283,8 +286,8 @@ export default function SalesPage() {
       columns={3}
       stats={[
         { key: 'sales', label: rtl ? 'إجمالي المبيعات' : 'Total Sales', value: monthlySales, icon: 'point_of_sale', color: 'primary' },
-        { key: 'expenses', label: rtl ? 'إجمالي المصروفات' : 'Total Expenses', value: totalExpenses.toFixed(2), icon: 'receipt_long', color: 'error' },
-        { key: 'profit', label: rtl ? 'صافي الربح' : 'Net Profit', value: (monthlySales - totalExpenses).toFixed(2), icon: 'payments', color: 'info' },
+        { key: 'expenses', label: rtl ? 'إجمالي المصروفات' : 'Total Expenses', value: money(totalExpenses), icon: 'receipt_long', color: 'error' },
+        { key: 'profit', label: rtl ? 'صافي الربح' : 'Net Profit', value: money(monthlySales - totalExpenses), icon: 'payments', color: 'info' },
       ]}
     />
   );

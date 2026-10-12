@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { getUpcomingClasses, listStaff, listPayroll, getStaffAttendanceSummary, type UpcomingClassData, type StaffData } from '../../services/api';
 import PageHeader from '../../components/shared/PageHeader';
@@ -79,7 +80,9 @@ function getWeekDates(base: Date): Date[] {
 }
 
 export default function GymCalendar() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const rtl = language === 'ar';
   const [activeTab, setActiveTab] = useState<GymTab>('Schedule');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -300,7 +303,7 @@ export default function GymCalendar() {
                       <td className="py-2.5 px-3 text-gray-500" dir="ltr">{s.phone || '—'}</td>
                       <td className="py-2.5 px-3 text-center text-gray-700">{att ? att.monthly_shifts : '—'}</td>
                       <td className="py-2.5 px-3 text-end font-bold text-gray-900">
-                        {s.salary != null ? `${Number(s.salary).toLocaleString()} ${rtl ? 'ج.م' : 'EGP'}` : '—'}
+                        {s.salary != null ? money(s.salary) : '—'}
                       </td>
                       <td className="py-2.5 px-3 text-center">
                         <StatusBadge
@@ -325,7 +328,7 @@ export default function GymCalendar() {
         columns={2}
         stats={[
           { key: 'records', label: rtl ? 'عدد العمليات' : 'Payroll Records', value: payroll.length, icon: 'receipt_long', color: 'info' },
-          { key: 'total', label: rtl ? 'إجمالي المدفوع' : 'Total Paid', value: `${payrollTotal.toLocaleString()} ${rtl ? 'ج.م' : 'EGP'}`, icon: 'payments', color: 'primary' },
+          { key: 'total', label: rtl ? 'إجمالي المدفوع' : 'Total Paid', value: money(payrollTotal), icon: 'payments', color: 'primary' },
         ]}
       />
 
@@ -359,9 +362,9 @@ export default function GymCalendar() {
                       <td className="py-2.5 px-3 font-medium text-gray-900">{p.staff_name || '—'}</td>
                       <td className="py-2.5 px-3 text-gray-500">{roleLabel(p.role, rtl)}</td>
                       <td className="py-2.5 px-3 text-gray-500">{p.payment_date ? new Date(p.payment_date).toLocaleDateString(rtl ? 'ar-EG' : 'en-GB') : '—'}</td>
-                      <td className="py-2.5 px-3 text-end text-gray-700">{Number(p.base_salary_paid || 0).toLocaleString()}</td>
-                      <td className="py-2.5 px-3 text-end text-gray-700">{Number(p.commissions_paid || 0).toLocaleString()}</td>
-                      <td className="py-2.5 px-3 text-end font-bold text-gray-900">{total.toLocaleString()}</td>
+                      <td className="py-2.5 px-3 text-end text-gray-700">{money(p.base_salary_paid)}</td>
+                      <td className="py-2.5 px-3 text-end text-gray-700">{money(p.commissions_paid)}</td>
+                      <td className="py-2.5 px-3 text-end font-bold text-gray-900">{money(total)}</td>
                     </tr>
                   );
                 })}

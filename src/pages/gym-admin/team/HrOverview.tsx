@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../../context/GymBrandContext';
+import { formatMoney } from '../../../utils/currency';
 import { listStaff, listPayroll, processPayroll, getStaffAttendanceSummary } from '../../../services/api';
 
 // HR & payroll tab — content of the old HRDashboard page without its
 // standalone title (TeamPage's header now owns the page title).
 export default function HrOverview() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const rtl = language === 'ar';
   const queryClient = useQueryClient();
   const [showPayForm, setShowPayForm] = useState(false);
@@ -157,8 +160,8 @@ export default function HrOverview() {
                     <tr key={p.id || i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                       <td className="p-4 text-gray-500">{i + 1}</td>
                       <td className="p-4 font-medium text-gray-800">{p.staff_name || p.full_name || '—'}</td>
-                      <td className="p-4">{p.base_salary_paid?.toLocaleString()} {rtl ? 'ر.س' : 'SAR'}</td>
-                      <td className="p-4">{p.commissions_paid?.toLocaleString()} {rtl ? 'ر.س' : 'SAR'}</td>
+                      <td className="p-4">{money(p.base_salary_paid)}</td>
+                      <td className="p-4">{money(p.commissions_paid)}</td>
                       <td className="p-4 text-gray-600">{p.payment_date ? new Date(p.payment_date).toLocaleDateString('ar-EG') : '—'}</td>
                     </tr>
                   ))}

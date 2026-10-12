@@ -269,6 +269,8 @@ export interface GymBrief {
   currency?: string;
   subscription_status?: string;
   is_active?: boolean;
+  trial_end?: string | null;
+  trial_days_remaining?: number | null;
 }
 
 export interface RestoredSession {

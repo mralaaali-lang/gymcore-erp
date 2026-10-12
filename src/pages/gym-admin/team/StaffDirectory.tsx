@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../../context/GymBrandContext';
+import { formatMoney } from '../../../utils/currency';
 import { listStaff, createStaff, updateStaff, type StaffData } from '../../../services/api';
 import PageLoader from '../../../components/shared/PageLoader';
 import Button from '../../../components/ui/Button';
@@ -37,7 +38,9 @@ const FILTERS = [
 // replace TrainersPage, which was a read-only coach-only card grid over the
 // same listStaff data.
 export default function StaffDirectory() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const rtl = language === 'ar';
   const queryClient = useQueryClient();
   const [params] = useSearchParams();
@@ -219,7 +222,7 @@ export default function StaffDirectory() {
                     <StatusBadge status={roleLabels[u.role] || u.role} variant={roleVariant(u.role)} />
                   </td>
                   <td className="p-4 text-gray-500" dir="ltr">{u.phone || '—'}</td>
-                  <td className="p-4 font-medium text-gray-900">{u.salary ? `${u.salary.toLocaleString()} ر.س` : '—'}</td>
+                  <td className="p-4 font-medium text-gray-900">{u.salary ? money(u.salary) : '—'}</td>
                   <td className="p-4">
                     <StatusBadge status={u.is_active ? (rtl ? 'نشط' : 'Active') : (rtl ? 'غير نشط' : 'Inactive')} variant={u.is_active ? 'success' : 'error'} />
                   </td>

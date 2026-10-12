@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../../../context/GymBrandContext';
+import { formatMoney } from '../../../utils/currency';
 import { useToast } from '../../../context/ToastContext';
 import { useApiQuery } from '../../../hooks/useApiQuery';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -50,7 +51,9 @@ const inputClass =
   'w-full px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400';
 
 export default function PurchasesPanel() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const rtl = language === 'ar';
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -174,7 +177,7 @@ export default function PurchasesPanel() {
                   <tr key={p.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
                     <td className="p-4 text-gray-500">{i + 1}</td>
                     <td className="p-4 font-medium text-gray-900">{p.supplier_name || '-'}</td>
-                    <td className="p-4 font-medium text-emerald-600">{p.total_amount?.toFixed(2)}</td>
+                    <td className="p-4 font-medium text-emerald-600">{money(p.total_amount)}</td>
                     <td className="p-4">
                       <StatusBadge
                         status={paymentMethods.find((pm) => pm.value === p.payment_method)
@@ -291,7 +294,7 @@ export default function PurchasesPanel() {
                       />
                     </div>
                     <div className="w-20 text-left text-sm font-medium text-gray-900 py-2">
-                      {(item.quantity * item.unit_price).toFixed(2)}
+                      {money(item.quantity * item.unit_price)}
                     </div>
                     {items.length > 1 && (
                       <button onClick={() => removeItemRow(idx)} className="text-red-500 p-1">
@@ -306,7 +309,7 @@ export default function PurchasesPanel() {
                 <span className="text-sm font-medium text-gray-900">
                   {rtl ? 'الإجمالي' : 'Total'}
                 </span>
-                <span className="text-lg font-bold text-emerald-600">{totalAmount.toFixed(2)}</span>
+                <span className="text-lg font-bold text-emerald-600">{money(totalAmount)}</span>
               </div>
 
               <div>

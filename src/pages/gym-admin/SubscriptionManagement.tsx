@@ -1,6 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import { listOffers } from '../../services/api';
 import PageHeader from '../../components/shared/PageHeader';
 import PageLoader from '../../components/shared/PageLoader';
@@ -8,7 +9,9 @@ import Card from '../../components/ui/Card';
 import StatusBadge from '../../components/ui/StatusBadge';
 
 export default function SubscriptionManagement() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const rtl = language === 'ar';
 
   const { data, isLoading, error } = useQuery({
@@ -59,7 +62,7 @@ export default function SubscriptionManagement() {
                   {offer.duration ? `${offer.duration} ${rtl ? 'أشهر' : 'months'}` : ''}
                 </p>
                 <p className="text-3xl font-bold text-gray-900 mb-4">
-                  {(offer.price || offer.total_price || 0).toLocaleString()} <span className="text-sm font-normal text-gray-400">ر.س</span>
+                  {money(offer.price || offer.total_price || 0)}
                 </p>
                 {offer.description && (
                   <p className="text-sm text-gray-500 mb-4">{offer.description}</p>

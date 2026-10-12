@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { listPayments, getFinanceSummary, listExpenses, listCashboxSessions, listOffers } from '../../services/api';
 import PageHeader from '../../components/shared/PageHeader';
@@ -59,7 +60,7 @@ function paymentStatusInfo(status?: string): { ar: string; en: string; variant: 
 }
 
 export default function BillingOverview() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
   const rtl = language === 'ar';
   const [params, setParams] = useSearchParams();
   const requestedTab = params.get('tab');
@@ -84,7 +85,7 @@ export default function BillingOverview() {
   const [page, setPage] = useState(1);
 
   const money = (v: number | undefined | null) =>
-    `${Number(v || 0).toLocaleString()} ${rtl ? 'ج.م' : 'EGP'}`;
+    formatMoney(Number(v || 0), gymProfile?.currency);
 
   // Overview + Payments share the payments feed
   const { data: paymentsRes, isLoading: paymentsLoading } = useApiQuery<{ data: any[]; pagination: any }>(
