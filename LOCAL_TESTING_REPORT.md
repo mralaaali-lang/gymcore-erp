@@ -586,3 +586,20 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 **التحقق الحي (docker :9000، مدير AMLGYM):** `tsc` سيرفر EXIT=0 · `tsc` فرونت EXIT=0 · `vite build` ✓ · إعادة بناء backend+frontend containers. `/auth/me` أرجع `trial_days_remaining: null` والشريط **مخفي** (صادق: AMLGYM بلا سجل تجربة). ثم أدراج تجربة 20 يومًا مؤقتة → الشريط ظهر بنص «تبقّى 20 يوماً على الفترة التجريبية المجانية» مع زر الترقية → حذف السجل → اختفى مجددًا (الـ DB تُرك كما كان). عيّنة المبيعات تعرض «… ج.م» بصيغة العملة و0 مواضع «EGP» نصية.
 
 **ملاحظة قرار:** إظهار/إخفاء الشريط صار حكمه بيانات لا ذوقًا — المنصة تتحكم في الترقية/المدة؛ يبقى قرار «مهلة انتهاء التجربة» (إخفاء الصالة عند 0 يومًا) مربوطًا بـ gracePeriod middleware الموجود على السيرفر إن رُبط بتجربة فعلية لاحقًا.
+
+---
+
+## 29) ربط GitHub → Railway: رفع تلقائي على كل push لـ main (2026-10-12)
+
+**القرار (بدل «ارفع» اليدوي لـ staging):** بدلًا من وصفة `git archive` + WSL-native `railway up` (§25)، صار كل service في مشروع gymcore-staging مربوطًا بالمستودع `mralaaali-lang/gymcore-erp` عبر تطبيق Railway GitHub Official، مع Deployment Trigger على فرع `main` — أي push يبني وينشر تلقائيًا. (تغيير إعدادات ويندوز الأمنية ما زال محظورًا؛ مشكلة railway.exe على ويندوز لم تعد ذات صلة — الربط تمّ بالكامل عبر GraphQL من CLI جلسة WSL الموجودة، بدون لمس أي توكن.)
+
+**ما تم ضبطه (عبر `railway api -f *.graphql`):**
+1. `serviceInstanceUpdate` لكل service: `source.repo = https://github.com/mralaaali-lang/gymcore-erp`.
+2. **backend** (`64b179de`): `rootDirectory = ""` (فارغ) + `dockerfilePath = "/server/Dockerfile.prod"` + `healthcheckPath = "/health"` — لأن Dockerfile نفسه يصرّح أن سياق البناء هو جذر المستودع (`COPY server/...` في رأسه).
+3. **frontend** (`043d0844`): `rootDirectory = "."` — نجاح بنائه أكّد الإعداد.
+4. سبب أول فشل للباك-إند Git (`0502ac67`): كان `rootDirectory` مضبوطًا خطأً على `"server"` فصار البحث عن `server/server/package.json` → `failed to compute cache key: "/server/package.json": not found`. تفريغه هو الإصلاح. (ملاحظة: enum الـ Builder في GraphQL لا يحتوي DOCKERFILE — وجود dockerfilePath يكفي.)
+5. الـ triggers كانت على فرع وهمي `railway-staging` (المستودع فيه main فقط) → `deploymentTriggerUpdate` بفرع `main` للخدمةين (trigger الباك-إند `2cbdad58`).
+6. `serviceInstanceAutoDeployUpdate` ترجّع INTERNAL_SERVER_ERROR وهي غير لازمة — الـ Deployment Triggers وحدها تشعل البناء (أثبتها الـ push التجريبي `3973a84` الذي أنشأ نسختي بناء فورًا).
+
+**آلية العمل الجديدة:** `git push origin main` ← webhook من تطبيق GitHub ← Railway يبني من Dockerfile ويفحص `/health` ثم يبدّل النسخة الحية. `deploy.sh` لم يعد لازمًا لـ staging (يبقى أداة طوارئ/تحكم يدوي). أول deploy حقيقي بهذه السلسلة هو commit التوثيق هذا نفسه؛ نتائج الفحوص الحية (backend `/health` + `/auth/me` فيه `trial_days_remaining` + صفحات §26–§28 على دومين الـfrontend) تُضاف هنا بعد التحقق.
+
