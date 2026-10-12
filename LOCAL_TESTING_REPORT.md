@@ -555,3 +555,20 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 **التحقق الحي (docker :9000، جلسة مدير AMLGYM):** `/admin/debts` حُوّل فعليًا لـ `billing?tab=Debts` والتبويب فاعل واللوحة تعرض الحالة الفارغة الصادقة؛ `/admin/announcements` → `marketing?tab=Announcements` مع القوائم الفارغة وزر «إضافة إعلان»؛ فتحنا نموذج «دين جديد» فعليًا وعمل بحث الأعضاء (3 نتائج من `/api/members`) ثم أُلغي بدون إنشاء بيانات؛ الشبكة: `/api/announcements 200`، `/auth/me 200`، صفر أخطاء. `tsc` فرونت EXIT=0 · `vite build` ✓ 10.5s.
 
 **ملاحظات:** لمسة تحسين صغيرة لا تفسد الالتزام: لم نجرب إنشاء دين/إعلان فعليًا (كتابة بيانات) احترامًا لـ«الحالة الفارغة الصادقة» في DB الاختبار؛ مسارات الديون تُغطت سابقًا في §24 (endpoint overdue-debts حي). بقايا دفعة 4: backup/migration داخل الإعدادات.
+
+---
+
+## 27) دمج دفعة 4 — النسخ الاحتياطي والترحيل داخل الإعدادات (2026-10-12)
+
+**الفكرة:** آخر قطعتين في سلسلة دمج الصفحات المتكررة: `/admin/backup` (TenantBackup) و`/admin/settings/migration` (MigrationCenter) أصبحا تبويبين **النسخ الاحتياطي** و**الترحيل** داخل مركز الإعدادات — نفس نمط §22/§23/§26 (panel بلا PageHeader + deep link `?tab=` + redirect للمسار القانوني).
+
+**التنفيذ:**
+1. `src/pages/settings/tabs/BackupTab.tsx` — نقل كامل لـ TenantBackup (قائمة النسخ + إنشاء/استعادة بتأكيد/تحميل) داخل بطاقة الإعدادات؛ إزالة PageHeader والبطاقة الخارجية، والـ toolbar صار صفاً رأسياً داخل اللوحة. الـ API نفسها `/admin/backup/list|create|restore|download` — لم يمسها شيء.
+2. `src/pages/settings/tabs/MigrationTab.tsx` — نقل MigrationCenter (اختيار المزود + 6 كروت استيراد)؛ الكروت صارت borders خفيفة بدل Card داخل Card (اللوحة أصلاً داخل بطاقة).
+3. `SettingsPage.tsx`: تبويبان جديدان في ALL_TABS/TAB_COMPONENTS (ids: `backup`, `migration`) + دعم **`?tab=`** كما في §26 (قراءة عند الـmount + مزامنة useEffect + كتابة `?tab=` بـ replace عند الضغط). **هذا يُصلح خللاً قديماً صامتاً:** كان MembersPage يرسل إلى `/admin/settings?tab=billing` بينما SettingsPage يتجاهل البارامتر تماماً.
+4. **إصلاح دور لازم اكتشفه التحقق الحي:**فلترتب `visibleTabs` كانت تعتمد `getStaffRole()` التي تفكّ JWT من localStorage — وجلسات الكوكيز الحالية (من §19) لا تخزّن توكنات، فصار الشريط الجانبي **فارغاً** وظهرت GymTab فقط (سلوك باقٍ من قبلنا). الحل: `getStaffRole() ?? (contextRole === 'gym-admin' ? 'manager' : null)` — أي نفس دور الجلسة من `/auth/me` المعاد استرجاعه في GymBrandContext.
+5. المسارات: `/admin/backup` → `Navigate /admin/settings?tab=backup`، `/admin/settings/migration` → `?tab=migration`؛ حُذفت الصفحتان القديمتان (git rm؛ grep نظيف من أي مراجع أخرى — لم تكن أي روابط sidebar لهما).
+
+**التحقق الحي (docker :9000، جلسة مدير AMLGYM):** `/admin/backup` حُوّل إلى `settings?tab=backup` والشريط الجانبي يعرض 13 تبويبا (النسخ الاحتياطي فاعل، حالة «لا توجد نسخ احتياطية بعد» صادقة)؛ `/admin/settings/migration` → لوحة الترحيل بكل الكروت؛ الرابط العميق `?tab=billing` (المكسور سابقاً) يفتح حقول الفواتير؛ الضغط على «الترحيل» يحدّث الـURL إلى `?tab=migration`. `tsc` EXIT=0 · `vite build` ✓ 4.6s · حاوية frontend معاد بناؤها تعمل.
+
+**ملاحظات:** لم نُنشئ نسخة احتياطية فعلية من الواجهة (الزر موجود والـendpoint مُختبَر سابقاً في جلسات backup)؛ `/admin/branding` ما زال redirect عام للإعدادات (بدون تبويب — مقصود). **سلسلة دمج الصفحات المتكررة اكتملت: لا توجد صفحات منفردة خارج الـhubs الآن إلا ما له طبيعة صفحة كاملة (تقارير، CRM، 360…).**

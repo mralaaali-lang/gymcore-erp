@@ -96,8 +96,9 @@ export default function AppRouter() {
         <Route path="/admin/crm" element={lazyLoad(() => import('../pages/gym-admin/CrmPage'), ['gym-admin'])} />
         <Route path="/admin/customer360/:id" element={lazyLoad(() => import('../pages/gym-admin/Customer360Page'), ['gym-admin'])} />
         <Route path="/admin/settings" element={lazyLoad(() => import('../pages/settings/SettingsPage'), ['gym-admin'])} />
-        <Route path="/admin/settings/migration" element={lazyLoad(() => import('../pages/gym-admin/MigrationCenter'), ['gym-admin'])} />
-        <Route path="/admin/backup" element={lazyLoad(() => import('../pages/shared/TenantBackup'), ['gym-admin'])} />
+        {/* Settings hub — backup/migration pages merged as tabs (§27). */}
+        <Route path="/admin/settings/migration" element={<Navigate to="/admin/settings?tab=migration" replace />} />
+        <Route path="/admin/backup" element={<Navigate to="/admin/settings?tab=backup" replace />} />
         <Route path="/admin/notifications" element={lazyLoad(() => import('../pages/super-admin/BroadcastEngine'), ['gym-admin'])} />
         {/* Sales, Purchases, Suppliers, Expenses, Debts, Cashbox */}
         <Route path="/admin/sales" element={lazyLoad(() => import('../pages/gym-admin/SalesPage'), ['gym-admin'])} />

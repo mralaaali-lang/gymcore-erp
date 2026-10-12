@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { getStaffRole } from '../../services/api';
 import PageHeader from '../../components/shared/PageHeader';
@@ -15,6 +16,8 @@ import SalesTab from './tabs/SalesTab';
 import EmailTab from './tabs/EmailTab';
 import IntegrationsTab from './tabs/IntegrationsTab';
 import SessionsTab from './tabs/SessionsTab';
+import BackupTab from './tabs/BackupTab';
+import MigrationTab from './tabs/MigrationTab';
 
 interface TabDef {
   id: string;
@@ -36,6 +39,9 @@ const ALL_TABS: TabDef[] = [
   { id: 'email', icon: 'mail', labelEn: 'Email', labelAr: 'البريد', roles: ['manager'] },
   { id: 'sessions', icon: 'devices', labelEn: 'Sessions', labelAr: 'الجلسات', roles: ['manager'] },
   { id: 'integrations', icon: 'link', labelEn: 'Integrations', labelAr: 'التكامل', roles: ['manager'] },
+  // §27 — merged standalone pages (was /admin/backup and /admin/settings/migration)
+  { id: 'backup', icon: 'backup', labelEn: 'Backup', labelAr: 'النسخ الاحتياطي', roles: ['manager'] },
+  { id: 'migration', icon: 'move_to_inbox', labelEn: 'Migration', labelAr: 'الترحيل', roles: ['manager'] },
 ];
 
 const TAB_COMPONENTS: Record<string, React.ComponentType> = {
@@ -50,20 +56,37 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
   email: EmailTab,
   sessions: SessionsTab,
   integrations: IntegrationsTab,
+  backup: BackupTab,
+  migration: MigrationTab,
 };
 
 export default function SettingsPage() {
-  const { language, setLanguage } = useApp();
+  const { language, setLanguage, role } = useApp();
   const rtl = language === 'ar';
 
-  const staffRole = getStaffRole();
+  // §27 fix — getStaffRole() decodes the localStorage JWT, which staff cookie
+  // sessions don't have; fall back to the mapped session role from context.
+  const staffRole = getStaffRole() ?? (role === 'gym-admin' ? 'manager' : null);
 
   const visibleTabs = useMemo(
     () => ALL_TABS.filter((t) => (t.roles as string[]).includes(staffRole ?? '')),
     [staffRole]
   );
 
-  const [activeTab, setActiveTab] = useState(visibleTabs[0]?.id || 'gym');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+
+  const [activeTab, setActiveTab] = useState(
+    () => (visibleTabs.find((t) => t.id === urlTab)?.id) || visibleTabs[0]?.id || 'gym'
+  );
+
+  // Keep in sync when arriving via /admin/backup or /admin/settings/migration
+  // redirect (or a ?tab= deep link like MembersPage's) with the page already mounted.
+  useEffect(() => {
+    if (urlTab && visibleTabs.some((t) => t.id === urlTab) && urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  }, [urlTab, visibleTabs, activeTab]);
 
   // Reset active tab if the current selection is no longer visible (e.g. role changed)
   useEffect(() => {
@@ -71,6 +94,12 @@ export default function SettingsPage() {
       setActiveTab(visibleTabs[0].id);
     }
   }, [visibleTabs, activeTab]);
+
+  const selectTab = (id: string) => {
+    setActiveTab(id);
+    // Reflect selection in the URL (?tab=) — §27 hub deep-link convention
+    setSearchParams({ tab: id }, { replace: true });
+  };
 
   const ActiveComponent = TAB_COMPONENTS[activeTab];
 
@@ -97,7 +126,7 @@ export default function SettingsPage() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => selectTab(tab.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-2xl transition-all ${
                     isActive
                       ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25'

@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import { useApp } from '../../context/GymBrandContext';
-import { useToast } from '../../context/ToastContext';
-import PageHeader from '../../components/shared/PageHeader';
-import Card from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
+import { useApp } from '../../../context/GymBrandContext';
+import { useToast } from '../../../context/ToastContext';
+import Button from '../../../components/ui/Button';
 
 const PROVIDERS = [
   { value: '', labelEn: 'Select your current provider', labelAr: 'اختر مزود الخدمة الحالي' },
@@ -25,7 +23,11 @@ const IMPORT_CARDS = [
   { id: 'products', icon: 'inventory_2', labelEn: 'Import Products', labelAr: 'استيراد المنتجات', descEn: 'Import product inventory and pricing', descAr: 'استيراد المخزون والتسعير' },
 ];
 
-export default function MigrationCenter() {
+/**
+ * MigrationTab — §27: merged /admin/settings/migration (MigrationCenter)
+ * into the Settings hub. Renders inside SettingsPage's content Card.
+ */
+export default function MigrationTab() {
   const { language } = useApp();
   const { showToast } = useToast();
   const rtl = language === 'ar';
@@ -45,14 +47,8 @@ export default function MigrationCenter() {
   };
 
   return (
-    <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
-      <PageHeader
-        title={rtl ? 'مركز الترحيل' : 'Migration Center'}
-        subtitle={rtl ? 'نقل بياناتك من مزود آخر' : 'Migrate your data from another provider'}
-        icon="move_to_inbox"
-      />
-
-      <Card>
+    <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-4">
+      <div>
         <label className="block text-sm font-semibold text-gray-500 mb-2">
           {rtl ? 'اختر مزود الخدمة الحالي' : 'Choose your current provider'}
         </label>
@@ -65,11 +61,11 @@ export default function MigrationCenter() {
             <option key={p.value} value={p.value} disabled={!p.value}>{rtl ? p.labelAr : p.labelEn}</option>
           ))}
         </select>
-      </Card>
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {IMPORT_CARDS.map((card) => (
-          <Card key={card.id} hoverable>
+          <div key={card.id} className="border border-gray-100 rounded-3xl p-4 shadow-sm hover:shadow-md transition-shadow">
             <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
               <span className="material-symbols-outlined text-2xl">{card.icon}</span>
             </div>
@@ -88,7 +84,7 @@ export default function MigrationCenter() {
               )}
               {importing === card.id ? (rtl ? 'جاري الاستيراد...' : 'Importing...') : (rtl ? 'استيراد' : 'IMPORT')}
             </Button>
-          </Card>
+          </div>
         ))}
       </div>
     </div>
