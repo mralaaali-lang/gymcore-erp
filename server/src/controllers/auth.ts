@@ -213,7 +213,7 @@ export const staffLogin = async (req: Request, res: Response): Promise<void> => 
     );
 
     res.status(200).json({
-      expires_in: 900,
+      expires_in: 300,
       user: {
         id: staff.id,
         full_name: staff.full_name,
@@ -328,7 +328,7 @@ export const refreshAccessToken = async (req: Request, res: Response): Promise<v
     res.cookie('refresh_token', newRefreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
 
     res.status(200).json({
-      expires_in: 900,
+      expires_in: 300,
       user: {
         id: staff.id,
         full_name: staff.full_name,
