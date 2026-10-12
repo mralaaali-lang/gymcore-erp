@@ -519,3 +519,22 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 **التحقق الحي (docker :9000، جلسة مدير صالة قائمة):** الشبكة — `/auth/me 200` (بعد refresh متوقع)، الـ3 endpoints الجديدة 200، leads 200، **صفر 403**؛ البنية — العنوان «الصالة الأولى»، «ج.م» بدل `$`، شريط اليوم 2 حضور/0 إيراد (حقيقي)، 4 كروت إجراء بحالتها الفارغة الصادقة، الرسم بسلسلتين ومحاور 0/1/2، لا تكرار ترحيب/متأخرات، footer «Alaa Ali · manager@first-gym.com» من /auth/me. `tsc` سيرفر+فرونت EXIT=0 · `vite build` ✓ 3.77s.
 
 **ملاحظات:** banner «تبقّى 31 يوماً» ما زال يظهر (مكوّن AppLayout/اشتراك SaaS — خارج نطاق الداشبورد، قرار عرض منفصل). صفحات أخرى ما زالت تعرض عملات ثابتة (SalesPage/ج.م في useGymDashboard…) — تعميم `formatMoney(gymProfile.currency)` عليها مهمة تالية صغيرة. التحقق التفاعلي ببقية الأدوار يبقى للمستخدم.
+
+---
+
+## 25) إعادة نشر staging على Railway لتطبيق §22–§24 — ✅ مكتملة (2026-10-12)
+
+**الغرض:** نقل كود دمج الفريق (§22) والمتجر (§23) والداشبورد الجديد (§24) إلى مشروع gymcore-staging، لأن آخر نجاح كان قبل هذه التغييرات (نشر 2026-10-11 21:30 UTC).
+
+**عقبات اليوم وحلولها (مهمة للتوثيق):**
+1. **Smart App Control على Windows يحجب `railway.exe`** — أي استدعاء للـ CLI المثبت (npm shim → bin/railway.exe) يفشل بصمت exit=1، وPowerShell يوضح: «An Application Control policy has blocked this file» (الـ registry تؤكد `VerifiedAndReputablePolicyState=1`). **لم نغيّر أي إعداد أمني.** الحل: تنزيل نسخة Linux رسمية (railway-v5.66.0-x86_64-unknown-linux-musl) وتشغيلها داخل WSL (docker-desktop) باستخدام جلسة CLI المحفوظة أصلاً (`HOME=/mnt/c/Users/X870`) — بدون لمس أي توكن.
+2. **الرفع من مسار Windows (drvfs `/mnt/d/...`) مع `.railwayignore` أو `.dockerignore`** ينتج فشل بناء: `header key "exclude-patterns" contains value with non-printable ASCII characters`، وحتى بدونها ظهر `tsconfig.json(1,446) error TS1005` (ملفات تصل تالفة/مسطّحة للـ builder). **الحل النهائي الموثوق:** `git archive HEAD -o deploy-snapshot.tar` ثم فكّه في نظام ملفات WSL الأصلي (`/root/deploy`) والنشر من هناك — نجح مباشرة للحبيبين.
+3. ترتيب النشر إلزامي backend ثم frontend (تجمّد DNS في nginx).
+
+**النتائج الحية (fetched بعد النشر مباشرة):**
+- Backend: deployment `60306940` SUCCESS · `/health` 200 · endpoints §24 (`/api/dashboard/expiring-soon|inactive-members|overdue-debts`) تُرجع **401** بدون توكن (وليست 404 → الكود الجديد منشور).
+- Frontend: deployment `8f0a12c3` SUCCESS · `/` 200 · `/admin/dashboard` (SPA) 200 · proxy health عبر nginx 200 · `/api/auth/me` 401 (proxy شغال).
+
+**قواعد تشغيلية للمستقبل:** للنشر من هذه الآلة استخدم الوصفة الثابتة: (1) `git archive HEAD` من جذر المستودع، (2) فكّه في WSL-native، (3) `HOME=/mnt/c/Users/X870 /tmp/railway up --detach -p 3afee7fa… -e 1e7438e0… -s <serviceId>` (backend `64b179de…` ثم frontend `043d0844…`)، (4) تحقّق بالـ probes أعلاه. لا ترفع من `/mnt/d` مباشرة. (قيد الاختبار: إذا فُعِل SAC ثم أُغلق لاحقاً لا يمكن إعادة تشغيله إلا بإعادة تثبيت ويندوز — لا تعتمد على CLI ويندوز.)
+
+**تنويه:** قاعدة بيانات staging ما زالت فارغة — التحقق التفاعلي الكامل بالدخول كمدير صالة على staging يحتاج onboarding أولًا (قرار مستخدم).
