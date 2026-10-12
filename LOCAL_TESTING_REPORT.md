@@ -538,3 +538,20 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 **قواعد تشغيلية للمستقبل:** للنشر من هذه الآلة استخدم الوصفة الثابتة: (1) `git archive HEAD` من جذر المستودع، (2) فكّه في WSL-native، (3) `HOME=/mnt/c/Users/X870 /tmp/railway up --detach -p 3afee7fa… -e 1e7438e0… -s <serviceId>` (backend `64b179de…` ثم frontend `043d0844…`)، (4) تحقّق بالـ probes أعلاه. لا ترفع من `/mnt/d` مباشرة. (قيد الاختبار: إذا فُعِل SAC ثم أُغلق لاحقاً لا يمكن إعادة تشغيله إلا بإعادة تثبيت ويندوز — لا تعتمد على CLI ويندوز.)
 
 **تنويه:** قاعدة بيانات staging ما زالت فارغة — التحقق التفاعلي الكامل بالدخول كمدير صالة على staging يحتاج onboarding أولًا (قرار مستخدم).
+
+---
+
+## 26) دمج دفعة 3 — الديون والإعلانات في الـhubs الموجودة (2026-10-12)
+
+**الفكرة:** إلغاء آخر صفحتين متكررتهما صغيرتين بدل إضافة hub ثالث: «الديون» طبيعتها مالية → تبويب **الديون** داخل مركز الفواتير (`/admin/billing?tab=Debts`)، و«الإعلانات» اتصال تسويقي → تبويب **الإعلانات** داخل التسويق (`/admin/marketing?tab=Announcements`).
+
+**التنفيذ:**
+1. `src/pages/gym-admin/billing/DebtsPanel.tsx` — نقل كامل لـ DebtsPage (جدول + إضافة دين + تسديد دفعة) بدون PageHeader؛ ترقيات: العملة صارت من إعدادات الصالة عبر `formatMoney(gymProfile.currency)` بدل `toFixed(2)` المجرد، والأرقام `Number()` (أعمدة NUMERIC تصل كـ strings)، وtoolbar داخلي للوحة.
+2. `src/pages/gym-admin/marketing/AnnouncementsPanel.tsx` — نقل AnnouncementsPage (قائمة مثبتة/غير مثبتة + نموذج نشر)؛ تثنّي تسميات الجمهور (كانت عربي فقط) و`formatDate` صار حسب اللغة؛ أضيفت toasts للنجاح/الفشل (كانت غائبة).
+3. `BillingOverview.tsx` + `MarketingAutomation.tsx`: تبويب جديد في BILLING_TABS/MARKETING_TABS مع label/icon، ودعم **`?tab=` من الـURL**: القراءة عند الـmount + `useEffect` مزامنة عند تغيير البارامتر (حالة الوصول من redirect والصفحة مركّبة فعلاً)، والضغط على تبويب يكتب `?tab=` بـ replace.
+4. المسارات: `/admin/debts` → `Navigate /admin/billing?tab=Debts`، `/admin/announcements` → `/admin/marketing?tab=Announcements`؛ حُذفت الصفحتان القديمتان (git rm؛ لا مراجع متبقية — grep نظيف).
+5. الروابط داخل التطبيق صارت للمسار القانوني: كارت «مستحقات متأخرة» في داشبورد §24 → `/admin/billing?tab=Debts`؛ تبويب «المحتوى» في MembersPage → `/admin/marketing?tab=Announcements`.
+
+**التحقق الحي (docker :9000، جلسة مدير AMLGYM):** `/admin/debts` حُوّل فعليًا لـ `billing?tab=Debts` والتبويب فاعل واللوحة تعرض الحالة الفارغة الصادقة؛ `/admin/announcements` → `marketing?tab=Announcements` مع القوائم الفارغة وزر «إضافة إعلان»؛ فتحنا نموذج «دين جديد» فعليًا وعمل بحث الأعضاء (3 نتائج من `/api/members`) ثم أُلغي بدون إنشاء بيانات؛ الشبكة: `/api/announcements 200`، `/auth/me 200`، صفر أخطاء. `tsc` فرونت EXIT=0 · `vite build` ✓ 10.5s.
+
+**ملاحظات:** لمسة تحسين صغيرة لا تفسد الالتزام: لم نجرب إنشاء دين/إعلان فعليًا (كتابة بيانات) احترامًا لـ«الحالة الفارغة الصادقة» في DB الاختبار؛ مسارات الديون تُغطت سابقًا في §24 (endpoint overdue-debts حي). بقايا دفعة 4: backup/migration داخل الإعدادات.

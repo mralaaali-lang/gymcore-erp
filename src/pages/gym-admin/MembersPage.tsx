@@ -114,7 +114,7 @@ export default function MembersPage() {
     { id: 'memberships', labelEn: 'Memberships', labelAr: 'الباقات', route: '/admin/subscriptions' },
     { id: 'rosters', labelEn: 'Rosters', labelAr: 'القوائم', route: null },
     { id: 'documents', labelEn: 'Documents', labelAr: 'المستندات', route: null },
-    { id: 'content', labelEn: 'Content', labelAr: 'المحتوى', route: '/admin/announcements' },
+    { id: 'content', labelEn: 'Content', labelAr: 'المحتوى', route: '/admin/marketing?tab=Announcements' },
     { id: 'growth', labelEn: 'Growth', labelAr: 'النمو', route: '/admin/analytics' },
     { id: 'settings', labelEn: 'Settings', labelAr: 'الإعدادات', route: '/admin/settings' },
   ];

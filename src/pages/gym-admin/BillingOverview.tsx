@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { listPayments, getFinanceSummary, listExpenses, listCashboxSessions, listOffers } from '../../services/api';
@@ -8,8 +9,11 @@ import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
 import Card from '../../components/ui/Card';
 import StatusBadge from '../../components/ui/StatusBadge';
+import DebtsPanel from './billing/DebtsPanel';
 
-const BILLING_TABS = ['Overview', 'Payments', 'Recurring', 'Discounts', 'Payment Forms', 'Accounting', 'Growth', 'Settings'] as const;
+// §26: DebtsPage merged in as the "Debts" tab; ?tab= deep links keep the old
+// /admin/debts URL working through a redirect.
+const BILLING_TABS = ['Overview', 'Payments', 'Recurring', 'Discounts', 'Payment Forms', 'Accounting', 'Debts', 'Growth', 'Settings'] as const;
 type BillingTab = typeof BILLING_TABS[number];
 
 const TAB_LABELS: Record<BillingTab, { en: string; ar: string }> = {
@@ -19,6 +23,7 @@ const TAB_LABELS: Record<BillingTab, { en: string; ar: string }> = {
   Discounts: { en: 'Discounts', ar: 'الخصومات' },
   'Payment Forms': { en: 'Payment Forms', ar: 'نماذج الدفع' },
   Accounting: { en: 'Accounting', ar: 'المحاسبة' },
+  Debts: { en: 'Debts', ar: 'الديون' },
   Growth: { en: 'Growth', ar: 'النمو' },
   Settings: { en: 'Settings', ar: 'الإعدادات' },
 };
@@ -30,6 +35,7 @@ const TAB_ICONS: Record<BillingTab, string> = {
   Discounts: 'discount',
   'Payment Forms': 'credit_card',
   Accounting: 'account_balance',
+  Debts: 'account_balance_wallet',
   Growth: 'trending_up',
   Settings: 'settings',
 };
@@ -55,7 +61,26 @@ function paymentStatusInfo(status?: string): { ar: string; en: string; variant: 
 export default function BillingOverview() {
   const { language } = useApp();
   const rtl = language === 'ar';
-  const [activeTab, setActiveTab] = useState<BillingTab>('Overview');
+  const [params, setParams] = useSearchParams();
+  const requestedTab = params.get('tab');
+  const [activeTab, setActiveTabState] = useState<BillingTab>(
+    requestedTab && (BILLING_TABS as readonly string[]).includes(requestedTab)
+      ? (requestedTab as BillingTab)
+      : 'Overview',
+  );
+  // Keep in sync when arriving via /admin/debts redirect with the page already
+  // mounted (same route, different ?tab).
+  useEffect(() => {
+    if (requestedTab && (BILLING_TABS as readonly string[]).includes(requestedTab)) {
+      setActiveTabState(requestedTab as BillingTab);
+    }
+  }, [requestedTab]);
+  const setActiveTab = (tab: BillingTab) => {
+    setActiveTabState(tab);
+    const next = new URLSearchParams(params);
+    next.set('tab', tab);
+    setParams(next, { replace: true });
+  };
   const [page, setPage] = useState(1);
 
   const money = (v: number | undefined | null) =>
@@ -388,6 +413,7 @@ export default function BillingOverview() {
       {activeTab === 'Payments' && renderPayments()}
       {activeTab === 'Recurring' && renderRecurring()}
       {activeTab === 'Accounting' && renderAccounting()}
+      {activeTab === 'Debts' && <DebtsPanel />}
       {['Discounts', 'Payment Forms', 'Growth', 'Settings'].includes(activeTab) && renderPlaceholder(activeTab)}
     </div>
   );

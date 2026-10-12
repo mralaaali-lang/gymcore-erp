@@ -275,7 +275,7 @@ export default function GymAdminDashboard() {
               subtitle={overdue && overdue.total_amount > 0 ? formatMoney(Number(overdue.total_amount), currency) : undefined}
               count={overdue?.data.length ?? 0}
               accent="rose"
-              to="/admin/debts"
+              to="/admin/billing?tab=Debts"
               rows={(overdue?.data ?? []).slice(0, 4).map((r) => ({
                 key: r.id,
                 primary: r.member_name,

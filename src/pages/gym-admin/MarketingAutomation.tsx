@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { listReferrals, type ReferralData } from '../../services/api';
@@ -7,13 +8,17 @@ import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
 import Card from '../../components/ui/Card';
 import StatusBadge from '../../components/ui/StatusBadge';
+import AnnouncementsPanel from './marketing/AnnouncementsPanel';
 
-const MARKETING_TABS = ['Dashboard', 'Referrals', 'Leads', 'Messaging', 'Automations', 'Settings'] as const;
+// §26: AnnouncementsPage merged in as the "Announcements" tab; the old
+// /admin/announcements route redirects here with ?tab=Announcements.
+const MARKETING_TABS = ['Dashboard', 'Referrals', 'Announcements', 'Leads', 'Messaging', 'Automations', 'Settings'] as const;
 type MarketingTab = typeof MARKETING_TABS[number];
 
 const TAB_LABELS: Record<MarketingTab, { en: string; ar: string }> = {
   Dashboard: { en: 'Dashboard', ar: 'لوحة البيانات' },
   Referrals: { en: 'Referrals', ar: 'الإحالات' },
+  Announcements: { en: 'Announcements', ar: 'الإعلانات' },
   Leads: { en: 'Leads', ar: 'العملاء المحتملين' },
   Messaging: { en: 'Messaging', ar: 'الرسائل' },
   Automations: { en: 'Automations', ar: 'الأتمتة' },
@@ -23,6 +28,7 @@ const TAB_LABELS: Record<MarketingTab, { en: string; ar: string }> = {
 const TAB_ICONS: Record<MarketingTab, string> = {
   Dashboard: 'dashboard',
   Referrals: 'group',
+  Announcements: 'campaign',
   Leads: 'leaderboard',
   Messaging: 'chat',
   Automations: 'settings_automation',
@@ -56,7 +62,24 @@ function referralName(r: ReferralData): string {
 export default function MarketingAutomation() {
   const { language } = useApp();
   const rtl = language === 'ar';
-  const [activeTab, setActiveTab] = useState<MarketingTab>('Dashboard');
+  const [params, setParams] = useSearchParams();
+  const requestedTab = params.get('tab');
+  const [activeTab, setActiveTabState] = useState<MarketingTab>(
+    requestedTab && (MARKETING_TABS as readonly string[]).includes(requestedTab)
+      ? (requestedTab as MarketingTab)
+      : 'Dashboard',
+  );
+  useEffect(() => {
+    if (requestedTab && (MARKETING_TABS as readonly string[]).includes(requestedTab)) {
+      setActiveTabState(requestedTab as MarketingTab);
+    }
+  }, [requestedTab]);
+  const setActiveTab = (tab: MarketingTab) => {
+    setActiveTabState(tab);
+    const next = new URLSearchParams(params);
+    next.set('tab', tab);
+    setParams(next, { replace: true });
+  };
   const [leadTimeToggle, setLeadTimeToggle] = useState<typeof TIME_TOGGLES[number]>('Week');
   const [signupTimeToggle, setSignupTimeToggle] = useState<typeof TIME_TOGGLES[number]>('Week');
   const [funnel, setFunnel] = useState('All');
@@ -261,7 +284,8 @@ export default function MarketingAutomation() {
 
       {activeTab === 'Dashboard' && renderDashboard()}
       {activeTab === 'Referrals' && renderReferrals()}
-      {activeTab !== 'Dashboard' && activeTab !== 'Referrals' && renderPlaceholder(activeTab)}
+      {activeTab === 'Announcements' && <AnnouncementsPanel />}
+      {activeTab !== 'Dashboard' && activeTab !== 'Referrals' && activeTab !== 'Announcements' && renderPlaceholder(activeTab)}
     </div>
   );
 }

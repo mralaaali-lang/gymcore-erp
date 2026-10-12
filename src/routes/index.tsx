@@ -104,10 +104,12 @@ export default function AppRouter() {
         <Route path="/admin/purchases" element={<Navigate to="/admin/products?tab=purchases" replace />} />
         <Route path="/admin/suppliers" element={<Navigate to="/admin/products?tab=suppliers" replace />} />
         <Route path="/admin/expenses" element={lazyLoad(() => import('../pages/gym-admin/ExpensesPage'), ['gym-admin'])} />
-        <Route path="/admin/debts" element={lazyLoad(() => import('../pages/gym-admin/DebtsPage'), ['gym-admin'])} />
         <Route path="/admin/cashbox" element={lazyLoad(() => import('../pages/gym-admin/CashboxPage'), ['gym-admin'])} />
         <Route path="/admin/cashbox/shifts" element={lazyLoad(() => import('../pages/gym-admin/CashboxShiftsPage'), ['gym-admin'])} />
-        <Route path="/admin/announcements" element={lazyLoad(() => import('../pages/gym-admin/AnnouncementsPage'), ['gym-admin'])} />
+        {/* Billing hub — DebtsPage merged as the "Debts" tab (§26). */}
+        <Route path="/admin/debts" element={<Navigate to="/admin/billing?tab=Debts" replace />} />
+        {/* Marketing hub — AnnouncementsPage merged as the "Announcements" tab (§26). */}
+        <Route path="/admin/announcements" element={<Navigate to="/admin/marketing?tab=Announcements" replace />} />
         {/* Team hub — merged trainers/shifts/hr/users pages into one tabbed page (§22). */}
         <Route path="/admin/trainers" element={<Navigate to="/admin/users?tab=staff&role=coach" replace />} />
         <Route path="/admin/users" element={lazyLoad(() => import('../pages/gym-admin/team/TeamPage'), ['gym-admin'])} />
