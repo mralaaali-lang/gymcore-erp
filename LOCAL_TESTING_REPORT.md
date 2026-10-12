@@ -601,5 +601,7 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 5. الـ triggers كانت على فرع وهمي `railway-staging` (المستودع فيه main فقط) → `deploymentTriggerUpdate` بفرع `main` للخدمةين (trigger الباك-إند `2cbdad58`).
 6. `serviceInstanceAutoDeployUpdate` ترجّع INTERNAL_SERVER_ERROR وهي غير لازمة — الـ Deployment Triggers وحدها تشعل البناء (أثبتها الـ push التجريبي `3973a84` الذي أنشأ نسختي بناء فورًا).
 
-**آلية العمل الجديدة:** `git push origin main` ← webhook من تطبيق GitHub ← Railway يبني من Dockerfile ويفحص `/health` ثم يبدّل النسخة الحية. `deploy.sh` لم يعد لازمًا لـ staging (يبقى أداة طوارئ/تحكم يدوي). أول deploy حقيقي بهذه السلسلة هو commit التوثيق هذا نفسه؛ نتائج الفحوص الحية (backend `/health` + `/auth/me` فيه `trial_days_remaining` + صفحات §26–§28 على دومين الـfrontend) تُضاف هنا بعد التحقق.
+**آلية العمل الجديدة:** `git push origin main` ← webhook من تطبيق GitHub ← Railway يبني من Dockerfile ويفحص `/health` ثم يبدّل النسخة الحية. `deploy.sh` لم يعد لازمًا لـ staging (يبقى أداة طوارئ/تحكم يدوي).
+
+**التحقق الحي (نجح من أول تجربة — commit التوثيق `ccb0bb4` نفسه هو الاختبار):** الدفع على main أنشأ بناءين تلقائيًا للخدمتين في نفس اللحظة (`f7a7955a` باك-إند + `9530e710` فرونت، branch=main وcommitHash=ccb0bb4) وكلاهما **SUCCESS** خلال ~4 دقائق. فحوصات staging بعد النشر: backend `/health` 200 · `/api/v1/auth/me` بلا جلسة 401 (متوقع) · route الـ§24 الجديدة `/api/v1/dashboard/expiring-soon` ترجع **401 وليس 404** = كود §22–§28 حيّ على staging · frontend `/` و`/admin/settings?tab=backup` 200. وسجل إقلاع الباك-إند أظهر **تنفيذ `057_gym_trials.sql` على قاعدة staging** («Running 057…» فوق 56 ميجريشن مطبقة) — الرفع التلقائي ينفذ ميجريشناته بنفسه. من هنا كل push = deploy؛ لا حاجة لكلمة «ارفع» في staging.
 
