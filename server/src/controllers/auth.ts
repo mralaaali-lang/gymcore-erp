@@ -24,8 +24,14 @@ const REFRESH_TOKEN_EXPIRY = '7d';
  */
 const gymBrief = async (gymId: string) => {
   const g = await query(
-    `SELECT id, name, subdomain, plan_tier, currency, subscription_status, is_active
-     FROM gyms WHERE id = $1`,
+    `SELECT g.id, g.name, g.subdomain, g.plan_tier, g.currency, g.subscription_status, g.is_active,
+            gt.trial_end,
+            CASE WHEN gt.trial_end > NOW()
+                 THEN GREATEST(1, CEIL(EXTRACT(EPOCH FROM (gt.trial_end - NOW())) / 86400))::int
+                 ELSE NULL END AS trial_days_remaining
+     FROM gyms g
+     LEFT JOIN gym_trials gt ON gt.gym_id = g.id
+     WHERE g.id = $1`,
     [gymId]
   );
   return g.rows[0] ?? null;
