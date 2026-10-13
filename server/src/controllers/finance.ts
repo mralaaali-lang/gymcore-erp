@@ -2,6 +2,31 @@ import { Request, Response } from 'express';
 import { query, getClient } from '../config/database';
 import logger from '../config/logger';
 
+// §34ث (UTC): every "today / this-month" money figure used to be bucketed by
+// UTC CURRENT_DATE while gyms.timezone is 'Africa/Cairo' — the first three
+// Cairo hours of any day landed on the previous day. These helpers resolve the
+// gym's timezone once per request and build timestamptz boundaries from it.
+const DEFAULT_TZ = 'Africa/Cairo';
+async function getGymTz(gym_id: string | undefined): Promise<string> {
+  if (!gym_id) return DEFAULT_TZ;
+  const r = await query(`SELECT COALESCE(timezone, $2) AS tz FROM gyms WHERE id = $1`, [gym_id, DEFAULT_TZ]);
+  return r.rows[0]?.tz || DEFAULT_TZ;
+}
+// SQL fragments — $2 is always the gym timezone string.
+const TZ_TODAY = `((CURRENT_TIMESTAMP AT TIME ZONE $2)::date)::timestamp AT TIME ZONE $2`;
+const TZ_YDAY = `(((CURRENT_TIMESTAMP AT TIME ZONE $2)::date) - 1)::timestamp AT TIME ZONE $2`;
+const TZ_MONTH = `(date_trunc('month', ((CURRENT_TIMESTAMP AT TIME ZONE $2)::date)::timestamp)) AT TIME ZONE $2`;
+
+// §34ث: ledger rows are attributed to the gym's currently-open cashbox shift
+// so the drawer can be reconciled against actual cash movement.
+const OPEN_SESSION = `
+  (SELECT id FROM cashbox_sessions WHERE gym_id = $1 AND status = 'open' ORDER BY opened_at DESC LIMIT 1)`;
+
+// Cash rules (honest for pre-058 data): expenses without a recorded method are
+// cash; payments count only when method is exactly 'cash'.
+const CASH_IN = `ft.type = 'payment' AND ft.payment_method = 'cash'`;
+const CASH_OUT = `ft.type = 'expense' AND (ft.payment_method IS NULL OR ft.payment_method = 'cash')`;
+
 // === PAYMENTS (financial_transactions — type='payment') ===
 // §34ث: the list used to fake `NULL::text AS member_name` and the insert
 // dropped member_id/payment_method even though the schema required them.
@@ -12,12 +37,13 @@ export const listPayments = async (req: Request, res: Response) => {
   const limit = parseInt(req.query.limit as string) || 20;
   const offset = (page - 1) * limit;
   try {
+    const tz = await getGymTz(gym_id);
     const agg = await query(
       `SELECT COUNT(*)::int AS total,
               COALESCE(SUM(amount), 0) AS total_sum,
-              COUNT(*) FILTER (WHERE created_at >= date_trunc('month', CURRENT_DATE))::int AS month_count,
-              COALESCE(SUM(amount) FILTER (WHERE created_at >= date_trunc('month', CURRENT_DATE)), 0) AS month_sum
-       FROM financial_transactions WHERE gym_id=$1 AND type='payment'`, [gym_id]);
+              COUNT(*) FILTER (WHERE created_at >= ${TZ_MONTH})::int AS month_count,
+              COALESCE(SUM(amount) FILTER (WHERE created_at >= ${TZ_MONTH}), 0) AS month_sum
+       FROM financial_transactions WHERE gym_id=$1 AND type='payment'`, [gym_id, tz]);
     const a = agg.rows[0] || {};
     const total = Number(a.total || 0);
     const data = await query(
@@ -46,8 +72,8 @@ export const createPayment = async (req: Request, res: Response) => {
       return;
     }
     const r = await query(
-      `INSERT INTO financial_transactions (gym_id, type, amount, description, staff_user_id, member_id, payment_method)
-       VALUES ($1,'payment',$2,$3,$4,$5,$6) RETURNING *`,
+      `INSERT INTO financial_transactions (gym_id, type, amount, description, staff_user_id, member_id, payment_method, cash_session_id)
+       VALUES ($1,'payment',$2,$3,$4,$5,$6,${OPEN_SESSION}) RETURNING *`,
       [gym_id, amount, description, staff_user_id, member_id, payment_method || 'cash']);
     res.status(201).json({ data: r.rows[0] });
   } catch (e: any) { logger.error('createPayment failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
@@ -57,17 +83,28 @@ export const createPayment = async (req: Request, res: Response) => {
 export const listExpenses = async (req: Request, res: Response) => {
   const gym_id = req.staff?.gym_id;
   try {
-    const data = await query(`SELECT ft.*, ec.name AS category_name FROM financial_transactions ft LEFT JOIN expense_categories ec ON ft.category_id=ec.id WHERE ft.gym_id=$1 AND ft.type='expense' ORDER BY ft.created_at DESC`, [gym_id]);
-    res.json({ data: data.rows });
+    const tz = await getGymTz(gym_id);
+    const [data, agg] = await Promise.all([
+      query(`SELECT ft.*, ec.name AS category_name FROM financial_transactions ft LEFT JOIN expense_categories ec ON ft.category_id=ec.id WHERE ft.gym_id=$1 AND ft.type='expense' ORDER BY ft.created_at DESC`, [gym_id]),
+      // §34ث: SalesPage used to client-side reduce the whole page of rows for
+      // "Total Expenses" — the server now states the true sums.
+      query(`SELECT COALESCE(SUM(amount),0) AS total_sum,
+                    COALESCE(SUM(amount) FILTER (WHERE created_at >= ${TZ_MONTH}),0) AS month_sum
+             FROM financial_transactions WHERE gym_id=$1 AND type='expense'`, [gym_id, tz]),
+    ]);
+    res.json({ data: data.rows, stats: { total_sum: Number(agg.rows[0].total_sum), month_sum: Number(agg.rows[0].month_sum) } });
   } catch (e: any) { logger.error('listExpenses failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };
 
 export const createExpense = async (req: Request, res: Response) => {
-  const { amount, description, category_id } = req.body;
+  const { amount, description, category_id, payment_method } = req.body;
   const gym_id = req.staff?.gym_id;
   const staff_user_id = req.staff?.staff_user_id;
   try {
-    const r = await query(`INSERT INTO financial_transactions (gym_id, type, amount, description, category_id, staff_user_id) VALUES ($1,'expense',$2,$3,$4,$5) RETURNING *`, [gym_id, amount, description, category_id, staff_user_id]);
+    // §34ث: method was silently dropped — every payout looked like a wallet
+    // ghost in the drawer. Default stays 'cash' (the register reality).
+    const r = await query(`INSERT INTO financial_transactions (gym_id, type, amount, description, category_id, staff_user_id, payment_method, cash_session_id)
+       VALUES ($1,'expense',$2,$3,$4,$5,$6,${OPEN_SESSION}) RETURNING *`, [gym_id, amount, description, category_id || null, staff_user_id, payment_method || 'cash']);
     res.status(201).json({ data: r.rows[0] });
   } catch (e: any) { logger.error('createExpense failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };
@@ -113,6 +150,16 @@ export const createSale = async (req: Request, res: Response) => {
       total += price * item.quantity;
     }
     await client.query(`UPDATE pos_orders SET total_amount=$1 WHERE id=$2`, [total, orderId]);
+    // §34ث: POS revenue must reach the finance ledger in the SAME transaction —
+    // before this, sales lived only in pos_orders and every money aggregate
+    // that read financial_transactions silently understated revenue.
+    if (total > 0) {
+      await client.query(
+        `INSERT INTO financial_transactions (gym_id, type, amount, description, staff_user_id, member_id, payment_method, pos_order_id, cash_session_id)
+         VALUES ($1,'payment',$2,$3,$4,$5,$6,$7,
+           (SELECT id FROM cashbox_sessions WHERE gym_id=$1 AND status='open' ORDER BY opened_at DESC LIMIT 1))`,
+        [gym_id, total, `مبيعات نقطة البيع #${orderId.slice(0, 8)}`, staff_user_id, member_id || null, payment_method || 'cash', orderId]);
+    }
     await client.query('COMMIT');
     const full = await query(`SELECT po.*, su.full_name AS staff_name FROM pos_orders po LEFT JOIN staff_users su ON po.staff_user_id=su.id WHERE po.id=$1`, [orderId]);
     res.status(201).json({ data: full.rows[0] });
@@ -200,12 +247,68 @@ export const payDebt = async (req: Request, res: Response) => {
 };
 
 // === CASHBOX ===
+// §34ث: sessions used to carry free-typed opening/closing numbers with no
+// relation to actual cash movement. Now every ledger row is attributed to the
+// open shift (cash_session_id), so the list states the EXPECTED drawer and the
+// difference against the counted closing balance.
 export const listCashboxSessions = async (req: Request, res: Response) => {
   const gym_id = req.staff?.gym_id;
   try {
-    const r = await query(`SELECT cs.*, su.full_name AS staff_name FROM cashbox_sessions cs LEFT JOIN staff_users su ON cs.staff_user_id=su.id WHERE cs.gym_id=$1 ORDER BY cs.opened_at DESC`, [gym_id]);
+    const r = await query(
+      `SELECT cs.*, su.full_name AS staff_name,
+              x.cash_in, x.cash_out,
+              cs.opening_balance + x.cash_in - x.cash_out AS expected_balance,
+              CASE WHEN cs.closing_balance IS NOT NULL
+                   THEN cs.closing_balance - (cs.opening_balance + x.cash_in - x.cash_out)
+                   ELSE NULL END AS difference
+       FROM cashbox_sessions cs
+       LEFT JOIN staff_users su ON cs.staff_user_id = su.id
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(ft.amount) FILTER (WHERE ${CASH_IN}), 0) AS cash_in,
+                COALESCE(SUM(ft.amount) FILTER (WHERE ${CASH_OUT}), 0) AS cash_out
+         FROM financial_transactions ft
+         WHERE ft.cash_session_id = cs.id
+       ) x ON TRUE
+       WHERE cs.gym_id=$1 ORDER BY cs.opened_at DESC`, [gym_id]);
     res.json({ data: r.rows });
   } catch (e: any) { logger.error('listCashbox failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
+};
+
+// Per-session cash movements (the reconciliation detail behind expected_balance).
+export const listSessionLedger = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const gym_id = req.staff?.gym_id;
+  try {
+    // §34ث — return the session with the SAME reconciliation fields as the list
+    // (staff name, cash in/out, expected, difference) so the ledger modal never
+    // shows a raw half-populated row.
+    const session = await query(
+      `SELECT cs.*, su.full_name AS staff_name,
+              x.cash_in, x.cash_out,
+              cs.opening_balance + x.cash_in - x.cash_out AS expected_balance,
+              CASE WHEN cs.closing_balance IS NOT NULL
+                   THEN cs.closing_balance - (cs.opening_balance + x.cash_in - x.cash_out)
+                   ELSE NULL END AS difference
+       FROM cashbox_sessions cs
+       LEFT JOIN staff_users su ON cs.staff_user_id = su.id
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(ft.amount) FILTER (WHERE ${CASH_IN}), 0) AS cash_in,
+                COALESCE(SUM(ft.amount) FILTER (WHERE ${CASH_OUT}), 0) AS cash_out
+         FROM financial_transactions ft
+         WHERE ft.cash_session_id = cs.id
+       ) x ON TRUE
+       WHERE cs.id=$1 AND cs.gym_id=$2`, [id, gym_id]);
+    if (session.rows.length === 0) { res.status(404).json({ error: 'Session not found' }); return; }
+    const rows = await query(
+      `SELECT ft.id, ft.type, ft.amount, ft.description, ft.payment_method, ft.created_at,
+              COALESCE(m.full_name, su.full_name) AS party
+       FROM financial_transactions ft
+       LEFT JOIN members m ON m.id = ft.member_id
+       LEFT JOIN staff_users su ON su.id = ft.staff_user_id
+       WHERE ft.cash_session_id = $1 AND ft.gym_id = $2
+       ORDER BY ft.created_at DESC LIMIT 500`, [id, gym_id]);
+    res.json({ data: { session: session.rows[0], rows: rows.rows } });
+  } catch (e: any) { logger.error('listSessionLedger failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };
 
 export const openCashbox = async (req: Request, res: Response) => {
@@ -213,6 +316,12 @@ export const openCashbox = async (req: Request, res: Response) => {
   const gym_id = req.staff?.gym_id;
   const staff_user_id = req.staff?.staff_user_id;
   try {
+    // §34ث: one open shift per gym — otherwise cash attribution is meaningless.
+    const open = await query(`SELECT id FROM cashbox_sessions WHERE gym_id=$1 AND status='open'`, [gym_id]);
+    if (open.rows.length > 0) {
+      res.status(400).json({ error: 'توجد وردية مفتوحة بالفعل — أغلقها قبل فتح وردية جديدة' });
+      return;
+    }
     const r = await query(`INSERT INTO cashbox_sessions (gym_id, staff_user_id, opening_balance, notes) VALUES ($1,$2,$3,$4) RETURNING *`, [gym_id, staff_user_id, opening_balance || 0, notes || null]);
     res.status(201).json({ data: r.rows[0] });
   } catch (e: any) { logger.error('openCashbox failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
@@ -222,7 +331,9 @@ export const closeCashbox = async (req: Request, res: Response) => {
   const { id, closing_balance, notes } = req.body;
   const gym_id = req.staff?.gym_id;
   try {
-    const r = await query(`UPDATE cashbox_sessions SET closed_at=NOW(), closing_balance=$1, status='closed', notes=CASE WHEN $4 IS NOT NULL THEN notes || ' | ' || $4 ELSE notes END WHERE id=$2 AND gym_id=$3 RETURNING *`, [closing_balance, id, gym_id, notes]);
+    // §34ث fix: $4 must be typed — Postgres cannot infer a bare NULL parameter
+    // inside `IS NOT NULL` ("could not determine data type of parameter $4").
+    const r = await query(`UPDATE cashbox_sessions SET closed_at=NOW(), closing_balance=$1, status='closed', notes=CASE WHEN $4::text IS NOT NULL THEN COALESCE(notes,'') || ' | ' || $4::text ELSE notes END WHERE id=$2 AND gym_id=$3 RETURNING *`, [closing_balance, id, gym_id, notes]);
     res.json({ data: r.rows[0] });
   } catch (e: any) { logger.error('closeCashbox failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };
@@ -231,17 +342,69 @@ export const closeCashbox = async (req: Request, res: Response) => {
 export const getFinanceSummary = async (req: Request, res: Response) => {
   const gym_id = req.staff?.gym_id;
   try {
-    const [revenue, expenses, debtsTotal, salesCount, todayRev, yesterdayRev, todaySales] = await Promise.all([
-      query(`SELECT COALESCE(SUM(amount),0) AS total FROM financial_transactions WHERE gym_id=$1 AND type='payment' AND created_at >= DATE_TRUNC('month', CURRENT_DATE)`, [gym_id]),
-      query(`SELECT COALESCE(SUM(amount),0) AS total FROM financial_transactions WHERE gym_id=$1 AND type='expense' AND created_at >= DATE_TRUNC('month', CURRENT_DATE)`, [gym_id]),
+    const tz = await getGymTz(gym_id);
+    // §34ث: monthly_sales was an ORDER COUNT rendered as revenue (and SalesPage
+    // subtracted money totals from it). It is now the real POS sum; the count
+    // travels separately. Revenue/expenses/today-strips use gym-local bounds.
+    const [revenue, expenses, debtsTotal, sales, todayRev, yesterdayRev, todaySales] = await Promise.all([
+      query(`SELECT COALESCE(SUM(amount),0) AS total FROM financial_transactions WHERE gym_id=$1 AND type='payment' AND created_at >= ${TZ_MONTH}`, [gym_id, tz]),
+      query(`SELECT COALESCE(SUM(amount),0) AS total FROM financial_transactions WHERE gym_id=$1 AND type='expense' AND created_at >= ${TZ_MONTH}`, [gym_id, tz]),
       query(`SELECT COALESCE(SUM(remaining_amount),0) AS total FROM member_debts WHERE gym_id=$1 AND status='active'`, [gym_id]),
-      query(`SELECT COUNT(*) AS count FROM pos_orders WHERE gym_id=$1 AND created_at >= DATE_TRUNC('month', CURRENT_DATE)`, [gym_id]),
+      query(`SELECT COALESCE(SUM(total_amount),0) AS sum, COUNT(*)::int AS count FROM pos_orders WHERE gym_id=$1 AND created_at >= ${TZ_MONTH}`, [gym_id, tz]),
       // §24 today-strip: payments collected today vs the same figure yesterday
-      query(`SELECT COALESCE(SUM(amount),0) AS total FROM financial_transactions WHERE gym_id=$1 AND type='payment' AND created_at >= CURRENT_DATE`, [gym_id]),
-      query(`SELECT COALESCE(SUM(amount),0) AS total FROM financial_transactions WHERE gym_id=$1 AND type='payment' AND created_at >= CURRENT_DATE - INTERVAL '1 day' AND created_at < CURRENT_DATE`, [gym_id]),
-      // §35ت — dashboard «مبيعات» card: today's real POS takings (sum + count)
-      query(`SELECT COALESCE(SUM(total_amount),0) AS total, COUNT(*)::int AS count FROM pos_orders WHERE gym_id=$1 AND created_at >= CURRENT_DATE`, [gym_id]),
+      query(`SELECT COALESCE(SUM(amount),0) AS total FROM financial_transactions WHERE gym_id=$1 AND type='payment' AND created_at >= ${TZ_TODAY}`, [gym_id, tz]),
+      query(`SELECT COALESCE(SUM(amount),0) AS total FROM financial_transactions WHERE gym_id=$1 AND type='payment' AND created_at >= ${TZ_YDAY} AND created_at < ${TZ_TODAY}`, [gym_id, tz]),
+      // §35ت — dashboard "مبيعات" card: today's real POS takings (gym-local day)
+      query(`SELECT COALESCE(SUM(total_amount),0) AS total, COUNT(*)::int AS count FROM pos_orders WHERE gym_id=$1 AND created_at >= ${TZ_TODAY}`, [gym_id, tz]),
     ]);
-    res.json({ data: { monthly_revenue: revenue.rows[0].total, monthly_expenses: expenses.rows[0].total, outstanding_debts: debtsTotal.rows[0].total, monthly_sales: salesCount.rows[0].count, today_revenue: todayRev.rows[0].total, yesterday_revenue: yesterdayRev.rows[0].total, today_sales_sum: todaySales.rows[0].total, today_sales_count: todaySales.rows[0].count } });
+    res.json({ data: {
+      monthly_revenue: revenue.rows[0].total,
+      monthly_expenses: expenses.rows[0].total,
+      outstanding_debts: debtsTotal.rows[0].total,
+      monthly_sales_sum: sales.rows[0].sum,
+      monthly_sales_count: sales.rows[0].count,
+      net_month: Number(revenue.rows[0].total) - Number(expenses.rows[0].total),
+      today_revenue: todayRev.rows[0].total,
+      yesterday_revenue: yesterdayRev.rows[0].total,
+      today_sales_sum: todaySales.rows[0].total,
+      today_sales_count: todaySales.rows[0].count,
+      timezone: tz,
+    } });
   } catch (e: any) { logger.error('getFinanceSummary failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
+};
+
+// === §34ث CASHBOOK (daily cash journal, grouped by GYM-local day) ===
+export const getCashbook = async (req: Request, res: Response) => {
+  const gym_id = req.staff?.gym_id;
+  const days = Math.min(365, Math.max(1, parseInt(req.query.days as string) || 30));
+  try {
+    const tz = await getGymTz(gym_id);
+    const r = await query(
+      `WITH days AS (
+         SELECT (CURRENT_TIMESTAMP AT TIME ZONE $2)::date - generate_series(0, $3::int - 1) AS d
+       ),
+       moves AS (
+         SELECT (ft.created_at AT TIME ZONE $2)::date AS d,
+                CASE WHEN ${CASH_IN} THEN ft.amount ELSE 0 END AS cash_in,
+                CASE WHEN ${CASH_OUT} THEN ft.amount ELSE 0 END AS cash_out
+         FROM financial_transactions ft
+         WHERE ft.gym_id = $1
+           AND (ft.type='payment' OR ft.type='expense')
+           AND ft.created_at >= ((CURRENT_TIMESTAMP AT TIME ZONE $2)::date - $3::int)::timestamp AT TIME ZONE $2
+       )
+       SELECT to_char(days.d, 'YYYY-MM-DD') AS date,
+              COALESCE(SUM(m.cash_in), 0) AS cash_in,
+              COALESCE(SUM(m.cash_out), 0) AS cash_out,
+              COALESCE(SUM(m.cash_in), 0) - COALESCE(SUM(m.cash_out), 0) AS net
+       FROM days LEFT JOIN moves m ON m.d = days.d
+       GROUP BY days.d ORDER BY days.d`, [gym_id, tz, days]);
+    const rows = r.rows.map((x) => ({ date: x.date, cash_in: Number(x.cash_in), cash_out: Number(x.cash_out), net: Number(x.net) }));
+    const totals = rows.reduce((t, x) => ({ cash_in: t.cash_in + x.cash_in, cash_out: t.cash_out + x.cash_out }), { cash_in: 0, cash_out: 0 });
+    res.status(200).json({ data: {
+      days,
+      timezone: tz,
+      rows,
+      totals: { cash_in: totals.cash_in, cash_out: totals.cash_out, net: totals.cash_in - totals.cash_out },
+    } });
+  } catch (e: any) { logger.error('getCashbook failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };

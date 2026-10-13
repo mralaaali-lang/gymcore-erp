@@ -143,7 +143,7 @@ import {
   listSuppliers, createSupplier,
   listDebts, createDebt, payDebt,
   listCashboxSessions, openCashbox, closeCashbox, getFinanceSummary,
-  // TEMP-REMOVED-FOR-COMMIT: getCashbook, listSessionLedger (restore after §34ح commit)
+  getCashbook, listSessionLedger,
 } from '../controllers/finance';
 import {
   completeStitchOrderHandler, listStitchOrdersHandler, getStitchOrderHandler,
@@ -393,7 +393,8 @@ router.post('/api/finance/debts/:id/pay', requireRole('manager'), validate(payDe
 router.get('/api/finance/cashbox', requireRole('manager'), listCashboxSessions);
 router.post('/api/finance/cashbox/open', requireRole('manager'), validate(openCashboxSchema), openCashbox);
 router.post('/api/finance/cashbox/close', requireRole('manager'), validate(closeCashboxSchema), closeCashbox);
-// TEMP-REMOVED-FOR-COMMIT: §34ث cashbook/ledger routes (restore after §34ح commit)
+router.get('/api/finance/cashbox/:id/ledger', requireRole('manager'), listSessionLedger); // §34ث
+router.get('/api/finance/cashbook', requireRole('manager'), getCashbook); // §34ث
 router.get('/api/finance/summary', requireRole('manager'), getFinanceSummary);
 
 // ====================================================================

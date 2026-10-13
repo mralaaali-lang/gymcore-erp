@@ -50,14 +50,20 @@ export async function getRetentionRate(req: Request, res: Response): Promise<voi
 export async function getPeakHours(req: Request, res: Response): Promise<void> {
   const gym_id = req.staff?.gym_id;
   try {
+    // §34ث (UTC): hours were extracted in the DB session timezone, so a 6 PM
+    // Cairo check-in plotted as 16:00 and the "30 days" cut was UTC-midnight.
+    // Bucket both by the GYM's configured timezone (gyms.timezone, default Cairo).
     const result = await query(`
       SELECT
-        EXTRACT(HOUR FROM check_in_time) AS hour,
+        EXTRACT(HOUR FROM a.check_in_time AT TIME ZONE COALESCE(g.timezone, 'Africa/Cairo')) AS hour,
         COUNT(*) AS check_ins,
-        COUNT(DISTINCT member_id) AS unique_members
-      FROM attendance_logs
-      WHERE gym_id = $1 AND check_in_time >= CURRENT_DATE - INTERVAL '30 days'
-      GROUP BY EXTRACT(HOUR FROM check_in_time)
+        COUNT(DISTINCT a.member_id) AS unique_members
+      FROM attendance_logs a
+      JOIN gyms g ON g.id = a.gym_id
+      WHERE a.gym_id = $1 AND a.deleted_at IS NULL
+        AND a.check_in_time >= ((CURRENT_TIMESTAMP AT TIME ZONE COALESCE(g.timezone, 'Africa/Cairo'))::date - 30)::timestamp
+                                 AT TIME ZONE COALESCE(g.timezone, 'Africa/Cairo')
+      GROUP BY EXTRACT(HOUR FROM a.check_in_time AT TIME ZONE COALESCE(g.timezone, 'Africa/Cairo'))
       ORDER BY hour
     `, [gym_id]);
     res.status(200).json({ data: result.rows });

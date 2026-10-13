@@ -33,12 +33,15 @@ export async function getCustomer360(req: Request, res: Response): Promise<void>
        LIMIT 30`,
       [member_id, gym_id]
     );
+    // §34ث: the fake `'cash' AS payment_method` is gone (the column is real
+    // since 058) and the list is scoped to THIS member — it used to show every
+    // payment in the gym on each member's 360 page.
     const paymentsResult = await query(
-      `SELECT id, created_at, amount, description, 'cash' AS payment_method
+      `SELECT id, created_at, amount, description, payment_method
        FROM financial_transactions
-       WHERE gym_id = $1 AND type = 'payment'
+       WHERE gym_id = $1 AND type = 'payment' AND member_id = $2
        ORDER BY created_at DESC LIMIT 20`,
-      [gym_id]
+      [gym_id, member_id]
     );
     // §30 side-fix: migration 044 dropped loyalty_points and replaced it with
     // loyalty_accounts/loyalty_tiers, but this endpoint still queried the old

@@ -172,6 +172,8 @@ export const createExpenseSchema = z.object({
   amount: z.number().min(0),
   description: sanitizedString({ max: 500 }),
   category_id: z.string().uuid().optional().nullable(),
+  // §34ث: payouts must state the method or the drawer cannot reconcile.
+  payment_method: z.enum(['cash', 'card', 'bank', 'wallet', 'vodafone_cash', 'instapay']).optional(),
 });
 
 export const createStaffSchemaV2 = z.object({

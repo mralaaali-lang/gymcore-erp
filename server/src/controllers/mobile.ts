@@ -153,7 +153,8 @@ export async function getMy360(req: Request, res: Response): Promise<void> {
     const [subResult, attResult, payResult, loyResult, statResult] = await Promise.all([
       query(`SELECT ms.*, mo.title AS plan_name FROM member_subscriptions ms LEFT JOIN membership_offers mo ON ms.offer_id = mo.id WHERE ms.member_id = $1 AND ms.gym_id = $2 ORDER BY ms.created_at DESC`, [memberId, gymId]),
       query(`SELECT id, check_in_time, entry_method FROM attendance_logs WHERE member_id = $1 AND gym_id = $2 ORDER BY check_in_time DESC LIMIT 30`, [memberId, gymId]),
-      query(`SELECT id, created_at, amount, description, 'cash' AS payment_method FROM financial_transactions WHERE gym_id = $1 AND type = 'payment' ORDER BY created_at DESC LIMIT 20`, [gymId]),
+      // §34ث: real payment_method (not a fake 'cash') and scoped to this member.
+      query(`SELECT id, created_at, amount, description, payment_method FROM financial_transactions WHERE gym_id = $1 AND type = 'payment' AND member_id = $2 ORDER BY created_at DESC LIMIT 20`, [gymId, memberId]),
       query(`SELECT la.current_points AS points_balance, LOWER(COALESCE(lt.name, 'bronze')) AS tier
        FROM loyalty_accounts la LEFT JOIN loyalty_tiers lt ON lt.id = la.tier_id
        WHERE la.member_id = $1 AND la.gym_id = $2`, [memberId, gymId]),

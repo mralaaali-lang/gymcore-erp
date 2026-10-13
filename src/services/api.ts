@@ -1142,11 +1142,13 @@ export async function createPayment(data: { member_id: string; amount: number; d
   const res = await api.post('/api/finance/payments', data);
   return res.data as { data: any };
 }
+// §34ث — expenses now carry honest server-side totals (sum of all + this month),
+// so pages must not re-add rows client-side.
 export async function listExpenses() {
   const res = await api.get('/api/finance/expenses');
-  return res.data as { data: any[] };
+  return res.data as { data: any[]; stats: { total_sum: string | number; month_sum: string | number } };
 }
-export async function createExpense(data: { amount: number; description: string; category_id?: string | null }) {
+export async function createExpense(data: { amount: number; description: string; category_id?: string | null; payment_method?: string }) {
   const res = await api.post('/api/finance/expenses', data);
   return res.data as { data: any };
 }
@@ -1190,9 +1192,49 @@ export async function payDebt(id: string, amount: number) {
   const res = await api.post(`/api/finance/debts/${id}/pay`, { amount });
   return res.data as { success: boolean; remaining: number };
 }
+// §34ث — shift rows now include reconciliation figures computed server-side
+// from the ledger (cash attributed to the OPEN shift while it runs).
+export interface CashboxSessionRow {
+  id: string;
+  staff_user_id: string | null;
+  staff_name?: string | null;
+  opened_at: string;
+  closed_at: string | null;
+  opening_balance: string | number;
+  closing_balance: string | number | null;
+  status: 'open' | 'closed';
+  notes?: string | null;
+  cash_in: string | number;
+  cash_out: string | number;
+  expected_balance: string | number;
+  difference: string | number | null;
+}
 export async function listCashboxSessions() {
   const res = await api.get('/api/finance/cashbox');
-  return res.data as { data: any[] };
+  return res.data as { data: CashboxSessionRow[] };
+}
+export interface CashLedgerRow {
+  id: string;
+  type: 'payment' | 'expense';
+  amount: string | number;
+  description: string | null;
+  payment_method: string | null;
+  created_at: string;
+  party: string | null;
+}
+export async function getCashSessionLedger(id: string) {
+  const res = await api.get(`/api/finance/cashbox/${id}/ledger`);
+  return res.data as { data: { session: CashboxSessionRow; rows: CashLedgerRow[] } };
+}
+export interface CashbookDay {
+  date: string;
+  cash_in: string | number;
+  cash_out: string | number;
+  net: string | number;
+}
+export async function getCashbook(days: number) {
+  const res = await api.get('/api/finance/cashbook', { params: { days } });
+  return res.data as { data: { days: number; timezone: string; rows: CashbookDay[]; totals: { cash_in: string | number; cash_out: string | number; net: string | number } } };
 }
 export async function openCashbox(opening_balance?: number, notes?: string) {
   const res = await api.post('/api/finance/cashbox/open', { opening_balance, notes });
@@ -1202,9 +1244,11 @@ export async function closeCashbox(id: string, closing_balance: number, notes?: 
   const res = await api.post('/api/finance/cashbox/close', { id, closing_balance, notes });
   return res.data as { data: any };
 }
+// §34ث — monthly_sales (an order COUNT shown as money) is gone: sum and count
+// travel separately, plus net_month and the gym timezone for honest labels.
 export async function getFinanceSummary() {
   const res = await api.get('/api/finance/summary');
-  return res.data as { data: { monthly_revenue: number; monthly_expenses: number; outstanding_debts: number; monthly_sales: number; today_revenue: number; yesterday_revenue: number; today_sales_sum?: number; today_sales_count?: number } };
+  return res.data as { data: { monthly_revenue: string | number; monthly_expenses: string | number; outstanding_debts: string | number; monthly_sales_sum: string | number; monthly_sales_count: number; net_month: number; today_revenue: string | number; yesterday_revenue: string | number; today_sales_sum?: string | number; today_sales_count?: number; timezone?: string } };
 }
 
 // ====================================================================

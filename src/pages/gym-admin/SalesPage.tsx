@@ -12,7 +12,6 @@ import {
   listProducts,
   listMembers,
   getFinanceSummary,
-  listExpenses,
   type ProductData,
   type MemberResponse,
 } from '../../services/api';
@@ -82,7 +81,6 @@ export default function SalesPage() {
   const { data: summaryRes } = useApiQuery<any>(['finance-summary'], () => getFinanceSummary());
   const { data: productsRes } = useQuery({ queryKey: ['products-all'], queryFn: () => listProducts(), enabled: activeTab === 'Create Sale' || activeTab === 'Products' });
   const { data: membersRes } = useQuery({ queryKey: ['members-search', memberSearch], queryFn: () => listMembers({ search: memberSearch || undefined, limit: 10 }), enabled: activeTab === 'Create Sale' });
-  const { data: expensesRes } = useApiQuery<any>(['expenses'], () => listExpenses());
 
   const createMutation = useMutation({
     mutationFn: (data: { member_id?: string | null; items: { product_id: string; quantity: number }[]; payment_method?: string }) => createSale(data),
@@ -120,9 +118,12 @@ export default function SalesPage() {
   const sales = salesRes?.data || [];
   const pagination = salesRes?.pagination;
   const totalPages = pagination ? Math.ceil(pagination.total / 20) : 1;
-  const monthlySales = summaryRes?.data?.monthly_sales ?? 0;
+  // §34ث — monthly_sales used to be an order COUNT rendered as money; the server
+  // now ships the real POS sum and the count separately.
+  const monthlySalesSum = Number(summaryRes?.data?.monthly_sales_sum ?? 0);
+  const monthlySalesCount = summaryRes?.data?.monthly_sales_count ?? 0;
+  const monthlyExpenses = Number(summaryRes?.data?.monthly_expenses ?? 0);
   const products = productsRes?.data || [];
-  const totalExpenses = ((expensesRes?.data || []) as any[]).reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
 
   const renderCreateSale = () => (
     <div className="max-w-2xl mx-auto">
@@ -212,7 +213,7 @@ export default function SalesPage() {
   const renderSalesList = () => (
     <>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-gray-500">{rtl ? 'إجمالي المبيعات' : 'Monthly Sales'}: <span className="font-bold text-emerald-600 text-lg">{monthlySales}</span></p>
+        <p className="text-sm text-gray-500">{rtl ? 'إجمالي مبيعات الشهر' : 'Monthly Sales'}: <span className="font-bold text-emerald-600 text-lg">{money(monthlySalesSum)}</span>{monthlySalesCount > 0 && <span className="text-xs text-gray-400"> · {monthlySalesCount} {rtl ? 'فاتورة' : 'invoices'}</span>}</p>
       </div>
       {isLoading ? <PageLoader variant="skeleton" rows={5} /> : (
         <Card className="p-0 overflow-hidden">
@@ -292,9 +293,11 @@ export default function SalesPage() {
     <StatsGrid
       columns={3}
       stats={[
-        { key: 'sales', label: rtl ? 'إجمالي المبيعات' : 'Total Sales', value: monthlySales, icon: 'point_of_sale', color: 'primary' },
-        { key: 'expenses', label: rtl ? 'إجمالي المصروفات' : 'Total Expenses', value: money(totalExpenses), icon: 'receipt_long', color: 'error' },
-        { key: 'profit', label: rtl ? 'صافي الربح' : 'Net Profit', value: money(monthlySales - totalExpenses), icon: 'payments', color: 'info' },
+        // §34ث — all three figures share the same monthly window and come from
+        // server aggregates (no client-side reduce, no count-minus-money math).
+        { key: 'sales', label: rtl ? 'مبيعات الشهر' : 'Monthly Sales', value: money(monthlySalesSum), icon: 'point_of_sale', color: 'primary' },
+        { key: 'expenses', label: rtl ? 'مصروفات الشهر' : 'Monthly Expenses', value: money(monthlyExpenses), icon: 'receipt_long', color: 'error' },
+        { key: 'profit', label: rtl ? 'الفرق (مبيعات − مصروفات)' : 'Sales − Expenses', value: money(monthlySalesSum - monthlyExpenses), icon: 'payments', color: 'info' },
       ]}
     />
   );

@@ -211,8 +211,9 @@ export const createSubscription = async (req: Request, res: Response): Promise<v
 
     if (paid > 0) {
       await client.query(
-        `INSERT INTO financial_transactions (gym_id, type, amount, description, staff_user_id, member_id, payment_method)
-         VALUES ($1,'payment',$2,$3,$4,$5,$6)`,
+        `INSERT INTO financial_transactions (gym_id, type, amount, description, staff_user_id, member_id, payment_method, cash_session_id)
+         VALUES ($1,'payment',$2,$3,$4,$5,$6,
+           (SELECT id FROM cashbox_sessions WHERE gym_id=$1 AND status='open' ORDER BY opened_at DESC LIMIT 1))`,
         [gym_id, paid, `رسوم اشتراك «${offer.title}» — ${member.full_name}`, staff_user_id, member_id, payment_method || 'cash']);
     }
     const owed = Math.round((price - paid) * 100) / 100;

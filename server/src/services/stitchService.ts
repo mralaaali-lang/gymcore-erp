@@ -89,16 +89,22 @@ export async function completeStitchOrder(
     );
     const posOrderId = posRes.rows[0].id;
 
+    // §34ث: type='income' was the third invisible vocabulary — normalized to
+    // 'payment' (CHECK constraint now enforces payment|expense) and linked to
+    // the POS order so the 060 backfill can never double-count this revenue.
     const finRes = await client.query(
       `INSERT INTO financial_transactions
-         (gym_id, staff_user_id, type, amount, description)
-       VALUES ($1, $2, 'income', $3, $4)
+         (gym_id, staff_user_id, type, amount, description, member_id, payment_method, pos_order_id, cash_session_id)
+       VALUES ($1, $2, 'payment', $3, $4, $5, 'stitch', $6,
+         (SELECT id FROM cashbox_sessions WHERE gym_id=$1 AND status='open' ORDER BY opened_at DESC LIMIT 1))
        RETURNING id`,
       [
         order.gym_id,
         staffUserId,
         price,
         `Stitch order ${orderId} — custom garment`,
+        order.member_id,
+        posOrderId,
       ]
     );
     const transactionId = finRes.rows[0].id;

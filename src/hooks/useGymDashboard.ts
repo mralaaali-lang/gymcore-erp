@@ -11,8 +11,9 @@ import { useApp } from '../context/GymBrandContext';
 import { formatMoney } from '../utils/currency';
 
 // §30: currency follows the gym's setting (formatMoney), not a hardcoded ج.م
-function formatCurrency(amount: number, code?: string | null): string {
-  return formatMoney(amount, code);
+// §34ث — finance summary now ships SUM values as strings; coerce here.
+function formatCurrency(amount: number | string | null | undefined, code?: string | null): string {
+  return formatMoney(Number(amount ?? 0), code);
 }
 
 export function useGymDashboard() {

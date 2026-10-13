@@ -3,22 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDateTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
-import { listCashboxSessions, openCashbox, closeCashbox, getFinanceSummary } from '../../services/api';
+import { listCashboxSessions, openCashbox, closeCashbox, getFinanceSummary, type CashboxSessionRow } from '../../services/api';
 import PageLoader from '../../components/shared/PageLoader';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-
-interface CashboxSession {
-  id: string;
-  staff_name: string;
-  staff_id?: string;
-  opening_balance: number;
-  closing_balance: number | null;
-  opened_at: string;
-  closed_at: string | null;
-  status: string;
-  notes: string;
-}
 
 const inputClass =
   'w-full px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400';
@@ -41,7 +29,7 @@ export default function CashboxShiftsPage() {
     staleTime: 30_000,
   });
 
-  const sessions: CashboxSession[] = sessionsData?.data || [];
+  const sessions: CashboxSessionRow[] = sessionsData?.data || [];
   const openSession = sessions.find((s) => s.status === 'open');
   const completedShifts = sessions.filter((s) => s.status === 'closed');
 
@@ -73,8 +61,9 @@ export default function CashboxShiftsPage() {
     }
   };
 
-  const formatCurrency = (v: number | null) =>
-    v != null ? formatMoney(v, gymProfile?.currency) : '—';
+  // §34ث — server numeric aggregates arrive as strings (SUM) — coerce once here.
+  const formatCurrency = (v: number | string | null) =>
+    v != null && v !== '' ? formatMoney(Number(v), gymProfile?.currency) : '—';
 
   const formatDate = (d: string | null) =>
     d ? formatDateTime(d) : '—';
@@ -116,11 +105,26 @@ export default function CashboxShiftsPage() {
             <div className="space-y-4">
               <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
                 <p className="text-sm text-orange-700 font-medium">
-                  {language === 'ar' ? `الجلسة الحالية مفتوحة بواسطة ${openSession.staff_name}` : `Current session open by ${openSession.staff_name}`}
+                  {language === 'ar' ? `الجلسة الحالية مفتوحة بواسطة ${openSession.staff_name ?? '—'}` : `Current session open by ${openSession.staff_name ?? '—'}`}
                 </p>
                 <p className="text-xs text-orange-600 mt-1">
                   {language === 'ar' ? 'رصيد الافتتاح' : 'Opening balance'}: {formatCurrency(openSession.opening_balance)}
                 </p>
+                {/* §34ث — live drawer figures while the shift is still open */}
+                <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+                  <div className="rounded-xl bg-white/70 border border-orange-100 p-2">
+                    <p className="text-[11px] text-orange-600">{language === 'ar' ? 'مقبوضات' : 'Cash In'}</p>
+                    <p className="text-sm font-bold text-emerald-600">{formatCurrency(openSession.cash_in)}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/70 border border-orange-100 p-2">
+                    <p className="text-[11px] text-orange-600">{language === 'ar' ? 'مدفوعات' : 'Cash Out'}</p>
+                    <p className="text-sm font-bold text-red-500">{formatCurrency(openSession.cash_out)}</p>
+                  </div>
+                  <div className="rounded-xl bg-white/70 border border-orange-100 p-2">
+                    <p className="text-[11px] text-orange-600">{language === 'ar' ? 'المتوقع' : 'Expected'}</p>
+                    <p className="text-sm font-bold text-gray-900">{formatCurrency(openSession.expected_balance)}</p>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -194,7 +198,7 @@ export default function CashboxShiftsPage() {
             </div>
             <div className="flex justify-between items-center p-3 rounded-2xl bg-gray-50 border border-gray-100">
               <span className="text-sm text-gray-500">{language === 'ar' ? 'مبيعات الشهر' : 'Monthly Sales'}</span>
-              <span className="text-sm font-bold text-gray-900">{formatCurrency(financeData?.data?.monthly_sales ?? null)}</span>
+              <span className="text-sm font-bold text-gray-900">{formatCurrency(Number(financeData?.data?.monthly_sales_sum ?? 0))}</span>
             </div>
             <div className="flex justify-between items-center p-3 rounded-2xl bg-gray-50 border border-gray-100">
               <span className="text-sm text-gray-500">{language === 'ar' ? 'الديون المستحقة' : 'Outstanding Debts'}</span>
@@ -231,18 +235,19 @@ export default function CashboxShiftsPage() {
                 </tr>
               )}
               {completedShifts.map((s) => {
-                const diff = s.closing_balance != null && s.opening_balance != null
-                  ? s.closing_balance - s.opening_balance
-                  : null;
+                // §34ث — difference comes from the server (closing − expected,
+                // where expected = opening + cash_in − cash_out). The old client
+                // math (closing − opening) ignored cash in/out and lied.
+                const diff = s.difference != null && (s.difference as any) !== '' ? Number(s.difference) : null;
                 return (
                   <tr key={s.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-                    <td className="p-4 font-medium text-gray-900">{s.staff_name}</td>
+                    <td className="p-4 font-medium text-gray-900">{s.staff_name ?? '—'}</td>
                     <td className="p-4 text-gray-900">{formatCurrency(s.opening_balance)}</td>
                     <td className="p-4 text-gray-900">{formatCurrency(s.closing_balance)}</td>
                     <td className="p-4">
                       {diff != null ? (
-                        <span className={`font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                          {diff >= 0 ? '+' : ''}{formatMoney(diff, gymProfile?.currency)}
+                        <span className={`font-medium ${diff === 0 ? 'text-gray-500' : diff > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {diff > 0 ? '+' : ''}{formatMoney(diff, gymProfile?.currency)}
                         </span>
                       ) : '—'}
                     </td>

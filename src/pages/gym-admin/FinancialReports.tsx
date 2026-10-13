@@ -85,7 +85,7 @@ export default function FinancialReports() {
             { key: 'revenue', label: 'إيرادات الشهر', value: money(summary.monthly_revenue), icon: 'wallet', color: 'primary' },
             { key: 'expenses', label: 'مصروفات الشهر', value: money(summary.monthly_expenses), icon: 'receipt_long', color: 'error' },
             { key: 'debts', label: 'الديون المستحقة', value: money(summary.outstanding_debts), icon: 'credit_card', color: 'info' },
-            { key: 'sales', label: 'عدد المبيعات', value: summary.monthly_sales || 0, icon: 'shopping_bag', color: 'secondary' },
+            { key: 'sales', label: 'عدد المبيعات', value: summary.monthly_sales_count || 0, icon: 'shopping_bag', color: 'secondary' },
           ]}
         />
       )}
@@ -213,7 +213,7 @@ export default function FinancialReports() {
             </div>
             <div className="p-5 rounded-2xl bg-gray-50 border border-gray-100">
               <p className="text-sm font-medium text-gray-500 mb-1">المبيعات</p>
-              <p className="text-2xl font-bold text-gray-900">{summary.monthly_sales || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">{money(summary.monthly_sales_sum)}</p>
             </div>
           </div>
         </Card>

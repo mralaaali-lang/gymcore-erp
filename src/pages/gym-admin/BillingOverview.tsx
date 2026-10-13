@@ -303,7 +303,7 @@ export default function BillingOverview() {
           { key: 'revenue', label: rtl ? 'إيرادات الشهر' : 'Monthly Revenue', value: money(summary.monthly_revenue), icon: 'trending_up', color: 'primary' },
           { key: 'expenses', label: rtl ? 'مصاريف الشهر' : 'Monthly Expenses', value: money(summary.monthly_expenses), icon: 'payments', color: 'error' },
           { key: 'debts', label: rtl ? 'ديون قائمة' : 'Outstanding Debts', value: money(summary.outstanding_debts), icon: 'account_balance_wallet', color: 'warning' },
-          { key: 'sales', label: rtl ? 'مبيعات الشهر' : 'Monthly Sales', value: money(summary.monthly_sales), icon: 'shopping_cart', color: 'info' },
+          { key: 'sales', label: rtl ? 'مبيعات الشهر' : 'Monthly Sales', value: money(Number(summary.monthly_sales_sum)), icon: 'shopping_cart', color: 'info' },
         ]}
       />
 
