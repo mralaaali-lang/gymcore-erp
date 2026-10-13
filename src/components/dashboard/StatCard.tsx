@@ -9,6 +9,8 @@ interface StatCardProps {
   value: string | number;
   trend?: string;
   trendPositive?: boolean;
+  /** §35ت — small muted caption line under the value (e.g. monthly revenue under today's). */
+  sub?: string;
   sparkData?: number[];
   accent?: AccentName;
   onClick?: () => void;
@@ -21,6 +23,7 @@ export default function StatCard({
   value,
   trend,
   trendPositive,
+  sub,
   sparkData,
   accent = 'emerald',
   onClick,
@@ -46,6 +49,7 @@ export default function StatCard({
             <p className="text-2xl md:text-3xl font-bold text-gray-900 mt-0.5 tracking-tight">
               {value}
             </p>
+            {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
           </div>
         </div>
         {trend && (

@@ -75,7 +75,7 @@ export default function SubscriptionsPage() {
   const [limit, setLimit] = useState(50);
 
   const [quick, setQuick] = useState<ActionKey | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(params.get('new') === '1'); // §35ت — dashboard «اشتراك جديد» deep link
   const [cancelling, setCancelling] = useState<SubscriptionRow | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 

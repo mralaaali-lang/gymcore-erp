@@ -1204,7 +1204,7 @@ export async function closeCashbox(id: string, closing_balance: number, notes?: 
 }
 export async function getFinanceSummary() {
   const res = await api.get('/api/finance/summary');
-  return res.data as { data: { monthly_revenue: number; monthly_expenses: number; outstanding_debts: number; monthly_sales: number; today_revenue: number; yesterday_revenue: number } };
+  return res.data as { data: { monthly_revenue: number; monthly_expenses: number; outstanding_debts: number; monthly_sales: number; today_revenue: number; yesterday_revenue: number; today_sales_sum?: number; today_sales_count?: number } };
 }
 
 // ====================================================================

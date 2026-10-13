@@ -8,16 +8,16 @@ import { useSetupProgress } from '../../hooks/useGymDashboard';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { getEnrollmentTrend, getPeakHours, getRevenueBreakdown, getBusinessMetrics } from '../../services/analytics';
 import {
-  listMembers, getFinanceSummary, getTodayAttendance, listLeads,
+  listMembers, getFinanceSummary, listLeads,
   getExpiringSoon, getInactiveMembers, getOverdueDebts,
 } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
 import {
-  Gift, Plus, TrendingUp, Users, DollarSign,
-  Clock, AlertTriangle, UserX, UserPlus, ChevronLeft,
+  Gift, Plus, TrendingUp, Users, DollarSign, Clock, AlertTriangle, UserX, UserPlus,
+  ChevronLeft, CreditCard, Wallet, ShoppingCart, BarChart3, Banknote, DoorOpen,
 } from 'lucide-react';
 import { StatCard, Panel, Banner, DashboardPage, PrimaryAction } from '../../components/dashboard';
-import { QuickActionBar, QuickActionModals, PRESENT_WINDOW_HOURS, type ActionKey } from '../../components/dashboard/QuickActionCenter';
+import { QuickActionModals, type ActionKey } from '../../components/dashboard/QuickActionCenter';
 import CheckInCard from '../../components/attendance/CheckInCard';
 
 // §24 redesign — "today's tasks first" (competitor pattern: Mindbody/Glofox/
@@ -32,6 +32,38 @@ const PeakHoursChart = lazy(() => import('../../components/charts/PeakHoursChart
 const RevenueBreakdownChart = lazy(() => import('../../components/charts/RevenueBreakdownChart'));
 
 const chartSkeleton = <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 h-80 animate-pulse" />;
+
+/** §35ت — one interactive action card (icon + label, opens a modal or a page). */
+function QuickCard({
+  icon: Icon,
+  label,
+  accent,
+  onClick,
+}: {
+  icon: typeof Users;
+  label: string;
+  accent: 'emerald' | 'rose' | 'amber' | 'violet' | 'sky';
+  onClick: () => void;
+}) {
+  const soft: Record<string, string> = {
+    emerald: 'bg-emerald-50 text-emerald-600',
+    rose: 'bg-rose-50 text-rose-600',
+    amber: 'bg-amber-50 text-amber-600',
+    violet: 'bg-violet-50 text-violet-600',
+    sky: 'bg-sky-50 text-sky-600',
+  };
+  return (
+    <button
+      onClick={onClick}
+      className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4 flex flex-col items-center justify-center gap-2 min-h-[96px] hover:shadow-md hover:border-gray-200 transition-all active:scale-[0.98] cursor-pointer"
+    >
+      <span className={`w-11 h-11 rounded-2xl flex items-center justify-center ${soft[accent]}`}>
+        <Icon size={22} strokeWidth={1.75} />
+      </span>
+      <span className="text-sm font-bold text-gray-900 text-center leading-tight">{label}</span>
+    </button>
+  );
+}
 
 /** One "needs your action" card: count badge + top rows + jump link. */
 function ActionCard({
@@ -140,7 +172,8 @@ export default function GymAdminDashboard() {
     { staleTime: 60_000 }
   );
   const { data: financeRes } = useApiQuery(['gym', 'finance', 'summary'], getFinanceSummary, { staleTime: 60_000 });
-  const { data: attendanceRes } = useApiQuery(['gym', 'attendance', 'today'], () => getTodayAttendance(), { staleTime: 30_000 });
+  // §35ت — attendance numbers moved into CheckInCard (same query key), so this
+  // page no longer fetches /attendance/today itself.
 
   // ── "Needs your action" feeds (§24 new manager-only endpoints) ──
   const { data: expiring } = useApiQuery(
@@ -164,31 +197,10 @@ export default function GymAdminDashboard() {
     { staleTime: 60_000 }
   );
 
-  const members = membersRes?.members ?? [];
   const totalMembers = membersRes?.total ?? 0;
-  const activeMembers = members.filter((m) => m.subscription_status === 'active').length;
   const fin = financeRes?.data;
   const monthlyRevenue = Number(fin?.monthly_revenue ?? 0);
   const todayRevenue = Number(fin?.today_revenue ?? 0);
-  const yesterdayRevenue = Number(fin?.yesterday_revenue ?? 0);
-  const todayCount = attendanceRes?.records.length ?? 0;
-
-  const revenueDeltaPct = yesterdayRevenue > 0
-    ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
-    : null;
-
-  // ── Sparklines/deltas from real series ──
-  const enrollmentSpark = enrollmentTrend?.map((r) => r.new_members) ?? [];
-  const membersSpark = enrollmentSpark.reduce<number[]>((acc, v, i) => {
-    acc.push((acc[i - 1] ?? 0) + v);
-    return acc;
-  }, []);
-  const revenueSpark = revenueBreakdown
-    ? [revenueBreakdown.memberships, revenueBreakdown.pos, revenueBreakdown.personal_training]
-    : [];
-  const enrollmentDelta = enrollmentSpark.length > 1
-    ? enrollmentSpark[enrollmentSpark.length - 1] - enrollmentSpark[enrollmentSpark.length - 2]
-    : 0;
 
   // Hide charts that would render as an empty frame (§24).
   const hasPeakData = (peakHours ?? []).some((h) => h.check_ins > 0);
@@ -196,13 +208,6 @@ export default function GymAdminDashboard() {
     && (revenueBreakdown.memberships + revenueBreakdown.pos + revenueBreakdown.personal_training) > 0;
 
   const daysWord = (n: number) => language === 'ar' ? `${n} يوم` : `${n}d`;
-
-  // "متواجدون الآن" = check-ins within the last PRESENT_WINDOW_HOURS (no check-out exists).
-  const presentRecords = attendanceRes?.records ?? [];
-  const presentCount = presentRecords.filter((r) => {
-    const ts = new Date((r as { check_in_time?: string }).check_in_time ?? 0).getTime();
-    return Number.isFinite(ts) && ts >= Date.now() - PRESENT_WINDOW_HOURS * 3600_000;
-  }).length;
 
   return (
     <div className="bg-gray-50 min-h-screen -m-6 p-6">
@@ -225,41 +230,85 @@ export default function GymAdminDashboard() {
           />
         )}
 
-        {/* §35ب — the unified check-in card is now the FIRST card of the page
-            (same component as the top of /admin/attendance — one source). */}
-        <CheckInCard />
-
-        {/* §33 دفعة 1 — every daily admin action starts here (real endpoints, no page detour) */}
-        <QuickActionBar onOpen={setAction} />
-
-        {/* ── Row 1: today at a glance ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {/* §35ت — four number cards first (each carries its sub-figure inside it),
+            then the unified check-in card, then the six interactive actions.
+            QuickActionBar is gone: these cards replace it entirely. */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
           <StatCard
-            icon={DollarSign}
-            label={t('dashboard.todayRevenue', 'مبيعات اليوم')}
-            value={formatMoney(todayRevenue, currency)}
-            trend={revenueDeltaPct !== null ? `${revenueDeltaPct > 0 ? '+' : ''}${revenueDeltaPct}%` : undefined}
-            trendPositive={(revenueDeltaPct ?? 0) >= 0}
-            accent="violet"
-            onClick={() => navigate('/admin/sales')}
+            icon={Users}
+            label={t('dashboard.members', 'المشتركين')}
+            value={String(totalMembers)}
+            sub={biz ? `+${biz.new_this_month} ${t('dashboard.newThisMonth', 'جديد هذا الشهر')}` : undefined}
+            accent="emerald"
+            onClick={() => navigate('/admin/members')}
           />
           <StatCard
-            icon={TrendingUp}
-            label={t('dashboard.monthlyRevenue', 'الإيراد الشهري')}
-            value={formatMoney(monthlyRevenue, currency)}
-            sparkData={revenueSpark.length > 1 ? revenueSpark : undefined}
+            icon={CreditCard}
+            label={t('dashboard.subscriptions', 'الاشتراكات')}
+            value={biz ? String(biz.active_members) : '—'}
+            sub={`${expiring?.total ?? 0} ${t('dashboard.expiring7d', 'تنتهي خلال 7 أيام')}`}
+            accent="violet"
+            onClick={() => navigate('/admin/subscriptions')}
+          />
+          <StatCard
+            icon={Wallet}
+            label={t('dashboard.revenueTodayCard', 'إيراد اليوم')}
+            value={formatMoney(todayRevenue, currency)}
+            sub={`${formatMoney(monthlyRevenue, currency)} ${t('dashboard.monthlyShort', 'شهرياً')}`}
             accent="amber"
             onClick={() => navigate('/admin/reports')}
           />
           <StatCard
-            icon={Users}
-            label={t('dashboard.activeMembers', 'الأعضاء النشطون')}
-            value={String(activeMembers || totalMembers)}
-            trend={enrollmentDelta !== 0 ? `${enrollmentDelta > 0 ? '+' : ''}${enrollmentDelta}` : undefined}
-            trendPositive={enrollmentDelta >= 0}
-            sparkData={membersSpark.length > 1 ? membersSpark : undefined}
+            icon={ShoppingCart}
+            label={t('dashboard.sales', 'مبيعات')}
+            value={formatMoney(Number(fin?.today_sales_sum ?? 0), currency)}
+            sub={`${fin?.today_sales_count ?? 0} ${t('dashboard.ordersToday', 'طلب اليوم')}`}
+            accent="sky"
+            onClick={() => navigate('/admin/sales')}
+          />
+        </div>
+
+        {/* §35ب — the unified check-in card (same component as the top of
+            /admin/attendance — one source). §35ت: «حضور اليوم» lives inside it. */}
+        <CheckInCard listTo="/admin/attendance" />
+
+        {/* §35ت — the six daily actions, real endpoints/modals only (replaces QuickActionBar) */}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-5">
+          <QuickCard
+            icon={UserPlus}
+            label={t('dashboard.newMember', 'مشترك جديد')}
             accent="emerald"
-            onClick={() => navigate('/admin/members')}
+            onClick={() => setAction('member')}
+          />
+          <QuickCard
+            icon={CreditCard}
+            label={t('dashboard.newSubscription', 'اشتراك جديد')}
+            accent="violet"
+            onClick={() => navigate('/admin/subscriptions?new=1')}
+          />
+          <QuickCard
+            icon={ShoppingCart}
+            label={t('dashboard.sell', 'بيع')}
+            accent="sky"
+            onClick={() => navigate('/admin/sales')}
+          />
+          <QuickCard
+            icon={Banknote}
+            label={t('dashboard.payment', 'دفعة')}
+            accent="amber"
+            onClick={() => setAction('payment')}
+          />
+          <QuickCard
+            icon={DoorOpen}
+            label={t('dashboard.attendance', 'الحضور')}
+            accent="rose"
+            onClick={() => navigate('/admin/attendance')}
+          />
+          <QuickCard
+            icon={BarChart3}
+            label={t('dashboard.reports', 'التقارير')}
+            accent="emerald"
+            onClick={() => navigate('/admin/reports')}
           />
         </div>
 
@@ -306,38 +355,12 @@ export default function GymAdminDashboard() {
           </div>
         )}
 
-        {/* ── Row 2: today's tasks — action cards first (check-in + attendance live here) ── */}
+        {/* ── Row 2: today's tasks — action cards ── */}
         <div>
           <h2 className="text-lg font-bold text-gray-900 mb-4">{t('dashboard.todaysTasks', 'مهام اليوم')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {/* §35ب — the old «تسجيل حضور» launcher panel is gone: the real
-                CheckInCard now opens the page, so a modal shortcut here
-                would just duplicate it (dashboard layout rule). */}
-            <Panel
-              icon={Users}
-              accent="violet"
-              title={t('dashboard.todayAttendance', 'حضور اليوم')}
-              subtitle={t('dashboard.presentNow', 'متواجدون الآن (آخر {{n}} ساعات)', { n: PRESENT_WINDOW_HOURS })}
-            >
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-emerald-50 rounded-2xl p-4 text-center">
-                  <p className="text-3xl font-bold text-emerald-700 tabular-nums">{todayCount}</p>
-                  <p className="text-xs font-semibold text-emerald-600 mt-1">{t('dashboard.checkedInToday', 'حضور اليوم')}</p>
-                </div>
-                <div className="bg-violet-50 rounded-2xl p-4 text-center">
-                  <p className="text-3xl font-bold text-violet-700 tabular-nums">{presentCount}</p>
-                  <p className="text-xs font-semibold text-violet-600 mt-1">{t('dashboard.presentNowShort', 'متواجدون الآن')}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setAction('today')}
-                className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 hover:text-emerald-700"
-              >
-                {t('dashboard.viewList', 'عرض القائمة')}
-                <ChevronLeft size={15} className="rtl:hidden" />
-                <ChevronLeft size={15} className="hidden rtl:block rotate-180" />
-              </button>
-            </Panel>
+            {/* §35ت — the «حضور اليوم» panel is gone: those numbers now live
+                inside the CheckInCard at the top of the page (no duplication). */}
             <ActionCard
               icon={Clock}
               title={t('dashboard.expiringSoon', 'اشتراكات تنتهي خلال 7 أيام')}

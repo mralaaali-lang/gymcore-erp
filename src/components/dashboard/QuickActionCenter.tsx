@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import jsQR from 'jsqr';
 import { formatTime } from '../../utils/date';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
@@ -277,8 +278,6 @@ function CheckInForm() {
   const busyRef = useRef(false);
   const lastTokenRef = useRef<{ token: string; at: number }>({ token: '', at: 0 });
 
-  const supportsBarcode = typeof window !== 'undefined' && 'BarcodeDetector' in window;
-
   const stopCamera = () => {
     if (loopRef.current !== null) { window.clearTimeout(loopRef.current); loopRef.current = null; }
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -319,10 +318,6 @@ function CheckInForm() {
 
   const startCamera = async () => {
     setCameraError(null);
-    if (!supportsBarcode) {
-      setCameraError(rtl ? 'متصفحك لا يدعم قراءة الباركود — استخدم الإدخال اليدوي للكود أو الهاتف.' : 'This browser cannot decode barcodes — use manual code/phone entry.');
-      return;
-    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream;
@@ -332,20 +327,32 @@ function CheckInForm() {
         await video.play().catch(() => undefined);
       }
       setCameraOn(true);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const Detector = (window as any).BarcodeDetector;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const detector = new Detector({ formats: ['qr_code', 'code_128', 'ean_13'] });
+      // §35ت — jsQR decodes frames in pure JS (same engine as the dashboard
+      // CheckInCard): no BarcodeDetector flag, so the "browser unsupported"
+      // dead-end cannot happen here either.
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       const tick = async () => {
-        if (!streamRef.current || !videoRef.current) return;
-        try {
-          const codes = await detector.detect(videoRef.current);
-          if (codes.length > 0) await submitToken(codes[0].rawValue, 'scan');
-        } catch { /* transient frame errors are expected */ }
-        loopRef.current = window.setTimeout(tick, 350);
+        const v = videoRef.current;
+        if (!streamRef.current || !v || !ctx) return;
+        if (v.readyState >= 2 && v.videoWidth > 0) {
+          const scale = Math.min(1, 360 / v.videoWidth);
+          canvas.width = Math.max(1, Math.round(v.videoWidth * scale));
+          canvas.height = Math.max(1, Math.round(v.videoHeight * scale));
+          ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+          try {
+            const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const found = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+            if (found?.data) await submitToken(found.data, 'scan');
+          } catch { /* transient frame errors are expected */ }
+        }
+        loopRef.current = window.setTimeout(tick, 300);
       };
-      loopRef.current = window.setTimeout(tick, 350);
+      loopRef.current = window.setTimeout(tick, 300);
     } catch {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      setCameraOn(false);
       setCameraError(rtl ? 'تعذر فتح الكاميرا — تحقق من إذن الكاميرا، أو استخدم الإدخال اليدوي.' : 'Camera unavailable — check permission, or use manual entry.');
     }
   };

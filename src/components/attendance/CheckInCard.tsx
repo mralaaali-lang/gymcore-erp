@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import jsQR from 'jsqr';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import {
@@ -16,9 +18,10 @@ import { Activity, Camera, Scan } from 'lucide-react';
 // §35ب — the unified check-in card. ONE field that accepts whatever the
 // receptionist actually has: a scanned barcode/QR pass, a typed phone,
 // a name (with live suggestions from /api/attendance/lookup), or a pasted
-// member UUID code. Camera decoding is built on the browser's own
-// BarcodeDetector (same engine as the §33 quick-action modal) with an
-// honest fallback message when the browser can't do it.
+// member UUID code. Camera decoding runs on jsQR (§35ت) — a pure-JS QR
+// decoder that works in every browser with camera access, replacing the
+// earlier BarcodeDetector path that desktop Chrome does not enable by
+// default (it produced a "browser unsupported" dead-end for the user).
 // Deliberately continuous: a success clears the field and keeps the card
 // open with a session counter, because the front desk processes a queue,
 // not a single visitor.
@@ -40,10 +43,11 @@ function looksLikeQrToken(raw: string): boolean {
   }
 }
 
-export default function CheckInCard({ className = '' }: { className?: string }) {
+export default function CheckInCard({ className = '', listTo }: { className?: string; listTo?: string }) {
   const { language, role } = useApp();
   const rtl = language === 'ar';
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const canCheckIn = role === 'gym-admin' || role === 'reception';
 
@@ -59,8 +63,6 @@ export default function CheckInCard({ className = '' }: { className?: string }) 
   const loopRef = useRef<number | null>(null);
   const busyRef = useRef(false);
   const lastTokenRef = useRef<{ token: string; at: number }>({ token: '', at: 0 });
-
-  const supportsBarcode = typeof window !== 'undefined' && 'BarcodeDetector' in window;
 
   // Live suggestions — name / phone / member-UUID matches from the server.
   const q = query.trim();
@@ -79,9 +81,11 @@ export default function CheckInCard({ className = '' }: { className?: string }) 
     () => getTodayAttendance(),
     { staleTime: 10_000, refetchInterval: 30_000 }
   );
-  const presentCount = (today?.records ?? []).filter(
+  const todayRecords = today?.records ?? [];
+  const presentCount = todayRecords.filter(
     (r) => !(r as { check_out_time?: string | null }).check_out_time
   ).length;
+  const todayCount = todayRecords.length;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['gym', 'attendance', 'today'] });
@@ -198,12 +202,6 @@ export default function CheckInCard({ className = '' }: { className?: string }) 
 
   const startCamera = async () => {
     setCameraError(null);
-    if (!supportsBarcode) {
-      setCameraError(rtl
-        ? 'متصفحك لا يدعم قراءة الباركود — استخدم الكود أو رقم الهاتف أو الاسم.'
-        : 'This browser cannot decode barcodes — use code / phone / name entry.');
-      return;
-    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream;
@@ -214,19 +212,26 @@ export default function CheckInCard({ className = '' }: { className?: string }) 
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => undefined);
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const Detector = (window as any).BarcodeDetector;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const detector = new Detector({ formats: ['qr_code', 'code_128', 'ean_13'] });
+      // §35ت — jsQR decodes frames in pure JS: no BarcodeDetector flag needed.
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       const tick = async () => {
-        if (!streamRef.current || !videoRef.current) return;
-        try {
-          const codes = await detector.detect(videoRef.current);
-          if (codes.length > 0) await scanToken(codes[0].rawValue);
-        } catch { /* transient frame errors are expected */ }
-        loopRef.current = window.setTimeout(tick, 350);
+        const video = videoRef.current;
+        if (!streamRef.current || !video || !ctx) return;
+        if (video.readyState >= 2 && video.videoWidth > 0) {
+          const scale = Math.min(1, 360 / video.videoWidth);
+          canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+          canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          try {
+            const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const found = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+            if (found?.data) await scanToken(found.data);
+          } catch { /* transient frame errors are expected */ }
+        }
+        loopRef.current = window.setTimeout(tick, 300);
       };
-      loopRef.current = window.setTimeout(tick, 350);
+      loopRef.current = window.setTimeout(tick, 300);
     } catch {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -255,15 +260,28 @@ export default function CheckInCard({ className = '' }: { className?: string }) 
           </p>
         </div>
 
-        {/* Big circle — live presence, from /api/attendance/today open sessions */}
-        <div className="shrink-0 text-center">
-          <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-emerald-50 border-4 border-emerald-200 flex flex-col items-center justify-center mx-auto">
-            <span className="text-2xl md:text-3xl font-extrabold text-emerald-700 tabular-nums leading-none">{presentCount}</span>
-            <Activity size={16} className="text-emerald-500 mt-1 animate-pulse" />
+        {/* §35ت — «حضور اليوم» lives inside the card on the left (the old
+            standalone dashboard panel and the presence circle are gone). */}
+        <div className="shrink-0 rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-center min-w-[150px]">
+          <p className="text-[11px] font-bold text-emerald-700">{rtl ? 'حضور اليوم' : 'Checked in today'}</p>
+          <div className="flex items-end justify-center gap-4 mt-1.5">
+            <div>
+              <p className="text-2xl font-extrabold text-emerald-700 tabular-nums leading-none">{todayCount}</p>
+              <p className="text-[10px] font-semibold text-emerald-600 mt-1">{rtl ? 'حضور' : 'visits'}</p>
+            </div>
+            <div>
+              <p className="text-2xl font-extrabold text-violet-700 tabular-nums leading-none">{presentCount}</p>
+              <p className="text-[10px] font-semibold text-violet-600 mt-1">{rtl ? 'متواجدون الآن' : 'inside now'}</p>
+            </div>
           </div>
-          <p className="text-[11px] font-semibold text-emerald-600 mt-1.5 whitespace-nowrap">
-            {rtl ? 'متواجدون الآن' : 'Present now'}
-          </p>
+          {listTo && (
+            <button
+              onClick={() => navigate(listTo)}
+              className="mt-2 text-xs font-semibold text-emerald-700 hover:underline"
+            >
+              {rtl ? 'عرض القائمة' : 'View full list'}
+            </button>
+          )}
         </div>
       </div>
 
