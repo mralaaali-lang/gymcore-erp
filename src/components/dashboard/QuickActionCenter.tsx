@@ -175,8 +175,8 @@ function AddMemberForm({ onDone, defaultPlanNote }: { onDone: () => void; defaul
         ) : offers.length === 0 ? (
           <p className="text-xs text-amber-600 bg-amber-50 rounded-xl p-3">
             {rtl
-              ? 'لا توجد عروض مفعّلة لهذه الصالة بعد — يمكنك تسجيل العضو بدون اشتراك وإضافة العروض من «الإدارة ← الاشتراكات».'
-              : 'No active offers yet — you can register the member without a plan and add offers under Admin → Subscriptions.'}
+              ? 'لا توجد عروض مفعّلة لهذه الصالة بعد — يمكنك تسجيل العضو بدون اشتراك وإضافة العروض من «الأعضاء ← الباقات».'
+              : 'No active offers yet — you can register the member without a plan and add offers under Members → Plans.'}
           </p>
         ) : (
           <select className={inputCls} value={planId} onChange={(e) => setPlanId(e.target.value)}>

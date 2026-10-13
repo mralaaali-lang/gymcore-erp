@@ -349,7 +349,7 @@ export default function GymAdminDashboard() {
               title={t('dashboard.expiringSoon', 'اشتراكات تنتهي خلال 7 أيام')}
               count={expiring?.total ?? 0}
               accent="amber"
-              to="/admin/subscriptions"
+              to="/admin/subscriptions?status=ending_soon"
               rows={(expiring?.data ?? []).slice(0, 4).map((r) => ({
                 key: r.member_id,
                 primary: r.member_name,

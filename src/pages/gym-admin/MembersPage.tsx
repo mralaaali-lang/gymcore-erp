@@ -117,7 +117,7 @@ export default function MembersPage() {
   const sectionTabs = [
     { id: 'members', labelEn: 'Members', labelAr: 'المشتركين', route: '/admin/members' },
     { id: 'attendance', labelEn: 'Attendance', labelAr: 'الحضور', route: '/admin/attendance' },
-    { id: 'memberships', labelEn: 'Memberships', labelAr: 'الباقات', route: '/admin/subscriptions' },
+    { id: 'memberships', labelEn: 'Memberships', labelAr: 'الباقات', route: '/admin/plans' },
     { id: 'content', labelEn: 'Content', labelAr: 'المحتوى', route: '/admin/marketing?tab=Announcements' },
     { id: 'growth', labelEn: 'Growth', labelAr: 'النمو', route: '/admin/analytics' },
     { id: 'settings', labelEn: 'Settings', labelAr: 'الإعدادات', route: '/admin/settings' },

@@ -259,7 +259,7 @@ export default function BillingOverview() {
           {rtl ? 'باقات العضوية النشطة (مصدر واحد: membership_offers)' : 'Active membership plans (single source: membership_offers)'}
         </h3>
         <button
-          onClick={() => navigate('/admin/subscriptions')}
+          onClick={() => navigate('/admin/plans')}
           className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
         >
           {rtl ? 'إدارة الباقات' : 'Manage plans'}

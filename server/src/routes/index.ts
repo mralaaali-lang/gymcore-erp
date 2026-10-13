@@ -62,7 +62,8 @@ import {
   revokeAllOtherSessions,
 } from '../controllers/auth';
 import { listOffers, listAllOffers, createOffer, updateOffer } from '../controllers/offers';
-import { createOfferSchema, updateOfferSchema } from '../validators/schemas';
+import { createOfferSchema, updateOfferSchema, createSubscriptionSchema } from '../validators/schemas';
+import { listSubscriptions, createSubscription } from '../controllers/subscriptions';
 import {
   loginSchema,
   qrAttendanceSchema,
@@ -214,6 +215,10 @@ router.post('/api/members', requireRole('manager', 'receptionist'), planGuard({ 
 router.put('/api/members/:id', requireRole('manager', 'receptionist'), validate(updateMemberSchema), updateMember);
 router.put('/api/members/:id/blacklist', requireRole('manager'), validate(blacklistMemberSchema), blacklistMember);
 router.post('/api/subscriptions/:subscriptionId/cancel', requireRole('manager'), validate(cancelSubscriptionSchema), cancelSubscription);
+// §34ي — صفحة الاشتراكات: قائمة مفلترة + إحصائيات من نفس الصفوف، وإنشاء
+// اشتراك يولّد دفعة ودينًا عند الجزئي/الآجل (كل الحسابات سيرفرية).
+router.get('/api/subscriptions', requireRole('manager'), listSubscriptions);
+router.post('/api/subscriptions', requireRole('manager'), validate(createSubscriptionSchema), createSubscription);
 
 // ====================================================================
 // MEMBERSHIP OFFERS

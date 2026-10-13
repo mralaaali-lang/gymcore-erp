@@ -875,6 +875,68 @@ export async function updateOffer(id: string, input: Partial<{ title: string; du
 }
 
 // ====================================================================
+// §34ي — صفحة الاشتراكات: دفتر حقيقي على member_subscriptions
+// ====================================================================
+export interface SubscriptionRow {
+  id: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  sport: string | null;
+  weekly_days: string[] | null;
+  price_paid: number | string;
+  coach_id: string | null;
+  coach_name: string | null;
+  member_id: string;
+  member_name: string;
+  member_phone: string | null;
+  offer_id: string;
+  offer_title: string;
+  duration_days: number;
+  offer_price: number | string;
+  remaining_days: number;
+  payment_state: 'paid' | 'unpaid';
+  outstanding_amount: number | string;
+}
+
+export interface SubscriptionsStats {
+  active: number;
+  ending_soon: number;
+  unpaid: number;
+  dues: number | string;
+}
+
+export async function listSubscriptions(params?: {
+  status?: string; sport?: string; duration?: string; search?: string;
+  member_id?: string; page?: number; limit?: number;
+}): Promise<{ data: SubscriptionRow[]; pagination: { page: number; limit: number; total: number; total_pages: number }; stats: SubscriptionsStats }> {
+  const res = await api.get('/api/subscriptions', { params });
+  return res.data;
+}
+
+export interface NewSubscriptionInput {
+  member_id: string;
+  offer_id: string;
+  coach_id?: string | null;
+  sport?: string | null;
+  start_date: string; // YYYY-MM-DD
+  end_date?: string;
+  weekly_days?: string[];
+  amount_paid: number;
+  payment_method: 'cash' | 'card' | 'vodafone_cash' | 'instapay' | 'bank';
+}
+
+export async function createSubscription(input: NewSubscriptionInput): Promise<{ data: SubscriptionRow & { member_name: string; offer_title: string; outstanding_amount: number } }> {
+  const res = await api.post('/api/subscriptions', input);
+  return res.data;
+}
+
+export async function cancelSubscription(id: string, reason: string): Promise<{ data: unknown }> {
+  const res = await api.post(`/api/subscriptions/${id}/cancel`, { reason });
+  return res.data;
+}
+
+// ====================================================================
 // CRM / LEAD MANAGEMENT
 // ====================================================================
 export interface LeadData {

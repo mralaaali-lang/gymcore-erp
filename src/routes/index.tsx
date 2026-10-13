@@ -80,7 +80,10 @@ export default function AppRouter() {
         <Route path="/admin/members" element={lazyLoad(() => import('../pages/gym-admin/MembersPage'), ['gym-admin'])} />
         <Route path="/admin/members/add" element={lazyLoad(() => import('../pages/gym-admin/MemberRegistrationForm'), ['gym-admin'])} />
         <Route path="/admin/members/:id" element={lazyLoad(() => import('../pages/gym-admin/MemberProfileView'), ['gym-admin'])} />
-        <Route path="/admin/subscriptions" element={lazyLoad(() => import('../pages/gym-admin/SubscriptionManagement'), ['gym-admin'])} />
+        {/* §34ي — /admin/subscriptions أصبح دفتر اشتراكات الأعضاء؛ صفحة
+            الباقات والعروض (§33ب) انتقلت إلى /admin/plans. */}
+        <Route path="/admin/subscriptions" element={lazyLoad(() => import('../pages/gym-admin/SubscriptionsPage'), ['gym-admin'])} />
+        <Route path="/admin/plans" element={lazyLoad(() => import('../pages/gym-admin/SubscriptionManagement'), ['gym-admin'])} />
         <Route path="/admin/attendance" element={lazyLoad(() => import('../pages/gym-admin/AttendanceRecords'), ['gym-admin'])} />
         {/* Store hub — merged products/purchases/suppliers pages into one tabbed page (§23). */}
         <Route path="/admin/products" element={lazyLoad(() => import('../pages/gym-admin/store/StorePage'), ['gym-admin'])} />

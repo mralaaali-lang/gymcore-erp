@@ -164,7 +164,8 @@ export const createPaymentSchema = z.object({
   member_id: z.string().uuid(),
   amount: z.number().min(0),
   description: sanitizedString({ max: 500 }).optional().or(z.literal('')),
-  payment_method: z.enum(['cash', 'card', 'bank', 'wallet']).default('cash'),
+  // §34ي: طرق الدفع المصرية — تخزين varchar أصلًا، التوسعة هنا فقط.
+  payment_method: z.enum(['cash', 'card', 'bank', 'wallet', 'vodafone_cash', 'instapay']).default('cash'),
 });
 
 export const createExpenseSchema = z.object({
@@ -568,4 +569,25 @@ export const updateOfferSchema = z.object({
   duration_days: z.number().int().min(1).max(3650).optional(),
   price: z.number().min(0).optional(),
   is_active: z.boolean().optional(),
+});
+
+// ====================================================================
+// §34ي — اشتراكات الأعضاء (صفحة الاشتراكات + نموذج «اشتراك جديد»)
+// الرياضات وأيام الأسبوع قوائم ثابتة لأنها أعمدة تصنيف في قاعدة البيانات؛
+// قيمها ترمّز بالأ الإنجليزية والعرض العربي يقرر في الفرونت.
+// ====================================================================
+export const SUBSCRIPTION_SPORTS = ['gym', 'cardio', 'boxing', 'kickboxing', 'swimming', 'crossfit', 'yoga'] as const;
+export const WEEK_DAY_CODES = ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri'] as const;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export const createSubscriptionSchema = z.object({
+  member_id: z.string().uuid(),
+  offer_id: z.string().uuid(),
+  coach_id: z.string().uuid().optional().nullable(),
+  sport: z.enum(SUBSCRIPTION_SPORTS).optional().nullable(),
+  start_date: z.string().regex(ISO_DATE, 'Date must be YYYY-MM-DD'),
+  end_date: z.string().regex(ISO_DATE, 'Date must be YYYY-MM-DD').optional(),
+  weekly_days: z.array(z.enum(WEEK_DAY_CODES)).max(7).optional(),
+  amount_paid: z.number().min(0),
+  payment_method: z.enum(['cash', 'card', 'vodafone_cash', 'instapay', 'bank']).default('cash'),
 });

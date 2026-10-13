@@ -56,6 +56,7 @@ function buildNavItems(base: string, role: UserRole): NavItem[] {
       // ── الأعضاء ──
       { label: i18n.t('sidebar.members'), icon: 'users', path: `${base}/members`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers') },
       { label: i18n.t('sidebar.subscriptions'), icon: 'subscriptions', path: `${base}/subscriptions`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers') },
+      { label: i18n.t('sidebar.plans'), icon: 'package', path: `${base}/plans`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers') },
       { label: i18n.t('sidebar.attendance'), icon: 'attendance', path: `${base}/attendance`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers') },
       { label: i18n.t('sidebar.schedule'), icon: 'schedule', path: `${base}/gym`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers') },
       // ── المالية ──
