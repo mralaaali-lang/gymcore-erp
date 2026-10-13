@@ -655,6 +655,10 @@ export interface MemberResponse {
   phone_number: string;
   status?: string;
   subscription_status?: string;
+  subscription_end_date?: string | null;
+  subscription_start_date?: string | null;
+  visit_count?: string | number;
+  code?: string;
   plan_name?: string;
   join_date?: string;
   created_at?: string;
@@ -662,6 +666,7 @@ export interface MemberResponse {
   gender?: string;
   last_checkin?: string;
   is_blacklisted?: boolean;
+  blacklist_reason?: string;
   balance?: string;
 }
 

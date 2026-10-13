@@ -11,14 +11,28 @@ import ExportButton from '../../components/shared/ExportButton';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Card from '../../components/ui/Card';
+import { formatDate, daysUntil } from '../../utils/date';
 
-const statusLabelsEn: Record<string, string> = { active: 'Active', expired: 'Expired', suspended: 'Suspended', inactive: 'Inactive' };
-const statusLabelsAr: Record<string, string> = { active: 'نشط', expired: 'منتهي', suspended: 'موقوف', inactive: 'غير نشط' };
+// §34د-1 — ONE truth per member: the subscription status from the server
+// (`subscription_status`, LEFT JOIN on the latest member_subscriptions row).
+// The old `m.status` badge was reading a field the API never returns, so it
+// rendered "غير نشط" for everyone and contradicted the billing column.
+type SubMeta = { label: string; variant: 'success' | 'warning' | 'error' | 'neutral' };
 
-function statusVariant(status: string): 'success' | 'warning' | 'error' | 'neutral' {
-  if (status === 'active') return 'success';
-  if (status === 'suspended') return 'error';
-  return 'neutral';
+function subMeta(status: string | undefined, blacklisted: boolean | undefined, rtl: boolean): SubMeta {
+  if (blacklisted) return { label: rtl ? 'موقوف (أسود)' : 'Blacklisted', variant: 'error' };
+  if (status === 'active') return { label: rtl ? 'نشط' : 'Active', variant: 'success' };
+  if (status === 'expired') return { label: rtl ? 'منتهي' : 'Expired', variant: 'warning' };
+  if (status === 'suspended') return { label: rtl ? 'موقوف' : 'Suspended', variant: 'error' };
+  if (status) return { label: status, variant: 'neutral' };
+  return { label: rtl ? 'لا اشتراك' : 'No subscription', variant: 'neutral' };
+}
+
+function subAvatarClass(meta: SubMeta): string {
+  if (meta.variant === 'success') return 'bg-emerald-500';
+  if (meta.variant === 'error') return 'bg-red-500';
+  if (meta.variant === 'warning') return 'bg-amber-500';
+  return 'bg-gray-300 text-gray-600';
 }
 
 function calcAge(dob: string): string {
@@ -191,8 +205,10 @@ export default function MembersPage() {
                 { key: 'full_name', label: rtl ? 'المشترك' : 'Member' },
                 { key: 'phone_number', label: rtl ? 'جهة الاتصال' : 'Contact' },
                 { key: 'plan_name', label: rtl ? 'المستوى' : 'Plan' },
-                { key: 'status', label: rtl ? 'الحالة' : 'Status' },
+                { key: 'subscription_status', label: rtl ? 'الحالة' : 'Status' },
+                { key: 'subscription_end_date', label: rtl ? 'تاريخ الانتهاء' : 'Ends' },
                 { key: 'join_date', label: rtl ? 'تاريخ الانضمام' : 'Joined' },
+                { key: 'visit_count', label: rtl ? 'الزيارات' : 'Visits' },
               ]}
               data={members as unknown as Record<string, unknown>[]}
               filename="members"
@@ -354,16 +370,19 @@ export default function MembersPage() {
                   <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'العمر / تاريخ الميلاد' : 'AGE / DOB'}</th>
                   <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'المستوى' : 'RANK / LEVEL'}</th>
                   <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'تاريخ الانضمام' : 'JOINED'}</th>
+                  <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'ينتهي في' : 'ENDS IN'}</th>
                   <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'آخر زيارة' : 'LAST VISIT'}</th>
-                  <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'حالة الفوترة' : 'BILLING STATUS'}</th>
+                  <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'الزيارات' : 'VISITS'}</th>
+                  <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'الحالة' : 'STATUS'}</th>
                   <th className="p-3 w-20"></th>
                 </tr>
               </thead>
               <tbody>
                 {members.map((m) => {
                   const initials = m.full_name ? m.full_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : '??';
-                  const subStatus = m.subscription_status || 'inactive';
-                  const subLabel = subStatus === 'active' ? (rtl ? 'نشط' : 'Active') : subStatus === 'expired' ? (rtl ? 'منتهي' : 'Expired') : (rtl ? 'غير نشط' : 'Inactive');
+                  const meta = subMeta(m.subscription_status, m.is_blacklisted, rtl);
+                  const endDays = daysUntil(m.subscription_end_date);
+                  const endSoon = m.subscription_status === 'active' && endDays !== null && endDays <= 7;
                   return (
                     <tr
                       key={m.id}
@@ -380,24 +399,31 @@ export default function MembersPage() {
                       </td>
                       <td className="p-3">
                         <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-2xl flex items-center justify-center text-xs font-bold text-white shrink-0 ${m.status === 'active' ? 'bg-emerald-500' : m.status === 'suspended' ? 'bg-red-500' : 'bg-gray-300 text-gray-600'}`}>
+                          <div className={`w-9 h-9 rounded-2xl flex items-center justify-center text-xs font-bold text-white shrink-0 ${subAvatarClass(meta)}`}>
                             {initials}
                           </div>
-                          <div>
-                            <p className="font-semibold text-gray-900 leading-tight">{m.full_name}</p>
-                            <span className="mt-0.5 inline-block">
-                              <StatusBadge status={rtl ? statusLabelsAr[m.status || 'inactive'] : statusLabelsEn[m.status || 'inactive']} variant={statusVariant(m.status || 'inactive')} />
-                            </span>
-                          </div>
+                          <p className="font-semibold text-gray-900 leading-tight">{m.full_name}</p>
                         </div>
                       </td>
                       <td className="p-3 text-gray-500" dir="ltr">{m.phone_number || '-'}</td>
-                      <td className="p-3 text-gray-500">{m.birth_date ? calcAge(m.birth_date) : '-'}</td>
+                      <td className="p-3 text-gray-500">
+                        {m.birth_date ? `${calcAge(m.birth_date)} · ${formatDate(m.birth_date, rtl)}` : '-'}
+                      </td>
                       <td className="p-3 text-gray-500">{m.plan_name || '-'}</td>
-                      <td className="p-3 text-gray-500">{m.join_date || m.created_at?.split('T')[0] || '-'}</td>
-                      <td className="p-3 text-gray-500">{m.last_checkin || '-'}</td>
+                      <td className="p-3 text-gray-500">{formatDate(m.join_date || m.created_at, rtl)}</td>
+                      <td className={`p-3 ${endSoon ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                        {m.subscription_end_date ? (
+                          <span title={formatDate(m.subscription_end_date, rtl)}>
+                            {formatDate(m.subscription_end_date, rtl)}
+                            {endDays !== null && endDays >= 0 && ` (${rtl ? `${endDays} يوم` : `${endDays}d`})`}
+                            {endDays !== null && endDays < 0 && (rtl ? ` (متأخر ${-endDays} يوم)` : ` (overdue ${-endDays}d)`)}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="p-3 text-gray-500">{formatDate(m.last_checkin, rtl)}</td>
+                      <td className="p-3 text-gray-500 tabular-nums">{m.visit_count != null ? Number(m.visit_count) : '-'}</td>
                       <td className="p-3">
-                        <StatusBadge status={subLabel} variant={subStatus === 'active' ? 'success' : 'neutral'} />
+                        <StatusBadge status={meta.label} variant={meta.variant} />
                       </td>
                       <td className="p-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
