@@ -584,6 +584,7 @@ function PaymentForm({ onDone, presetMember }: { onDone: () => void; presetMembe
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gym', 'finance', 'summary'] });
+      queryClient.invalidateQueries({ queryKey: ['billing-payments'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard', 'overdue-debts'] });
       queryClient.invalidateQueries({ queryKey: ['analytics', 'revenue-breakdown'] });
       queryClient.invalidateQueries({ queryKey: ['analytics', 'business-metrics'] });

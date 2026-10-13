@@ -3,15 +3,34 @@ import { query, getClient } from '../config/database';
 import logger from '../config/logger';
 
 // === PAYMENTS (financial_transactions — type='payment') ===
+// §34ث: the list used to fake `NULL::text AS member_name` and the insert
+// dropped member_id/payment_method even though the schema required them.
+// Migration 058 added the columns; now they are stored and joined for real.
 export const listPayments = async (req: Request, res: Response) => {
   const gym_id = req.staff?.gym_id;
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 20;
   const offset = (page - 1) * limit;
   try {
-    const count = await query(`SELECT COUNT(*) FROM financial_transactions WHERE gym_id=$1 AND type='payment'`, [gym_id]);
-    const data = await query(`SELECT ft.*, NULL::text AS member_name FROM financial_transactions ft WHERE ft.gym_id=$1 AND ft.type='payment' ORDER BY ft.created_at DESC LIMIT $2 OFFSET $3`, [gym_id, limit, offset]);
-    res.json({ data: data.rows, pagination: { page, limit, total: parseInt(count.rows[0].count) } });
+    const agg = await query(
+      `SELECT COUNT(*)::int AS total,
+              COALESCE(SUM(amount), 0) AS total_sum,
+              COUNT(*) FILTER (WHERE created_at >= date_trunc('month', CURRENT_DATE))::int AS month_count,
+              COALESCE(SUM(amount) FILTER (WHERE created_at >= date_trunc('month', CURRENT_DATE)), 0) AS month_sum
+       FROM financial_transactions WHERE gym_id=$1 AND type='payment'`, [gym_id]);
+    const a = agg.rows[0] || {};
+    const total = Number(a.total || 0);
+    const data = await query(
+      `SELECT ft.*, m.full_name AS member_name
+       FROM financial_transactions ft
+       LEFT JOIN members m ON m.id = ft.member_id
+       WHERE ft.gym_id=$1 AND ft.type='payment'
+       ORDER BY ft.created_at DESC LIMIT $2 OFFSET $3`, [gym_id, limit, offset]);
+    res.json({
+      data: data.rows,
+      pagination: { page, limit, total, total_pages: Math.max(1, Math.ceil(total / limit)) },
+      stats: { total_count: total, total_sum: Number(a.total_sum), month_count: Number(a.month_count || 0), month_sum: Number(a.month_sum) },
+    });
   } catch (e: any) { logger.error('listPayments failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };
 
@@ -20,7 +39,16 @@ export const createPayment = async (req: Request, res: Response) => {
   const gym_id = req.staff?.gym_id;
   const staff_user_id = req.staff?.staff_user_id;
   try {
-    const r = await query(`INSERT INTO financial_transactions (gym_id, type, amount, description, staff_user_id) VALUES ($1,'payment',$2,$3,$4) RETURNING *`, [gym_id, amount, description, staff_user_id]);
+    // Tenant check: refuse to book a payment against another gym's member.
+    const member = await query(`SELECT id FROM members WHERE id=$1 AND gym_id=$2`, [member_id, gym_id]);
+    if (member.rows.length === 0) {
+      res.status(400).json({ error: 'Member not found in this gym' });
+      return;
+    }
+    const r = await query(
+      `INSERT INTO financial_transactions (gym_id, type, amount, description, staff_user_id, member_id, payment_method)
+       VALUES ($1,'payment',$2,$3,$4,$5,$6) RETURNING *`,
+      [gym_id, amount, description, staff_user_id, member_id, payment_method || 'cash']);
     res.status(201).json({ data: r.rows[0] });
   } catch (e: any) { logger.error('createPayment failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { formatDate } from '../../utils/date';
-import { useSearchParams } from 'react-router-dom';
+import { formatDate, fmtNum } from '../../utils/date';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -34,7 +34,7 @@ const TAB_ICONS: Record<BillingTab, string> = {
   Overview: 'dashboard',
   Payments: 'receipt_long',
   Recurring: 'autorenew',
-  Discounts: 'discount',
+  Discounts: 'sell',
   'Payment Forms': 'credit_card',
   Accounting: 'account_balance',
   Debts: 'account_balance_wallet',
@@ -42,27 +42,15 @@ const TAB_ICONS: Record<BillingTab, string> = {
   Settings: 'settings',
 };
 
-const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-
-function paymentStatusInfo(status?: string): { ar: string; en: string; variant: 'success' | 'warning' | 'error' | 'neutral' } {
-  switch (status) {
-    case 'paid':
-      return { ar: 'مدفوعة', en: 'Paid', variant: 'success' };
-    case 'pending':
-    case 'scheduled':
-      return { ar: 'مجدولة', en: 'Scheduled', variant: 'warning' };
-    case 'overdue':
-    case 'late':
-      return { ar: 'متأخرة', en: 'Overdue', variant: 'error' };
-    default:
-      return { ar: status || 'غير معروفة', en: status || 'Unknown', variant: 'neutral' };
-  }
+// §34هـ: month labels are ISO (2026-10), never names, in both languages.
+function isoMonth(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 export default function BillingOverview() {
   const { language, gymProfile } = useApp();
   const rtl = language === 'ar';
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const requestedTab = params.get('tab');
   const [activeTab, setActiveTabState] = useState<BillingTab>(
@@ -89,7 +77,7 @@ export default function BillingOverview() {
     formatMoney(Number(v || 0), gymProfile?.currency);
 
   // Overview + Payments share the payments feed
-  const { data: paymentsRes, isLoading: paymentsLoading } = useApiQuery<{ data: any[]; pagination: any }>(
+  const { data: paymentsRes, isLoading: paymentsLoading } = useApiQuery<{ data: any[]; pagination: any; stats?: any }>(
     ['billing-payments', String(page)],
     () => listPayments(page),
     { enabled: activeTab === 'Overview' || activeTab === 'Payments' },
@@ -123,12 +111,13 @@ export default function BillingOverview() {
   const latestSession = cashboxSessions[0];
   const monthlyRevenue = summary.monthly_revenue ?? 0;
 
-  const scheduledCount = payments.filter((p: any) => p.status === 'pending' || p.status === 'scheduled').length;
-  const paidCount = payments.filter((p: any) => p.status === 'paid').length;
-  const overdueCount = payments.filter((p: any) => p.status === 'overdue' || p.status === 'late').length;
+  // §34ث: counters come from SERVER aggregates over ALL payment rows —
+  // the old code counted the current 20-row page slice and filtered a
+  // `status` column that financial_transactions does not even have.
+  const payStats = paymentsRes?.stats || {};
 
   const pagination: any = paymentsRes?.pagination || {};
-  const totalPages: number = pagination.total_pages || pagination.pages || pagination.last_page || 1;
+  const totalPages: number = pagination.total_pages || 1;
 
   const fmtDate = (v?: string) => {
     if (!v) return '-';
@@ -144,9 +133,9 @@ export default function BillingOverview() {
       <StatsGrid
         columns={3}
         stats={[
-          { key: 'scheduled', label: rtl ? 'المجدولة' : 'Scheduled', value: scheduledCount, icon: 'schedule', color: 'info' },
-          { key: 'paid', label: rtl ? 'المدفوعة' : 'Paid', value: paidCount, icon: 'check_circle', color: 'primary' },
-          { key: 'overdue', label: rtl ? 'المتأخرة' : 'Overdue', value: overdueCount, icon: 'warning', color: 'error' },
+          { key: 'monthcount', label: rtl ? 'مدفوعات هذا الشهر' : 'Payments this month', value: fmtNum(Number(payStats.month_count || 0)), icon: 'schedule', color: 'info' },
+          { key: 'monthsum', label: rtl ? 'إيراد مدفوعات الشهر' : 'Payment revenue', value: money(payStats.month_sum), icon: 'check_circle', color: 'primary' },
+          { key: 'totalsum', label: rtl ? 'إجمالي المدفوعات' : 'All-time payments', value: money(payStats.total_sum), icon: 'account_balance', color: 'secondary' },
         ]}
       />
 
@@ -154,9 +143,7 @@ export default function BillingOverview() {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-gray-900">{rtl ? 'الإيرادات الشهرية' : 'Monthly Revenue'}</h3>
-            <p className="text-xs text-gray-500 mt-1">
-              {rtl ? `${MONTHS_AR[new Date().getMonth()]} ${new Date().getFullYear()}` : `${MONTHS_EN[new Date().getMonth()]} ${new Date().getFullYear()}`}
-            </p>
+            <p className="text-xs text-gray-500 mt-1">{isoMonth()}</p>
           </div>
           {summaryLoading ? (
             <span className="material-symbols-outlined text-2xl text-gray-300 animate-spin">progress_activity</span>
@@ -172,21 +159,15 @@ export default function BillingOverview() {
           <PageLoader />
         ) : payments.length > 0 ? (
           <div className="space-y-2">
-            {payments.slice(0, 5).map((p: any, i: number) => {
-              const st = paymentStatusInfo(p.status);
-              return (
-                <div key={p.id || i} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{p.description || p.member_name || '-'}</p>
-                    <p className="text-xs text-gray-500">{fmtDate(p.created_at)}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <StatusBadge status={rtl ? st.ar : st.en} variant={st.variant} />
-                    <span className="text-sm font-bold text-emerald-600">{money(p.amount)}</span>
-                  </div>
+            {payments.slice(0, 5).map((p: any, i: number) => (
+              <div key={p.id || i} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{p.member_name || p.description || '-'}</p>
+                  <p className="text-xs text-gray-500">{fmtDate(p.created_at)}{p.description && p.member_name ? ` · ${p.description}` : ''}</p>
                 </div>
-              );
-            })}
+                <span className="text-sm font-bold text-emerald-600">{money(p.amount)}</span>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="text-center py-8 text-gray-500">
@@ -220,28 +201,27 @@ export default function BillingOverview() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-start text-xs text-gray-400 border-b border-gray-100">
-                  <th className="py-2 px-3 text-start font-medium">{rtl ? 'الوصف / العضو' : 'Description / Member'}</th>
+                  <th className="py-2 px-3 text-start font-medium">{rtl ? 'العضو' : 'Member'}</th>
+                  <th className="py-2 px-3 text-start font-medium">{rtl ? 'الوصف' : 'Description'}</th>
                   <th className="py-2 px-3 text-start font-medium">{rtl ? 'التاريخ' : 'Date'}</th>
                   <th className="py-2 px-3 text-start font-medium">{rtl ? 'طريقة الدفع' : 'Method'}</th>
-                  <th className="py-2 px-3 text-start font-medium">{rtl ? 'الحالة' : 'Status'}</th>
                   <th className="py-2 px-3 text-end font-medium">{rtl ? 'المبلغ' : 'Amount'}</th>
                 </tr>
               </thead>
               <tbody>
-                {payments.map((p: any, i: number) => {
-                  const st = paymentStatusInfo(p.status);
-                  return (
-                    <tr key={p.id || i} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
-                      <td className="py-2.5 px-3 font-medium text-gray-900">{p.description || p.member_name || '-'}</td>
-                      <td className="py-2.5 px-3 text-gray-500">{fmtDate(p.created_at)}</td>
-                      <td className="py-2.5 px-3 text-gray-500">{p.payment_method || '-'}</td>
-                      <td className="py-2.5 px-3">
-                        <StatusBadge status={rtl ? st.ar : st.en} variant={st.variant} />
-                      </td>
-                      <td className="py-2.5 px-3 text-end font-bold text-gray-900">{money(p.amount)}</td>
-                    </tr>
-                  );
-                })}
+                {payments.map((p: any, i: number) => (
+                  <tr key={p.id || i} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
+                    <td className="py-2.5 px-3 font-medium text-gray-900">{p.member_name || '—'}</td>
+                    <td className="py-2.5 px-3 text-gray-500">{p.description || '—'}</td>
+                    <td className="py-2.5 px-3 text-gray-500 whitespace-nowrap">{fmtDate(p.created_at)}</td>
+                    <td className="py-2.5 px-3 text-gray-500">
+                      {p.payment_method
+                        ? ({ cash: rtl ? 'نقدًا' : 'Cash', card: rtl ? 'بطاقة' : 'Card', bank: rtl ? 'بنك' : 'Bank', wallet: rtl ? 'محفظة' : 'Wallet' } as Record<string, string>)[p.payment_method] || p.payment_method
+                        : '—'}
+                    </td>
+                    <td className="py-2.5 px-3 text-end font-bold text-gray-900">{money(p.amount)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -274,9 +254,17 @@ export default function BillingOverview() {
 
   const renderRecurring = () => (
     <div className="space-y-4">
-      <h3 className="text-base font-bold text-gray-900">
-        {rtl ? 'باقات العضوية (الاشتراكات المتكررة)' : 'Membership Plans (Recurring Subscriptions)'}
-      </h3>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-base font-bold text-gray-900">
+          {rtl ? 'باقات العضوية النشطة (مصدر واحد: membership_offers)' : 'Active membership plans (single source: membership_offers)'}
+        </h3>
+        <button
+          onClick={() => navigate('/admin/subscriptions')}
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+        >
+          {rtl ? 'إدارة الباقات' : 'Manage plans'}
+        </button>
+      </div>
       {offersLoading ? (
         <Card><PageLoader /></Card>
       ) : offers.length === 0 ? (
@@ -289,21 +277,18 @@ export default function BillingOverview() {
           {offers.map((offer: any) => (
             <Card key={offer.id}>
               <div className="flex items-start justify-between mb-2">
-                <h4 className="text-base font-bold text-gray-900">{offer.name}</h4>
+                <h4 className="text-base font-bold text-gray-900">{offer.title}</h4>
                 <StatusBadge
                   status={offer.is_active ? (rtl ? 'مفعلة' : 'Active') : (rtl ? 'متوقفة' : 'Inactive')}
                   variant={offer.is_active ? 'success' : 'neutral'}
                 />
               </div>
               <p className="text-2xl font-extrabold text-emerald-600">
-                {money(offer.price || offer.total_price)}
+                {money(Number(offer.price))}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                {offer.duration ? `${offer.duration} ${rtl ? 'شهر' : 'month(s)'}` : ''}
+                {fmtNum(offer.duration_days)} {rtl ? 'يوم' : 'days'}
               </p>
-              {offer.description && (
-                <p className="text-sm text-gray-500 mt-3 line-clamp-2">{offer.description}</p>
-              )}
             </Card>
           ))}
         </div>
