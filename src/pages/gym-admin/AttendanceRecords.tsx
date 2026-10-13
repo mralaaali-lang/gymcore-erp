@@ -12,7 +12,7 @@ import CheckInCard from '../../components/attendance/CheckInCard';
 import { PrimaryAction, SecondaryAction, StatCard, Panel, EmptyState } from '../../components/dashboard';
 import { escapeHtml, printDocument } from '../../utils/print';
 import {
-  UsersThree, DoorOpen, LogOut, Plus, ShoppingCart, CalendarPlus,
+  DoorOpen, LogOut, Plus, ShoppingCart, CalendarPlus,
   FileText, Users, Clock, Calendar, Activity,
 } from 'lucide-react';
 
@@ -137,17 +137,8 @@ export default function AttendanceRecords() {
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6 bg-gray-50 min-h-screen -m-6 p-6">
-      {/* Header — title right, quick actions left (their own row on mobile) */}
+      {/* §35ث — title/subtitle moved to the top bar; quick actions kept here */}
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0">
-            <UsersThree size={22} className="text-emerald-600" />
-          </span>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900">{rtl ? 'الحضور' : 'Attendance'}</h1>
-            <p className="text-sm text-gray-500">{rtl ? 'تسجيل دخول وخروج الأعضاء' : 'Member check-in and check-out'}</p>
-          </div>
-        </div>
         {role === 'gym-admin' && (
           <div className="flex items-center gap-2 flex-wrap">
             <PrimaryAction onClick={() => navigate('/admin/members/add')}>

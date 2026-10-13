@@ -13,10 +13,10 @@ import {
 } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
 import {
-  Gift, Plus, TrendingUp, Users, DollarSign, Clock, AlertTriangle, UserX, UserPlus,
+  Gift, TrendingUp, Users, DollarSign, Clock, AlertTriangle, UserX, UserPlus,
   ChevronLeft, CreditCard, Wallet, ShoppingCart, BarChart3, Banknote, DoorOpen,
 } from 'lucide-react';
-import { StatCard, Panel, Banner, DashboardPage, PrimaryAction } from '../../components/dashboard';
+import { StatCard, Panel, Banner, DashboardPage } from '../../components/dashboard';
 import { QuickActionModals, type ActionKey } from '../../components/dashboard/QuickActionCenter';
 import CheckInCard from '../../components/attendance/CheckInCard';
 
@@ -211,14 +211,7 @@ export default function GymAdminDashboard() {
 
   return (
     <div className="bg-gray-50 min-h-screen -m-6 p-6">
-      <DashboardPage
-        actions={
-          <PrimaryAction onClick={() => setAction('member')}>
-            <Plus size={16} />
-            {t('dashboard.addMember', 'إضافة عضو')}
-          </PrimaryAction>
-        }
-      >
+      <DashboardPage>
         {/* Setup progress — only for a zero-state (brand new) gym */}
         {isZeroState && (
           <Banner
@@ -230,8 +223,13 @@ export default function GymAdminDashboard() {
           />
         )}
 
-        {/* §35ت — four number cards first (each carries its sub-figure inside it),
-            then the unified check-in card, then the six interactive actions.
+        {/* §35ث — the unified check-in card is the FIRST card of the dashboard
+            (same component as the top of /admin/attendance — one source).
+            «+ إضافة عضو» header button removed: «مشترك جديد» exists below. */}
+        <CheckInCard listTo="/admin/attendance" />
+
+        {/* §35ت — four number cards (each carries its sub-figure inside it),
+            then the six interactive actions.
             QuickActionBar is gone: these cards replace it entirely. */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
           <StatCard
@@ -267,10 +265,6 @@ export default function GymAdminDashboard() {
             onClick={() => navigate('/admin/sales')}
           />
         </div>
-
-        {/* §35ب — the unified check-in card (same component as the top of
-            /admin/attendance — one source). §35ت: «حضور اليوم» lives inside it. */}
-        <CheckInCard listTo="/admin/attendance" />
 
         {/* §35ت — the six daily actions, real endpoints/modals only (replaces QuickActionBar) */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-5">

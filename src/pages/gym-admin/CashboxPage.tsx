@@ -73,7 +73,6 @@ export default function CashboxPage() {
   if (isLoading) {
     return (
       <div dir={language === 'ar' ? 'rtl' : 'ltr'} className="space-y-6">
-        <PageHeader title="الخزينة" icon="savings" />
         <PageLoader message={language === 'ar' ? 'جاري التحميل...' : 'Loading...'} />
       </div>
     );
@@ -82,7 +81,6 @@ export default function CashboxPage() {
   if (error) {
     return (
       <div dir={language === 'ar' ? 'rtl' : 'ltr'} className="space-y-6">
-        <PageHeader title="الخزينة" icon="savings" />
         <Card className="text-center text-sm text-red-500">
           {language === 'ar' ? 'فشل تحميل بيانات الخزينة' : 'Failed to load cashbox data'}
         </Card>
@@ -93,9 +91,6 @@ export default function CashboxPage() {
   return (
     <div dir={language === 'ar' ? 'rtl' : 'ltr'} className="space-y-6">
       <PageHeader
-        title="الخزينة"
-        subtitle={language === 'ar' ? 'جلسات الخزينة اليومية' : 'Daily cashbox sessions'}
-        icon="savings"
         actions={
           <>
             <span className="inline-flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-2.5 text-sm shadow-sm">

@@ -97,9 +97,6 @@ export default function ExpensesPage() {
   return (
     <div dir={language === 'ar' ? 'rtl' : 'ltr'} className="space-y-6">
       <PageHeader
-        title={language === 'ar' ? 'المصروفات' : 'Expenses'}
-        subtitle={language === 'ar' ? 'تتبع مصروفات النادي' : 'Track gym expenses'}
-        icon="receipt_long"
         actions={
           <Button variant="primary" onClick={() => setShowModal(true)}>
             <Plus size={16} />

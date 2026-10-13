@@ -130,15 +130,10 @@ export default function SubscriptionsPage() {
     if (!ok) showToast(rtl ? 'المتصفح منع نافذة الطباعة' : 'Print popup blocked', 'error');
   };
 
-  const cardCls = (active: boolean) =>
-    `w-full text-start rounded-xl border px-3 py-2.5 min-h-[48px] md:min-h-0 ${active ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-gray-200 bg-white text-gray-700'} text-sm font-semibold`;
-
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="bg-gray-50 min-h-screen -m-6 p-6">
       {/* 1) الهيدر العلوي: العنوان + الأزرار السريعة */}
       <DashboardPage
-        title={rtl ? 'الاشتراكات' : 'Subscriptions'}
-        subtitle={rtl ? 'كل اشتراكات الصالة — أرقام من قاعدة البيانات مباشرة' : 'All gym subscriptions — real figures, straight from the DB'}
         actions={
           <>
             <SecondaryAction onClick={() => setQuick('checkin')}>
@@ -306,15 +301,8 @@ export default function SubscriptionsPage() {
                 </select>
                 {rtl ? 'صف' : 'rows'} · {fmtNum(pagination.total)} {rtl ? 'إجمالي' : 'total'}
               </label>
-              <div className="flex items-center gap-2">
-                <button className={cardCls(false)} disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                  {rtl ? 'السابق' : 'Prev'}
-                </button>
-                <span className="text-sm text-gray-600">{fmtNum(pagination.page)} / {fmtNum(pagination.total_pages)}</span>
-                <button className={cardCls(false)} disabled={page >= pagination.total_pages} onClick={() => setPage((p) => p + 1)}>
-                  {rtl ? 'التالي' : 'Next'}
-                </button>
-              </div>
+              {/* §35ث — السابق/التالي removed per owner; «إجمالي» above carries the count. */}
+              <span className="text-sm text-gray-600">{fmtNum(pagination.page)} / {fmtNum(pagination.total_pages)}</span>
             </div>
           )}
         </Panel>
@@ -359,13 +347,15 @@ export default function SubscriptionsPage() {
   );
 }
 
-/** رقم كبير ملون فوق وصف صغير — نمط كروت المواصفة. */
+/** §35ث — أيقونة في اليمين عمودياً وبجانبها الرقم والوصف (نمط أفقي). */
 function Statish({ icon, color, bg, value, label }: { icon: React.ReactNode; color: string; bg: string; value: string; label: string }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:border-gray-200 transition-colors">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bg} ${color}`}>{icon}</div>
-      <p className={`text-2xl md:text-3xl font-bold tracking-tight mt-2 ${color}`}>{value}</p>
-      <p className="text-sm text-gray-500">{label}</p>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:border-gray-200 transition-colors flex items-center gap-4">
+      <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${bg} ${color}`}>{icon}</div>
+      <div className="min-w-0">
+        <p className={`text-2xl md:text-3xl font-bold tracking-tight leading-none ${color}`}>{value}</p>
+        <p className="text-sm text-gray-500 mt-1 truncate">{label}</p>
+      </div>
     </div>
   );
 }

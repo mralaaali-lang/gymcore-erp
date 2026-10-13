@@ -4,7 +4,6 @@ import { formatDateTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
 import { listCashboxSessions, openCashbox, closeCashbox, getFinanceSummary } from '../../services/api';
-import PageHeader from '../../components/shared/PageHeader';
 import PageLoader from '../../components/shared/PageLoader';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -83,8 +82,7 @@ export default function CashboxShiftsPage() {
   if (isLoading) {
     return (
       <div dir={language === 'ar' ? 'rtl' : 'ltr'} className="space-y-6">
-        <PageHeader title="تسليم الخزينة" icon="swap_horiz" />
-        <PageLoader message={language === 'ar' ? 'جاري التحميل...' : 'Loading...'} />
+                <PageLoader message={language === 'ar' ? 'جاري التحميل...' : 'Loading...'} />
       </div>
     );
   }
@@ -92,8 +90,7 @@ export default function CashboxShiftsPage() {
   if (error) {
     return (
       <div dir={language === 'ar' ? 'rtl' : 'ltr'} className="space-y-6">
-        <PageHeader title="تسليم الخزينة" icon="swap_horiz" />
-        <Card className="text-center text-sm text-red-500">
+                <Card className="text-center text-sm text-red-500">
           {language === 'ar' ? 'فشل تحميل بيانات تسليم الخزينة' : 'Failed to load shift handover data'}
         </Card>
       </div>
@@ -102,11 +99,7 @@ export default function CashboxShiftsPage() {
 
   return (
     <div dir={language === 'ar' ? 'rtl' : 'ltr'} className="space-y-6">
-      <PageHeader
-        title="تسليم الخزينة"
-        subtitle={language === 'ar' ? 'تسليم الورديات بين الموظفين' : 'Shift handover between staff'}
-        icon="swap_horiz"
-      />
+      {/* §35ث — heading moved to the top bar */}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">

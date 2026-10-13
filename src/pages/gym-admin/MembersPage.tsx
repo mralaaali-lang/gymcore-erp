@@ -136,8 +136,6 @@ export default function MembersPage() {
   return (
     <DashboardPage
       className="bg-gray-50 min-h-screen -m-6 p-6"
-      title={rtl ? 'إدارة المشتركين' : 'Members'}
-      subtitle={rtl ? 'إدارة مشتركي الصالة الرياضية' : 'Manage gym members'}
       actions={
         <PrimaryAction onClick={() => setAction('member')}>
           <Plus size={16} />

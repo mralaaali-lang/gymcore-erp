@@ -2,8 +2,10 @@ import React from 'react';
 import { useApp } from '../../context/GymBrandContext';
 
 interface PageHeaderProps {
-  /** Page title displayed in large text */
-  title: string;
+  /** Page title displayed in large text.
+   *  §35ث — optional: gym-admin page titles moved to the top bar, so pages
+   *  pass no title and PageHeader renders only actions/breadcrumbs. */
+  title?: string;
   /** Optional subtitle/description below the title */
   subtitle?: string;
   /** Optional breadcrumbs for navigation context */
@@ -42,6 +44,12 @@ export default function PageHeader({
   const { language } = useApp();
   const isRtl = language === 'ar';
 
+  // §35ث — a page with no title/subtitle/breadcrumbs/actions has nothing for
+  // this component to render (its heading now lives in the top bar).
+  if (!title && !subtitle && !breadcrumbs?.length && !actions) return null;
+
+  const hasIdentity = !!(title || subtitle || icon);
+
   return (
     <div
       className={`flex flex-col gap-3 mb-6 ${className}`}
@@ -72,8 +80,9 @@ export default function PageHeader({
         </nav>
       )}
 
-      {/* Title Row */}
+      {/* Title Row — §35ث: identity block only when the page still passes one */}
       <div className="flex items-start justify-between flex-wrap gap-3">
+        {hasIdentity && (
         <div className="flex items-center gap-3">
           {icon &&
             (typeof icon === 'string' ? (
@@ -86,12 +95,13 @@ export default function PageHeader({
               icon
             ))}
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{title}</h1>
+            {title && <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{title}</h1>}
             {subtitle && (
               <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
             )}
           </div>
         </div>
+        )}
 
         {/* Actions */}
         {actions && (

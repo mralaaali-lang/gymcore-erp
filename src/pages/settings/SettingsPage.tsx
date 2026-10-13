@@ -106,9 +106,6 @@ export default function SettingsPage() {
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
       <PageHeader
-        title={rtl ? 'الإعدادات' : 'Settings'}
-        subtitle={rtl ? 'إدارة إعدادات الصالة' : 'Manage your gym settings'}
-        icon="settings"
         actions={
           <Button variant="outline" onClick={() => setLanguage(rtl ? 'en' : 'ar')}>
             <span className="material-symbols-outlined text-lg">translate</span>

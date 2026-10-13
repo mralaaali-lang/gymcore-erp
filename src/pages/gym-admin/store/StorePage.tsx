@@ -1,6 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../../context/GymBrandContext';
-import PageHeader from '../../../components/shared/PageHeader';
 import ProductCatalog from './ProductCatalog';
 import PurchasesPanel from './PurchasesPanel';
 import SuppliersPanel from './SuppliersPanel';
@@ -34,11 +33,7 @@ export default function StorePage() {
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6 bg-gray-50 min-h-screen -m-6 p-6">
-      <PageHeader
-        title={rtl ? 'المتجر' : 'Store'}
-        subtitle={rtl ? 'المنتجات والمشتريات والموردون في مكان واحد' : 'Products, purchases and suppliers in one place'}
-        icon="storefront"
-      />
+      {/* §35ث — heading moved to the top bar */}
 
       {isManager && (
         <div className="flex gap-2 bg-white border border-gray-100 rounded-2xl p-1.5 shadow-sm w-fit">

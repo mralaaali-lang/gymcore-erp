@@ -50,8 +50,10 @@ export function buildNavItems(base: string, role: UserRole, badges?: NavBadges):
   }
 
   if (role === 'gym-admin') {
+    // §35ث — the «الرئيسية» group is gone: the sidebar brand block already
+    // links to /admin/dashboard, so the dashboard keeps its entrance and the
+    // sidebar starts from the top with الأعضاء.
     return [
-      { label: i18n.t('sidebar.dashboard'), icon: 'dashboard', path: `${base}/dashboard`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionHome') },
       // ── الأعضاء ──
       { label: i18n.t('sidebar.members'), icon: 'users', path: `${base}/members`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers') },
       { label: i18n.t('sidebar.subscriptions'), icon: 'subscriptions', path: `${base}/subscriptions`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers') },
@@ -150,4 +152,138 @@ export function resolvePageTitle(items: NavItem[], pathname: string): { label: s
     }
   }
   return best ? { label: best.label, section: best.section } : null;
+}
+
+/**
+ * §35ث — full page headings (title + subtitle) moved OUT of the pages and
+ * INTO the top bar. Keyed by the base route path; values mirror each page's
+ * former PageHeader/DashboardPage wording. Unknown paths → null, and TopNav
+ * falls back to the nav-label behavior of §35أ.
+ */
+export interface PageHeading {
+  title: { ar: string; en: string };
+  subtitle?: { ar: string; en: string };
+}
+
+export const PAGE_TITLES: Record<string, PageHeading> = {
+  '/admin/dashboard': {
+    title: { ar: 'لوحة القيادة', en: 'Dashboard' },
+    subtitle: { ar: 'نظرة عامة على صالتك اليوم', en: 'Your gym at a glance today' },
+  },
+  '/admin/members': {
+    title: { ar: 'إدارة المشتركين', en: 'Members' },
+    subtitle: { ar: 'إدارة مشتركي الصالة الرياضية', en: 'Manage gym members' },
+  },
+  '/admin/subscriptions': {
+    title: { ar: 'الاشتراكات', en: 'Subscriptions' },
+    subtitle: { ar: 'كل اشتراكات الصالة — أرقام من قاعدة البيانات مباشرة', en: 'All gym subscriptions — real figures, straight from the DB' },
+  },
+  '/admin/attendance': {
+    title: { ar: 'الحضور', en: 'Attendance' },
+    subtitle: { ar: 'تسجيل دخول وخروج الأعضاء', en: 'Member check-ins and check-outs' },
+  },
+  '/admin/gym': {
+    title: { ar: 'الصالة', en: 'Gym' },
+    subtitle: { ar: 'الجدول الزمني والإدارة', en: 'Schedule and management' },
+  },
+  '/admin/billing': {
+    title: { ar: 'الفواتير', en: 'Invoices' },
+    subtitle: { ar: 'إدارة الفواتير والمدفوعات', en: 'Manage invoices and payments' },
+  },
+  '/admin/expenses': {
+    title: { ar: 'المصروفات', en: 'Expenses' },
+    subtitle: { ar: 'تتبع مصروفات النادي', en: 'Track club expenses' },
+  },
+  '/admin/cashbox/shifts': {
+    title: { ar: 'تسليم الخزينة', en: 'Shift Handover' },
+    subtitle: { ar: 'تسليم الورديات بين الموظفين', en: 'Shift handover between staff' },
+  },
+  '/admin/cashbox': {
+    title: { ar: 'الخزينة', en: 'Cashbox' },
+    subtitle: { ar: 'جلسات الخزينة اليومية', en: 'Daily cash sessions' },
+  },
+  '/admin/sales': {
+    title: { ar: 'نقطة البيع', en: 'Point of Sale' },
+    subtitle: { ar: 'المبيعات والمنتجات', en: 'Sales and products' },
+  },
+  '/admin/reports': {
+    title: { ar: 'التقارير المالية', en: 'Financial Reports' },
+    subtitle: { ar: 'المدفوعات والملخص المالي', en: 'Payments and financial summary' },
+  },
+  '/admin/products': {
+    title: { ar: 'المتجر', en: 'Store' },
+    subtitle: { ar: 'المنتجات والمشتريات والموردون في مكان واحد', en: 'Products, purchases and suppliers in one place' },
+  },
+  '/admin/marketing': {
+    title: { ar: 'التسويق', en: 'Marketing' },
+    subtitle: { ar: 'أتمتة وإدارة الحملات التسويقية', en: 'Marketing campaign automation and management' },
+  },
+  '/admin/crm': {
+    title: { ar: 'إدارة العملاء المحتملين', en: 'Leads' },
+    subtitle: { ar: 'تابع العملاء المحتملين عبر مراحل البيع', en: 'Track leads through the sales pipeline' },
+  },
+  '/admin/analytics': {
+    title: { ar: 'التحليلات', en: 'Analytics' },
+    subtitle: { ar: 'زيارات الأعضاء وإشغال الكلاسات والاحتفاظ — كلها من بيانات الصالة الفعلية', en: 'Member visits, class occupancy and retention — all from real gym data' },
+  },
+  '/admin/website': {
+    title: { ar: 'بناء الموقع', en: 'Website Builder' },
+    subtitle: { ar: 'إنشاء وتخصيص موقع الصالة الإلكتروني', en: 'Create and customize the gym website' },
+  },
+  '/admin/plans': {
+    title: { ar: 'الباقات والعروض', en: 'Plans & Offers' },
+    subtitle: { ar: 'مصدر واحد للباقات — يُستخدم في إضافة الأعضاء وفي حساب الإيراد المتكرر', en: 'One source of plans — used by member signup and recurring revenue' },
+  },
+  '/admin/users': {
+    title: { ar: 'الفريق', en: 'Team' },
+    subtitle: { ar: 'الموظفون والدوام والموارد البشرية في مكان واحد', en: 'Staff, shifts and HR in one place' },
+  },
+  '/admin/settings': {
+    title: { ar: 'الإعدادات', en: 'Settings' },
+    subtitle: { ar: 'إدارة إعدادات الصالة', en: 'Manage gym settings' },
+  },
+  // §35ث — pages reused by the trainer/reception roles keep the same top-bar
+  // heading treatment as their /admin twins.
+  '/reception/members': {
+    title: { ar: 'الأعضاء', en: 'Members' },
+    subtitle: { ar: 'إدارة مشتركي الصالة الرياضية', en: 'Manage gym members' },
+  },
+  '/reception/attendance': {
+    title: { ar: 'الحضور', en: 'Attendance' },
+    subtitle: { ar: 'تسجيل دخول وخروج الأعضاء', en: 'Member check-ins and check-outs' },
+  },
+  '/reception/products': {
+    title: { ar: 'المتجر', en: 'Store' },
+    subtitle: { ar: 'المنتجات والمشتريات', en: 'Products and purchases' },
+  },
+  '/trainer/clients': {
+    title: { ar: 'عملائي', en: 'My Clients' },
+    subtitle: { ar: 'أعضاء المدرب المسندون', en: 'Members assigned to the coach' },
+  },
+  '/trainer/attendance': {
+    title: { ar: 'الحضور', en: 'Attendance' },
+    subtitle: { ar: 'تسجيل دخول وخروج الأعضاء', en: 'Member check-ins and check-outs' },
+  },
+};
+
+/**
+ * §35ث — longest-prefix lookup over PAGE_TITLES (query ignored, detail routes
+ * like /admin/members/:id resolve to their base page). Returns language-
+ * selected strings, or null when the path has no dedicated heading.
+ */
+export function resolvePageHeading(
+  pathname: string,
+  isRtl: boolean
+): { title: string; subtitle?: string } | null {
+  const clean = pathname.split('?')[0];
+  let bestKey = '';
+  for (const key of Object.keys(PAGE_TITLES)) {
+    if (clean === key || clean.startsWith(key + '/')) {
+      if (key.length > bestKey.length) bestKey = key;
+    }
+  }
+  if (!bestKey) return null;
+  const heading = PAGE_TITLES[bestKey];
+  const pick = (v: { ar: string; en: string }) => (isRtl ? v.ar : v.en);
+  return { title: pick(heading.title), subtitle: heading.subtitle ? pick(heading.subtitle) : undefined };
 }

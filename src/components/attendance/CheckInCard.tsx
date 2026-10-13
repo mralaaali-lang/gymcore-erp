@@ -260,24 +260,25 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
           </p>
         </div>
 
-        {/* §35ت — «حضور اليوم» lives inside the card on the left (the old
-            standalone dashboard panel and the presence circle are gone). */}
-        <div className="shrink-0 rounded-2xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-center min-w-[150px]">
-          <p className="text-[11px] font-bold text-emerald-700">{rtl ? 'حضور اليوم' : 'Checked in today'}</p>
-          <div className="flex items-end justify-center gap-4 mt-1.5">
+        {/* §35ت — «حضور اليوم» lives inside the card (the old standalone
+            dashboard panel and the presence circle are gone).
+            §35ث — same place, but enlarged: bigger numbers and padding. */}
+        <div className="shrink-0 rounded-2xl bg-emerald-50 border border-emerald-100 px-6 py-4 text-center min-w-[220px]">
+          <p className="text-sm font-bold text-emerald-700">{rtl ? 'حضور اليوم' : 'Checked in today'}</p>
+          <div className="flex items-end justify-center gap-6 mt-2">
             <div>
-              <p className="text-2xl font-extrabold text-emerald-700 tabular-nums leading-none">{todayCount}</p>
-              <p className="text-[10px] font-semibold text-emerald-600 mt-1">{rtl ? 'حضور' : 'visits'}</p>
+              <p className="text-4xl font-extrabold text-emerald-700 tabular-nums leading-none">{todayCount}</p>
+              <p className="text-xs font-semibold text-emerald-600 mt-1.5">{rtl ? 'حضور' : 'visits'}</p>
             </div>
             <div>
-              <p className="text-2xl font-extrabold text-violet-700 tabular-nums leading-none">{presentCount}</p>
-              <p className="text-[10px] font-semibold text-violet-600 mt-1">{rtl ? 'متواجدون الآن' : 'inside now'}</p>
+              <p className="text-4xl font-extrabold text-violet-700 tabular-nums leading-none">{presentCount}</p>
+              <p className="text-xs font-semibold text-violet-600 mt-1.5">{rtl ? 'متواجدون الآن' : 'inside now'}</p>
             </div>
           </div>
           {listTo && (
             <button
               onClick={() => navigate(listTo)}
-              className="mt-2 text-xs font-semibold text-emerald-700 hover:underline"
+              className="mt-2.5 text-sm font-semibold text-emerald-700 hover:underline"
             >
               {rtl ? 'عرض القائمة' : 'View full list'}
             </button>
@@ -288,7 +289,28 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
       {canCheckIn ? (
         <>
           <div className="relative mt-4">
+            {/* §35ث — DOM order [submit, camera, input]: in Arabic RTL the
+                first child renders rightmost, so «حضور» + camera sit on the
+                right of the row as requested (buttons-right in RTL). */}
             <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void submitQuery()}
+                disabled={busy || !q}
+                className="shrink-0 h-12 md:h-11 px-5 rounded-xl bg-emerald-600 text-white text-base md:text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 min-w-[96px]"
+              >
+                {busy ? (rtl ? 'جارٍ التسجيل…' : 'Saving…') : (rtl ? 'حضور' : 'Check in')}
+              </button>
+              <button
+                type="button"
+                onClick={cameraOn ? stopCamera : startCamera}
+                aria-label={cameraOn ? (rtl ? 'إيقاف الكاميرا' : 'Stop camera') : (rtl ? 'مسح بالكاميرا' : 'Scan with camera')}
+                className={`shrink-0 w-12 h-12 md:h-11 md:w-11 rounded-xl border font-bold flex items-center justify-center transition ${
+                  cameraOn ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <Camera size={20} />
+              </button>
               <input
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setHighlight(0); setLast(null); }}
@@ -302,24 +324,6 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
                 aria-label={rtl ? 'بحث العضو لتسجيل الحضور' : 'Member lookup for check-in'}
                 className="flex-1 h-12 md:h-11 px-4 text-base md:text-sm rounded-xl border border-gray-200 bg-white text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
               />
-              <button
-                type="button"
-                onClick={cameraOn ? stopCamera : startCamera}
-                aria-label={cameraOn ? (rtl ? 'إيقاف الكاميرا' : 'Stop camera') : (rtl ? 'مسح بالكاميرا' : 'Scan with camera')}
-                className={`shrink-0 w-12 h-12 md:h-11 md:w-11 rounded-xl border font-bold flex items-center justify-center transition ${
-                  cameraOn ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <Camera size={20} />
-              </button>
-              <button
-                type="button"
-                onClick={() => void submitQuery()}
-                disabled={busy || !q}
-                className="shrink-0 h-12 md:h-11 px-5 rounded-xl bg-emerald-600 text-white text-base md:text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 min-w-[96px]"
-              >
-                {busy ? (rtl ? 'جارٍ التسجيل…' : 'Saving…') : (rtl ? 'حضور' : 'Check in')}
-              </button>
             </div>
 
             {/* Live suggestions — clicking one registers that member directly */}

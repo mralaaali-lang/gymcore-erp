@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { resolvePageTitle } from './navConfig';
+import { resolvePageHeading, resolvePageTitle } from './navConfig';
 import type { NavItem } from '../../types';
 import {
   getNotificationHistory,
@@ -118,6 +118,10 @@ export default function TopNav({ navItems }: { navItems: NavItem[] }) {
   const historyPath = isPlatform ? '/super-admin/notifications' : '/admin/notifications';
 
   const page = resolvePageTitle(navItems, location.pathname);
+  // §35ث — the full page title + subtitle (formerly inside each page header)
+  // now lives here in the top bar. Unknown routes fall back to the §35أ
+  // nav-label behavior so other roles (super-admin/trainer/…) are unaffected.
+  const heading = resolvePageHeading(location.pathname, language === 'ar');
 
   return (
     <header className="bg-gradient-to-br from-petrol-dark via-petrol to-petrol-light w-full sticky top-0 z-30 shrink-0">
@@ -127,8 +131,11 @@ export default function TopNav({ navItems }: { navItems: NavItem[] }) {
             they are deliberately not repeated here. */}
         <div className="min-w-0">
           <h1 className="text-headline-md md:text-headline-lg font-bold text-white tracking-tight truncate">
-            {page?.label ?? t('sidebar.dashboard')}
+            {heading?.title ?? page?.label ?? t('sidebar.dashboard')}
           </h1>
+          {heading?.subtitle && (
+            <p className="text-[11px] md:text-xs text-white/70 truncate mt-0.5">{heading.subtitle}</p>
+          )}
         </div>
 
         {/* End (geometric left in Arabic): mobile menu button + language

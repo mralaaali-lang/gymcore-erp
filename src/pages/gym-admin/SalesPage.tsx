@@ -16,7 +16,6 @@ import {
   type ProductData,
   type MemberResponse,
 } from '../../services/api';
-import PageHeader from '../../components/shared/PageHeader';
 import StatsGrid from '../../components/shared/StatsGrid';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
@@ -310,11 +309,7 @@ export default function SalesPage() {
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
-      <PageHeader
-        title={rtl ? 'نقطة البيع' : 'Point of Sale'}
-        subtitle={rtl ? 'المبيعات والمنتجات' : 'Sales & merchandise'}
-        icon="point_of_sale"
-      />
+      {/* §35ث — heading moved to the top bar */}
 
       <UnifiedTabs
         tabs={POS_TABS.map((tab) => ({

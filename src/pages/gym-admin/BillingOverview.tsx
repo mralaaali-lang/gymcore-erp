@@ -5,7 +5,6 @@ import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { listPayments, getFinanceSummary, listExpenses, listCashboxSessions, listOffers } from '../../services/api';
-import PageHeader from '../../components/shared/PageHeader';
 import StatsGrid from '../../components/shared/StatsGrid';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
@@ -379,11 +378,7 @@ export default function BillingOverview() {
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
-      <PageHeader
-        title={rtl ? 'الفواتير' : 'Billing'}
-        subtitle={rtl ? 'إدارة الفواتير والمدفوعات' : 'Manage invoices & payments'}
-        icon="receipt_long"
-      />
+      {/* §35ث — heading moved to the top bar */}
 
       <UnifiedTabs
         tabs={BILLING_TABS.map((tab) => ({

@@ -3,7 +3,6 @@ import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSettings, updateSettings, uploadGymLogo } from '../../services/api';
-import PageHeader from '../../components/shared/PageHeader';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -230,11 +229,7 @@ export default function WebsiteGenerator() {
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
-      <PageHeader
-        title={rtl ? 'بناء الموقع' : 'Website Builder'}
-        subtitle={rtl ? 'إنشاء وتخصيص موقع الصالة الإلكتروني' : 'Build & customize your gym website'}
-        icon="web"
-      />
+      {/* §35ث — heading moved to the top bar */}
 
       <UnifiedTabs
         tabs={WEBSITE_TABS.map((tab) => ({

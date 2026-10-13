@@ -1,6 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../../context/GymBrandContext';
-import PageHeader from '../../../components/shared/PageHeader';
 import StaffDirectory from './StaffDirectory';
 import ShiftsLog from './ShiftsLog';
 import HrOverview from './HrOverview';
@@ -32,11 +31,7 @@ export default function TeamPage() {
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6 bg-gray-50 min-h-screen -m-6 p-6">
-      <PageHeader
-        title={rtl ? 'الفريق' : 'Team'}
-        subtitle={rtl ? 'الموظفون والدوام والموارد البشرية في مكان واحد' : 'Staff, attendance and HR in one place'}
-        icon="team"
-      />
+      {/* §35ث — heading moved to the top bar */}
 
       <div className="flex gap-2 bg-white border border-gray-100 rounded-2xl p-1.5 shadow-sm w-fit">
         {TABS.map((t) => (

@@ -68,9 +68,6 @@ export default function FinancialReports() {
   return (
     <div dir={language === 'ar' ? 'rtl' : 'ltr'} className="space-y-6">
       <PageHeader
-        title="التقارير المالية"
-        subtitle={language === 'ar' ? 'المدفوعات والملخص المالي' : 'Payments and financial summary'}
-        icon="bar_chart"
         actions={
           tab === 'payments' ? (
             <Button variant="primary" onClick={() => setShowForm(!showForm)}>

@@ -129,8 +129,6 @@ export default function SubscriptionManagement() {
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="bg-gray-50 min-h-screen -m-6 p-6">
       <DashboardPage
-        title={rtl ? 'الباقات والعروض' : 'Plans & Offers'}
-        subtitle={rtl ? 'مصدر واحد للباقات — يُستخدم في إضافة الأعضاء وفي حساب الإيراد المتكرر' : 'Single source of truth — used by member signup and MRR'}
         actions={
           <PrimaryAction onClick={() => setEditing(null)}>
             <Plus size={16} />

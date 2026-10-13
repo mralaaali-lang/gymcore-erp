@@ -5,7 +5,6 @@ import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { listReferrals, type ReferralData } from '../../services/api';
 import { getMarketingFunnel, type MarketingFunnel, type FunnelSeriesPoint } from '../../services/analytics';
-import PageHeader from '../../components/shared/PageHeader';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
 import Card from '../../components/ui/Card';
@@ -362,11 +361,7 @@ export default function MarketingAutomation() {
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
-      <PageHeader
-        title={rtl ? 'التسويق' : 'Marketing'}
-        subtitle={rtl ? 'أتمتة وإدارة الحملات التسويقية' : 'Marketing automation & campaigns'}
-        icon="campaign"
-      />
+      {/* §35ث — heading moved to the top bar */}
 
       <UnifiedTabs
         tabs={MARKETING_TABS.map((tab) => ({

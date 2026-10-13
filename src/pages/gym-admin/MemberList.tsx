@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { listMembers, type MemberResponse } from '../../services/api';
-import PageHeader from '../../components/shared/PageHeader';
 import FilterBar from '../../components/shared/FilterBar';
 import PageLoader from '../../components/shared/PageLoader';
 import Button from '../../components/ui/Button';
@@ -66,11 +65,7 @@ export default function MemberList() {
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6 bg-gray-50 min-h-screen -m-6 p-6">
-      <PageHeader
-        title={rtl ? 'إدارة المشتركين' : 'Member Directory'}
-        subtitle={rtl ? 'قائمة المشتركين في الصالة' : 'Gym member directory'}
-        icon="groups"
-      />
+      {/* §35ث — heading moved to the top bar */}
 
       <FilterBar
         search={search}

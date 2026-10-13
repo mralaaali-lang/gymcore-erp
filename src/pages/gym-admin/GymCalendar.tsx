@@ -4,7 +4,6 @@ import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { getUpcomingClasses, listStaff, listPayroll, getStaffAttendanceSummary, type UpcomingClassData, type StaffData } from '../../services/api';
-import PageHeader from '../../components/shared/PageHeader';
 import StatsGrid from '../../components/shared/StatsGrid';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
@@ -435,11 +434,7 @@ export default function GymCalendar() {
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
-      <PageHeader
-        title={rtl ? 'الصالة' : 'Gym'}
-        subtitle={rtl ? 'الجدول الزمني والإدارة' : 'Schedule & management'}
-        icon="fitness_center"
-      />
+      {/* §35ث — heading moved to the top bar */}
 
       <UnifiedTabs
         tabs={GYM_TABS.map((tab) => ({

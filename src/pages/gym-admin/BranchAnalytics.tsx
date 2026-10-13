@@ -59,10 +59,8 @@ export default function BranchAnalytics() {
 
   return (
     <div className="bg-gray-50 min-h-screen -m-6 p-6">
-      <DashboardPage
-        title={t('analytics.title', 'التحليلات')}
-        subtitle={t('analytics.subtitle', 'زيارات الأعضاء وإشغال الكلاسات والاحتفاظ — كلها من بيانات الصالة الفعلية')}
-      >
+      <DashboardPage>
+        {/* §35ث — heading moved to the top bar */}
         {/* KPI row */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
           <StatCard
