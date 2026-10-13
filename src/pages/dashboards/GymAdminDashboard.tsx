@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/GymBrandContext';
 import { useSetupProgress } from '../../hooks/useGymDashboard';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { getEnrollmentTrend, getPeakHours, getRevenueBreakdown } from '../../services/analytics';
+import { getEnrollmentTrend, getPeakHours, getRevenueBreakdown, getBusinessMetrics } from '../../services/analytics';
 import {
   listMembers, getFinanceSummary, getTodayAttendance, listLeads,
   getExpiringSoon, getInactiveMembers, getOverdueDebts,
@@ -123,6 +123,12 @@ export default function GymAdminDashboard() {
   const { data: revenueBreakdown, isLoading: revenueLoading, isError: revenueError } = useApiQuery(
     ['analytics', 'revenue-breakdown'],
     async () => (await getRevenueBreakdown()).data,
+    { staleTime: 5 * 60_000 }
+  );
+  // §34أ — money KPIs, all server-computed from member_subscriptions.
+  const { data: biz } = useApiQuery(
+    ['analytics', 'business-metrics'],
+    async () => (await getBusinessMetrics()).data,
     { staleTime: 5 * 60_000 }
   );
 
@@ -251,6 +257,49 @@ export default function GymAdminDashboard() {
             onClick={() => navigate('/admin/members')}
           />
         </div>
+
+        {/* ── Row 1b (§34أ): money KPIs — every figure server-computed from member_subscriptions ── */}
+        {biz && (
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 mb-4">{t('dashboard.moneyKpis', 'مؤشرات الفلوس')}</h2>
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
+              <StatCard
+                icon={DollarSign}
+                label={t('dashboard.mrr', 'الإيراد الشهري المتكرر')}
+                value={formatMoney(biz.mrr, currency)}
+                trend={`${biz.active_members} ${t('dashboard.activeSubsShort', 'اشتراك نشط')}`}
+                trendPositive
+                accent="emerald"
+                onClick={() => navigate('/admin/reports')}
+              />
+              <StatCard
+                icon={Users}
+                label={t('dashboard.arpu', 'متوسط إيراد العضو')}
+                value={biz.arpu != null ? formatMoney(biz.arpu, currency) : '—'}
+                accent="sky"
+                onClick={() => navigate('/admin/members')}
+              />
+              <StatCard
+                icon={UserX}
+                label={t('dashboard.churnRate', 'نسبة التسرّب')}
+                value={biz.churn_rate_pct != null ? `${biz.churn_rate_pct}%` : '—'}
+                trend={biz.active_at_month_start > 0 ? `${biz.churned_this_month}/${biz.active_at_month_start}` : undefined}
+                trendPositive={(biz.churn_rate_pct ?? 0) <= 0}
+                accent="rose"
+                onClick={() => navigate('/admin/reports')}
+              />
+              <StatCard
+                icon={TrendingUp}
+                label={t('dashboard.netGrowth', 'صافي النمو')}
+                value={`${biz.net_growth > 0 ? '+' : ''}${biz.net_growth}`}
+                trend={`+${biz.new_this_month} · −${biz.churned_this_month}`}
+                trendPositive={biz.net_growth >= 0}
+                accent="violet"
+                onClick={() => navigate('/admin/members')}
+              />
+            </div>
+          </div>
+        )}
 
         {/* ── Row 2: today's tasks — action cards first (check-in + attendance live here) ── */}
         <div>

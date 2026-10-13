@@ -112,7 +112,7 @@ import {
 import {
   listLeads, getLeadById, createLead, updateLead, deleteLead, getLeadStats,
 } from '../controllers/crm';
-import { getRetentionRate, getPeakHours, getRevenueForecast, getEnrollmentTrend, getRevenueBreakdown } from '../controllers/analytics';
+import { getRetentionRate, getPeakHours, getRevenueForecast, getEnrollmentTrend, getRevenueBreakdown, getBusinessMetrics } from '../controllers/analytics';
 import { getExpiringSoon, getInactiveMembers, getOverdueDebts } from '../controllers/dashboard';
 import { handlePaymentWebhook } from '../controllers/webhooks';
 import { webhookIdempotency } from '../middleware/webhookIdempotency';
@@ -280,6 +280,7 @@ router.get('/api/analytics/peak-hours', requireRole('manager'), getPeakHours);
 router.get('/api/analytics/revenue-forecast', requireRole('manager'), getRevenueForecast);
 router.get('/api/analytics/enrollment-trend', requireRole('manager'), getEnrollmentTrend);
 router.get('/api/analytics/revenue-breakdown', requireRole('manager'), getRevenueBreakdown);
+router.get('/api/analytics/business-metrics', requireRole('manager'), getBusinessMetrics); // §34أ
 
 // ====================================================================
 // MANAGER DASHBOARD — "needs your action" feeds (§24, read-only)

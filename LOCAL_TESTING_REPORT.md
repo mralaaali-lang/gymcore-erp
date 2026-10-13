@@ -728,6 +728,8 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 
 **تحقق حي (docker :9000، refresh + إعادة تحميل للـHTML الجديد):** tsc فرونت EXIT=0 · vite build ✓ · الحاوية frontend معاد بناؤها. الـbundle يحوي media queries عند 576/992/1200 + قواعد members-table/text-size-adjust/pointer:coarse. في المتصفح: viewport الجديد مؤكد · `html` = 16px · `dir=rtl` · جدول الأعضاء خطه 16px والـoverflowX=`auto` عند عرض 953px (لأنه <992 — صحيح، سيصبح hidden على الديسكتوب) · مودال إضافة عضو: input=48px/16px · مودال الحضور: خانة المسح=49px/17px، الكاميرا=58px، التبويبات=48px. لقطة checkin_modal تتحقق أن التخطيط سليم بلا كسر.
 
+**تصحيح (2026-10-13، طلب صريح من صاحب المشروع):** مقاسات المنافس (16px + 48px + جدول 16px) أُطبقت أولًا على كل الشاشات بالخطأ؛ الصحيح أنها تعمل **فقط** تحت `@media (max-width: 768px)`، والديسكتوب يعود 14px/مدمج كما كان. نُفّذ: كتلة CSS كاملة داخل الـmedia query، وفي `QuickActionCenter` كل `min-h-[48px]/text-base` تُستعاد بـ`md:min-h-0/md:text-sm` (وخانة المسح `md:!min-h-0 md:!text-sm`)، وجدول الأعضاء عاد `text-sm` مع `overflow-x:auto` للموبايل فقط و`hidden` للديسكتوب. الـviewport بلا زووم و`dir=rtl` و`text-size-adjust` بقيت عامة (لا تضر الديسكتوب). commit محلي 70a350f.
+
 ## §34د-3+4 — طرد الميت في تاب الأعضاء + حالة فارغة صادقة (2026-10-13)
 **الطلب:** تنفيذ البندين 3 و4 من قائمة اقتراحات الأعضاء (بموافقة صريحة على قائمة الحذف كاملة).
 
@@ -742,3 +744,16 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 **بقي (لأنه حقيقي):** بانر النجاح `member_just_added` (يضبطه فعلًا `MemberRegistrationForm` عند الإضافة من الصفحة الكاملة)، البحث، الفلاتر الستة، التصدير، الترقيم.
 
 **تحقق حي (docker :9000):** tsc EXIT=0 · vite build ✓ · حاوية frontend. فحص DOM بعد التحميل: checkboxes=0 · زر طباعة=false · بانر فوترة=false · أيقونات logout=0 · التبويبات = [المشتركين، الحضور، الباقات، المحتوى، النمو، الإعدادات] بالضبط · 4 صفوف حقيقية (أضاف المستخدم «عماد حمدي» بتجربته الخاصة — بيانات حية لم تُمس). لقطة members_clean. ملاحظة: الحالة الفارغة الجديدة لن تُرسم حيًا إلا عند صفر أعضاء (الـDB فيه 4 الآن) — مسارها مُتحقق بالكود ونفس مودال الإضافة مُختبَر حيًا سابقًا.
+
+## §34أ — مؤشرات الفلوس في لوحة القيادة: MRR / ARPU / Churn / صافي النمو (2026-10-13)
+**الطلب:** «أرقام الفلوس هي اللي بتبيع — صاحب الجيم لما يشوف إيراده الشهري المتكرر ونسبة المتسربين ومتوسط العضو في الديمو، دي اللي تقفل الصفقة. والبيانات موجودة أصلًا».
+
+**السيرفر** (`server/src/controllers/analytics.ts` + route في `routes/index.ts` سطر 283، `requireRole('manager')`): endpoint جديد `GET /api/analytics/business-metrics` يحسب كل شيء من `member_subscriptions` وحدها (صفر تقديرات):
+- **MRR** = Σ `price_paid × 30 / GREATEST(end−start+1, 1)` للاشتراكات النشطة غير المحذوفة (تطبيع شهري honest لأي مدة).
+- **ARPU** = MRR ÷ عدد الأعضاء النشطين؛ `null` إذا لا أساس (تُعرض «—»).
+- **Churn%** = ملغيات/منتهيات هذا الشهر ÷ النشطي في بداية الشهر؛ `null` إذا الأساس صفر (لوحة صالة جديدة تعرض «—» بشرف بدل 0% كاذبة).
+- **صافي النمو** = اشتراكات جديدة هذا الشهر − المتسربين، مع تفصيل `+new · −churned` في شارة الاتجاه.
+
+**الفرونت** (`src/services/analytics.ts` + `GymAdminDashboard.tsx`): واجهة `BusinessMetrics` + `getBusinessMetrics()`؛ استعلام `useApiQuery(['analytics','business-metrics'], …, staleTime 5d)`؛ صف KPI جديد «مؤشرات الفلوس» بين صف لمحة اليوم و«مهام اليوم»: 4 بطاقات `StatCard` (نفس أدوات اللوحة — إيراد متكرر emerald، متوسط العضو sky، التسرب rose، النمو violet) بخطوط `formatMoney` بنفس عملة الصالة. الإبطال: `QuickActionCenter` يؤجل `['analytics','business-metrics']` بعد إضافة عضو وبعد تسجيل دفعة (نفس مواضع revenue-breakdown).
+
+**تحقق حي (docker :9000، refresh أولًا):** tsc سيرفر+فرونت EXIT=0 · vite build ✓ · الحاويتان معاد بناؤهما. `GET /api/analytics/business-metrics` → 200: `{mrr:580.65, arpu:193.55, churn_rate_pct:null, churned:0, base:0, new:3, net_growth:3, active_members:3}` — يتطابق يدويًا مع الاشتراكات الثلاثة النشطة (تطبيع 30 يوم). اللوحة تعرض بالضبط: «الإيراد الشهري المتكرر 580.65 ج.م · 3 اشتراك نشط» / «متوسط إيراد العضو 193.55 ج.م» / «نسبة التسرّب —» / «صافي النمو +3 (+3 · −0)». لقطة dashboard_money_kpis.

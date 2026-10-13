@@ -165,3 +165,71 @@ export async function getRevenueBreakdown(req: Request, res: Response): Promise<
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+// §34أ — business money metrics for the admin dashboard:
+// MRR (active subs normalised to a 30-day month), ARPU (MRR / active
+// members), monthly churn % (subs that ended this month / subs active at
+// month start), and net growth (new active subs this month - churned).
+// Every figure is derived from member_subscriptions only — no estimates.
+export async function getBusinessMetrics(req: Request, res: Response): Promise<void> {
+  const gym_id = req.staff?.gym_id;
+  try {
+    const result = await query(`
+      WITH mrr AS (
+        SELECT
+          COALESCE(SUM(price_paid * 30.0 / GREATEST((end_date - start_date + 1)::numeric, 1)), 0) AS mrr,
+          COUNT(DISTINCT member_id) AS active_members
+        FROM member_subscriptions
+        WHERE gym_id = $1 AND status = 'active' AND deleted_at IS NULL
+      ),
+      churned AS (
+        SELECT COUNT(*) AS n
+        FROM member_subscriptions
+        WHERE gym_id = $1 AND deleted_at IS NULL
+          AND status IN ('cancelled', 'expired')
+          AND end_date >= date_trunc('month', CURRENT_DATE)::date
+          AND end_date < (date_trunc('month', CURRENT_DATE) + INTERVAL '1 month')::date
+      ),
+      base AS (
+        SELECT COUNT(*) AS n
+        FROM member_subscriptions
+        WHERE gym_id = $1 AND deleted_at IS NULL
+          AND start_date <= date_trunc('month', CURRENT_DATE)::date
+          AND end_date >= date_trunc('month', CURRENT_DATE)::date
+      ),
+      new_subs AS (
+        SELECT COUNT(*) AS n
+        FROM member_subscriptions
+        WHERE gym_id = $1 AND deleted_at IS NULL AND status = 'active'
+          AND start_date >= date_trunc('month', CURRENT_DATE)::date
+      )
+      SELECT mrr.mrr, mrr.active_members,
+             churned.n AS churned_this_month,
+             base.n AS active_at_month_start,
+             new_subs.n AS new_this_month
+      FROM mrr, churned, base, new_subs
+    `, [gym_id]);
+    const r = result.rows[0] || {};
+    const mrr = Number(r.mrr || 0);
+    const activeMembers = Number(r.active_members || 0);
+    const churnedN = Number(r.churned_this_month || 0);
+    const baseN = Number(r.active_at_month_start || 0);
+    const newN = Number(r.new_this_month || 0);
+    res.status(200).json({
+      data: {
+        mrr: Math.round(mrr * 100) / 100,
+        // null = honest "no base to divide by" (the UI renders '—')
+        arpu: activeMembers > 0 ? Math.round((mrr / activeMembers) * 100) / 100 : null,
+        churn_rate_pct: baseN > 0 ? Math.round((churnedN / baseN) * 1000) / 10 : null,
+        churned_this_month: churnedN,
+        active_at_month_start: baseN,
+        new_this_month: newN,
+        net_growth: newN - churnedN,
+        active_members: activeMembers,
+      },
+    });
+  } catch (error) {
+    logger.error('Business metrics query failed', { error: (error as Error).message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}

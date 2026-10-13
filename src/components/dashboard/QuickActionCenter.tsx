@@ -134,6 +134,7 @@ function AddMemberForm({ onDone, defaultPlanNote }: { onDone: () => void; defaul
       queryClient.invalidateQueries({ queryKey: ['gym', 'members', 'summary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard', 'expiring-soon'] });
       queryClient.invalidateQueries({ queryKey: ['membership-offers'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics', 'business-metrics'] });
       showToast(rtl ? 'تم إضافة العضو' : 'Member added', 'success');
     },
     onError: (e) => showToast(apiError(e, rtl ? 'فشل إضافة العضو' : 'Failed to add member'), 'error'),
@@ -585,6 +586,7 @@ function PaymentForm({ onDone, presetMember }: { onDone: () => void; presetMembe
       queryClient.invalidateQueries({ queryKey: ['gym', 'finance', 'summary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard', 'overdue-debts'] });
       queryClient.invalidateQueries({ queryKey: ['analytics', 'revenue-breakdown'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics', 'business-metrics'] });
       showToast(rtl ? `تم تسجيل دفعة ${formatMoney(Number(amount), gymProfile?.currency)}` : 'Payment recorded', 'success');
       onDone();
     },
