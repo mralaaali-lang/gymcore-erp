@@ -87,8 +87,19 @@ function groupNavItems(items: NavItem[]): NavGroup[] {
 }
 
 export default function Sidebar({ items }: SidebarProps) {
-  const { isSidebarOpen, role, logout } = useApp();
+  const { isSidebarOpen, role, logout, gymProfile, language } = useApp();
   const { t } = useTranslation();
+
+  // §33أ-تنظيف: the gym's own identity (name · today's date · plan) lives
+  // here in the brand block — the dashboard no longer repeats it. Platform
+  // sessions (no gym profile) keep the generic GymCore branding.
+  const brandName = gymProfile?.name || 'GymCore';
+  const brandSub = gymProfile?.name
+    ? [
+        new Date().toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }),
+        gymProfile.plan_tier ? t(`plan.${gymProfile.plan_tier}`, gymProfile.plan_tier) : null,
+      ].filter(Boolean).join(' · ')
+    : t('sidebar.brandTagline');
 
   const filteredItems = items.filter((item) =>
     item.roles.some((r) => r === role)
@@ -156,11 +167,11 @@ export default function Sidebar({ items }: SidebarProps) {
       <div className="py-4 px-4 flex items-center gap-2.5 border-b border-gray-100 shrink-0">
         <NavLink to={`${ROLE_BASE[role]}/dashboard`} className="flex items-center gap-2.5 min-w-0">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-emerald-500/30 shrink-0">
-            ج
+            {brandName.charAt(0)}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">GymCore</p>
-            <p className="text-[10px] text-gray-400 truncate">{t('sidebar.brandTagline')}</p>
+            <p className="text-sm font-bold text-gray-900 truncate">{brandName}</p>
+            <p className="text-[10px] text-gray-400 truncate">{brandSub}</p>
           </div>
         </NavLink>
       </div>

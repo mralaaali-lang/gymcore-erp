@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -11,11 +12,11 @@ import {
 } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
 import {
-  Gift, Plus, Calendar, TrendingUp, Users, DollarSign,
-  Clock, AlertTriangle, UserX, UserPlus, ChevronLeft,
+  Gift, Plus, TrendingUp, Users, DollarSign,
+  Clock, AlertTriangle, UserX, UserPlus, ChevronLeft, QrCode,
 } from 'lucide-react';
-import { StatCard, Panel, Banner, DashboardPage, PrimaryAction } from '../../components/dashboard';
-import QuickActionCenter from '../../components/dashboard/QuickActionCenter';
+import { StatCard, Panel, Banner, DashboardPage, PrimaryAction, AccentAction } from '../../components/dashboard';
+import { QuickActionBar, QuickActionModals, PRESENT_WINDOW_HOURS, type ActionKey } from '../../components/dashboard/QuickActionCenter';
 
 // §24 redesign — "today's tasks first" (competitor pattern: Mindbody/Glofox/
 // Wodify owner dashboards lead with what needs action today, not vanity KPIs).
@@ -100,6 +101,10 @@ export default function GymAdminDashboard() {
   const navigate = useNavigate();
   const currency = gymProfile?.currency;
 
+  // §33أ-تنظيف — gym name/date/plan moved to the sidebar brand block; the page
+  // header keeps only the add-member CTA, and quick actions live in cards.
+  const [action, setAction] = useState<ActionKey | null>(null);
+
   // Setup banner only for a brand-new gym — an operating gym never sees it (§24).
   const { doneCount, total } = useSetupProgress(isZeroState);
   const progress = total > 0 ? Math.round((doneCount / total) * 100) : 0;
@@ -173,7 +178,6 @@ export default function GymAdminDashboard() {
   const revenueSpark = revenueBreakdown
     ? [revenueBreakdown.memberships, revenueBreakdown.pos, revenueBreakdown.personal_training]
     : [];
-  const attendanceSpark = peakHours?.map((h) => h.check_ins) ?? [];
   const enrollmentDelta = enrollmentSpark.length > 1
     ? enrollmentSpark[enrollmentSpark.length - 1] - enrollmentSpark[enrollmentSpark.length - 2]
     : 0;
@@ -184,18 +188,19 @@ export default function GymAdminDashboard() {
     && (revenueBreakdown.memberships + revenueBreakdown.pos + revenueBreakdown.personal_training) > 0;
 
   const daysWord = (n: number) => language === 'ar' ? `${n} يوم` : `${n}d`;
-  const gymName = gymProfile?.name || t('dashboard.title');
+
+  // "متواجدون الآن" = check-ins within the last PRESENT_WINDOW_HOURS (no check-out exists).
+  const presentRecords = attendanceRes?.records ?? [];
+  const presentCount = presentRecords.filter((r) => {
+    const ts = new Date((r as { check_in_time?: string }).check_in_time ?? 0).getTime();
+    return Number.isFinite(ts) && ts >= Date.now() - PRESENT_WINDOW_HOURS * 3600_000;
+  }).length;
 
   return (
     <div className="bg-gray-50 min-h-screen -m-6 p-6">
       <DashboardPage
-        title={gymName}
-        subtitle={[
-          new Date().toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }),
-          gymProfile?.plan_tier ? t(`plan.${gymProfile.plan_tier}`, gymProfile.plan_tier) : null,
-        ].filter(Boolean).join(' · ')}
         actions={
-          <PrimaryAction onClick={() => navigate('/admin/members/add')}>
+          <PrimaryAction onClick={() => setAction('member')}>
             <Plus size={16} />
             {t('dashboard.addMember', 'إضافة عضو')}
           </PrimaryAction>
@@ -213,18 +218,10 @@ export default function GymAdminDashboard() {
         )}
 
         {/* §33 دفعة 1 — every daily admin action starts here (real endpoints, no page detour) */}
-        <QuickActionCenter />
+        <QuickActionBar onOpen={setAction} />
 
         {/* ── Row 1: today at a glance ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <StatCard
-            icon={Calendar}
-            label={t('dashboard.todayCheckin', 'حضور اليوم')}
-            value={String(todayCount)}
-            sparkData={attendanceSpark.length > 1 ? attendanceSpark : undefined}
-            accent="emerald"
-            onClick={() => navigate('/admin/attendance')}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           <StatCard
             icon={DollarSign}
             label={t('dashboard.todayRevenue', 'مبيعات اليوم')}
@@ -254,10 +251,49 @@ export default function GymAdminDashboard() {
           />
         </div>
 
-        {/* ── Row 2: needs your action ── */}
+        {/* ── Row 2: today's tasks — action cards first (check-in + attendance live here) ── */}
         <div>
-          <h2 className="text-lg font-bold text-gray-900 mb-4">{t('dashboard.needsAction', 'يحتاج إجراءك')}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+          <h2 className="text-lg font-bold text-gray-900 mb-4">{t('dashboard.todaysTasks', 'مهام اليوم')}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            <Panel
+              icon={QrCode}
+              accent="emerald"
+              title={t('dashboard.checkInCard', 'تسجيل حضور')}
+              subtitle={t('dashboard.checkInCardSub', 'مسح باركود · كود · رقم هاتف')}
+            >
+              <p className="text-sm text-gray-500 leading-relaxed">
+                {t('dashboard.checkInCardDesc', 'افتح شاشة الحضور: كاميرا تمسح QR/الباركود وتسجّل تلقائيًا بشكل مستمر، أو أدخل الكود/رقم الهاتف يدويًا.')}
+              </p>
+              <AccentAction className="mt-4 w-full" onClick={() => setAction('checkin')}>
+                <QrCode size={16} />
+                {t('dashboard.openCheckIn', 'فتح شاشة الحضور')}
+              </AccentAction>
+            </Panel>
+            <Panel
+              icon={Users}
+              accent="violet"
+              title={t('dashboard.todayAttendance', 'حضور اليوم')}
+              subtitle={t('dashboard.presentNow', 'متواجدون الآن (آخر {{n}} ساعات)', { n: PRESENT_WINDOW_HOURS })}
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-emerald-50 rounded-2xl p-4 text-center">
+                  <p className="text-3xl font-bold text-emerald-700 tabular-nums">{todayCount}</p>
+                  <p className="text-xs font-semibold text-emerald-600 mt-1">{t('dashboard.checkedInToday', 'حضور اليوم')}</p>
+                </div>
+                <div className="bg-violet-50 rounded-2xl p-4 text-center">
+                  <p className="text-3xl font-bold text-violet-700 tabular-nums">{presentCount}</p>
+                  <p className="text-xs font-semibold text-violet-600 mt-1">{t('dashboard.presentNowShort', 'متواجدون الآن')}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAction('today')}
+                className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 hover:text-emerald-700"
+              >
+                {t('dashboard.viewList', 'عرض القائمة')}
+                <ChevronLeft size={15} className="rtl:hidden" />
+                <ChevronLeft size={15} className="hidden rtl:block rotate-180" />
+              </button>
+            </Panel>
             <ActionCard
               icon={Clock}
               title={t('dashboard.expiringSoon', 'اشتراكات تنتهي خلال 7 أيام')}
@@ -320,7 +356,7 @@ export default function GymAdminDashboard() {
 
         {/* ── Row 3: analytics (only cards with real data) ── */}
         <div>
-          <h2 className="text-lg font-bold text-gray-900 mb-4">{t('dashboard.title')}</h2>
+          <h2 className="text-lg font-bold text-gray-900 mb-4">{t('dashboard.analytics', 'التحليلات')}</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {enrollmentError ? (
               <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 text-sm text-red-500">{t('dashboard.loadError')}</div>
@@ -367,6 +403,9 @@ export default function GymAdminDashboard() {
           </p>
         )}
       </DashboardPage>
+
+      {/* Centered popups for every quick action (member/staff/check-in/today/payment/expense) */}
+      <QuickActionModals action={action} onClose={() => setAction(null)} />
     </div>
   );
 }

@@ -45,7 +45,7 @@ function timeAgo(iso: string | null, t: (k: string, o?: any) => string): string 
 }
 
 export default function TopNav() {
-  const { branding, role, language, setLanguage } = useApp();
+  const { role, language, setLanguage } = useApp();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -117,14 +117,13 @@ export default function TopNav() {
   return (
     <header className="bg-gradient-to-br from-petrol-dark via-petrol to-petrol-light w-full sticky top-0 z-30 shrink-0">
       <div className="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-5 md:py-6">
-        {/* Left (geometric left, per spec): page title on top, username below */}
+        {/* Left (geometric left, per spec): page title only — the gym name,
+            date and plan now live in the sidebar brand block (§33أ-تنظيف),
+            so repeating them here was the duplicate the owner flagged. */}
         <div>
           <h1 className="text-headline-md md:text-headline-lg font-bold text-white tracking-tight">
             {t('sidebar.dashboard')}
           </h1>
-          <p className="text-body-md text-petrol-muted mt-0.5">
-            {branding?.name || t('common.appName')}
-          </p>
         </div>
 
         {/* Right: language toggle + "What's new?" pill with live unread badge */}

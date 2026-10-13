@@ -9,7 +9,7 @@ import {
   listOffers, listExpenseCategories, searchMembers, getTodayAttendance,
 } from '../../services/api';
 import Spinner from '../../components/ui/Spinner';
-import { UserPlus, UserCog, QrCode, Users, Banknote, Receipt, X } from 'lucide-react';
+import { UserPlus, UserCog, QrCode, Banknote, Receipt, X } from 'lucide-react';
 
 // ====================================================================
 // §33 دفعة 1 — Quick Action Center for the manager dashboard.
@@ -33,7 +33,7 @@ import { UserPlus, UserCog, QrCode, Users, Banknote, Receipt, X } from 'lucide-r
 // the input so the receptionist can scan the next member immediately.
 // ====================================================================
 
-type ActionKey = 'member' | 'coach' | 'reception' | 'checkin' | 'today' | 'payment' | 'expense';
+export type ActionKey = 'member' | 'coach' | 'reception' | 'checkin' | 'today' | 'payment' | 'expense';
 
 /** Extract the server's own error text so the UI never hides a real rejection. */
 function apiError(e: unknown, fallback: string): string {
@@ -449,7 +449,7 @@ interface AttendanceRow {
   verified_by_name?: string | null;
 }
 
-const PRESENT_WINDOW_HOURS = 3;
+export const PRESENT_WINDOW_HOURS = 3;
 
 function TodayAttendance() {
   const { language } = useApp();
@@ -671,15 +671,34 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
 }
 
 // ── Action bar ─────────────────────────────────────────────────────
-const ACTIONS: { key: ActionKey; icon: typeof UserPlus; ar: string; en: string; accent: string }[] = [
-  { key: 'member', icon: UserPlus, ar: 'إضافة عضو', en: 'Add member', accent: 'bg-emerald-600 text-white hover:bg-emerald-700' },
-  { key: 'coach', icon: UserCog, ar: 'إضافة كابتن', en: 'Add coach', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
-  { key: 'reception', icon: UserCog, ar: 'إضافة ريسبشن', en: 'Add reception', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
-  { key: 'checkin', icon: QrCode, ar: 'تسجيل حضور', en: 'Check in', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
-  { key: 'today', icon: Users, ar: 'حضور اليوم', en: 'Today', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
-  { key: 'payment', icon: Banknote, ar: 'تسجيل دفعة', en: 'Record payment', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
-  { key: 'expense', icon: Receipt, ar: 'تسجيل مصروف', en: 'Record expense', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
+// §33أ-تنظيف: the bar only carries the forms; check-in and today's
+// attendance are rendered as Panel cards by the dashboard itself, and
+// "add member" is the dashboard header's primary action — no duplicates.
+const BAR_ACTIONS: { key: ActionKey; icon: typeof UserPlus; ar: string; en: string }[] = [
+  { key: 'coach', icon: UserCog, ar: 'إضافة كابتن', en: 'Add coach' },
+  { key: 'reception', icon: UserCog, ar: 'إضافة ريسبشن', en: 'Add reception' },
+  { key: 'payment', icon: Banknote, ar: 'تسجيل دفعة', en: 'Record payment' },
+  { key: 'expense', icon: Receipt, ar: 'تسجيل مصروف', en: 'Record expense' },
 ];
+
+export function QuickActionBar({ onOpen }: { onOpen: (k: ActionKey) => void }) {
+  const { language } = useApp();
+  const rtl = language === 'ar';
+  return (
+    <div dir={rtl ? 'rtl' : 'ltr'} className="flex flex-wrap gap-2">
+      {BAR_ACTIONS.map((a) => (
+        <button
+          key={a.key}
+          onClick={() => onOpen(a.key)}
+          className="inline-flex items-center gap-2 rounded-xl bg-white text-gray-800 border border-gray-200 px-4 py-2.5 text-sm font-bold shadow-sm hover:bg-gray-50 transition"
+        >
+          <a.icon size={16} />
+          {rtl ? a.ar : a.en}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const TITLES: Record<ActionKey, [string, string]> = {
   member: ['إضافة عضو جديد', 'Add new member'],
@@ -691,35 +710,19 @@ const TITLES: Record<ActionKey, [string, string]> = {
   expense: ['تسجيل مصروف صالة', 'Record gym expense'],
 };
 
-export default function QuickActionCenter() {
+export function QuickActionModals({ action, onClose }: { action: ActionKey | null; onClose: () => void }) {
   const { language } = useApp();
   const rtl = language === 'ar';
-  const [openKey, setOpenKey] = useState<ActionKey | null>(null);
-  const close = () => setOpenKey(null);
-
   return (
-    <div dir={rtl ? 'rtl' : 'ltr'} className="flex flex-wrap gap-2">
-      {ACTIONS.map((a) => (
-        <button
-          key={a.key}
-          onClick={() => setOpenKey(a.key)}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm transition ${a.accent}`}
-        >
-          <a.icon size={16} />
-          {rtl ? a.ar : a.en}
-        </button>
-      ))}
-
-      <Modal open={openKey !== null} onClose={close} title={openKey ? (rtl ? TITLES[openKey][0] : TITLES[openKey][1]) : ''}>
-        {openKey === 'member' && <AddMemberForm key="m" onDone={close} />}
-        {(openKey === 'coach' || openKey === 'reception') && (
-          <AddStaffForm key={`s-${openKey}`} defaultRole={openKey === 'coach' ? 'coach' : 'receptionist'} onDone={close} />
-        )}
-        {openKey === 'checkin' && <CheckInForm key="ci" />}
-        {openKey === 'today' && <TodayAttendance key="td" />}
-        {openKey === 'payment' && <PaymentForm onDone={close} />}
-        {openKey === 'expense' && <ExpenseForm onDone={close} />}
-      </Modal>
-    </div>
+    <Modal open={action !== null} onClose={onClose} title={action ? (rtl ? TITLES[action][0] : TITLES[action][1]) : ''}>
+      {action === 'member' && <AddMemberForm key="m" onDone={onClose} />}
+      {(action === 'coach' || action === 'reception') && (
+        <AddStaffForm key={`s-${action}`} defaultRole={action === 'coach' ? 'coach' : 'receptionist'} onDone={onClose} />
+      )}
+      {action === 'checkin' && <CheckInForm key="ci" />}
+      {action === 'today' && <TodayAttendance key="td" />}
+      {action === 'payment' && <PaymentForm onDone={onClose} />}
+      {action === 'expense' && <ExpenseForm onDone={onClose} />}
+    </Modal>
   );
 }

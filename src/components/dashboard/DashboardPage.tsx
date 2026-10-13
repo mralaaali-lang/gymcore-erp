@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useApp } from '../../context/GymBrandContext';
 
 interface DashboardPageProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   actions?: ReactNode;
   children: ReactNode;
@@ -11,7 +11,9 @@ interface DashboardPageProps {
 
 /**
  * Standard page shell — dashboard header (title + subtitle + actions)
- * inside a `space-y-6` container. RTL-aware.
+ * inside a `space-y-6` container. RTL-aware. Title/subtitle are optional:
+ * the manager dashboard moved gym name/date/plan to the sidebar brand
+ * block (§33أ-تنظيف), so it renders with an actions-only header.
  */
 export default function DashboardPage({
   title,
@@ -24,13 +26,18 @@ export default function DashboardPage({
   const isRtl = language === 'ar';
   return (
     <div className={`space-y-6 ${className}`} dir={isRtl ? 'rtl' : 'ltr'}>
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{title}</h1>
-          {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+      {(title || subtitle || actions) && (
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          {title && (
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">{title}</h1>
+              {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+            </div>
+          )}
+          {!title && subtitle && <div><p className="text-sm text-gray-500 mt-1">{subtitle}</p></div>}
+          {actions && <div className="flex items-center gap-2 flex-wrap ms-auto">{actions}</div>}
         </div>
-        {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
-      </div>
+      )}
       {children}
     </div>
   );
