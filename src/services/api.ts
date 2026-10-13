@@ -1183,7 +1183,7 @@ export async function createPtPackage(data: { name: string; session_count: numbe
   const res = await api.post('/api/training/packages', data);
   return res.data as { data: any };
 }
-export async function listPtSessions(params?: { member_id?: string; trainer_id?: string }) {
+export async function listPtSessions(params?: { member_id?: string; trainer_id?: string; mine?: boolean }) {
   const res = await api.get('/api/training/sessions', { params });
   return res.data as { data: any[] };
 }

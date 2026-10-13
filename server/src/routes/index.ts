@@ -300,9 +300,13 @@ router.get('/api/loyalty/history/:member_id', requireRole('manager', 'receptioni
 
 // ====================================================================
 // CUSTOMER 360 — Unified Member View
+// §32 fix: the static '/search' path must be registered BEFORE the
+// '/:member_id' param route — express matches in order, so previously
+// GET /api/customer360/search hit getCustomer360 with member_id="search"
+// and 500'd ("invalid input syntax for type uuid").
 // ====================================================================
-router.get('/api/customer360/:member_id', requireRole('manager', 'receptionist', 'coach'), getCustomer360);
 router.get('/api/customer360/search', requireRole('manager', 'receptionist', 'coach'), getMemberSearch);
+router.get('/api/customer360/:member_id', requireRole('manager', 'receptionist', 'coach'), getCustomer360);
 
 // ====================================================================
 // AI COACH — Insights & Recommendations

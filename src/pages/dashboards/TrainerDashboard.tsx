@@ -9,7 +9,8 @@ import { DashboardPage } from '../../components/dashboard';
 function useTrainerDashboard() {
   const { data: sessionsData, isLoading: sLoading } = useApiQuery(
     ['trainer', 'sessions'],
-    () => listPtSessions({}),
+    // §32: mine=true — a coach's dashboard must show THEIR sessions only.
+    () => listPtSessions({ mine: true }),
     { staleTime: 30_000 },
   );
   const { data: attendanceData, isLoading: aLoading } = useApiQuery(

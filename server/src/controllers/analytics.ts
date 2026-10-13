@@ -134,11 +134,15 @@ export async function getRevenueBreakdown(req: Request, res: Response): Promise<
       FROM pos_orders
       WHERE gym_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '30 days'
     `, [gym_id]);
+    // §32: real PT revenue — each COMPLETED session earns its package's
+    // per-session price (total_price / session_count). Replaces the fabricated
+    // "COUNT(*) * 50" estimate that had no basis in pt_packages pricing.
     const pt = await query(`
-      SELECT COALESCE(COUNT(DISTINCT s.id) * 50, 0) AS estimated
+      SELECT COALESCE(SUM(pkg.total_price / NULLIF(pkg.session_count, 0)), 0) AS total
       FROM pt_sessions ps
-      JOIN member_subscriptions s ON s.member_id = ps.member_id AND s.gym_id = ps.gym_id
-      WHERE ps.gym_id = $1 AND ps.scheduled_at >= CURRENT_DATE - INTERVAL '30 days'
+      JOIN pt_packages pkg ON pkg.id = ps.package_id
+      WHERE ps.gym_id = $1 AND ps.status = 'completed'
+        AND ps.completed_at >= CURRENT_DATE - INTERVAL '30 days'
     `, [gym_id]);
     const aging = await query(`
       SELECT
@@ -152,7 +156,7 @@ export async function getRevenueBreakdown(req: Request, res: Response): Promise<
       data: {
         memberships: Number(memberships.rows[0]?.total || 0),
         pos: Number(pos.rows[0]?.total || 0),
-        personal_training: Number(pt.rows[0]?.estimated || 0),
+        personal_training: Number(pt.rows[0]?.total || 0),
         aging_receivables: aging.rows[0] || { current: 0, aging_1_30: 0, aging_31_60: 0, aging_60_plus: 0 },
       },
     });

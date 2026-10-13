@@ -37,6 +37,31 @@
 
 ---
 
+## 🚨 قرار ملزم (2026-10-13): **صفر mocks في المشروع**
+
+لا بيانات ثابتة/مفبركة/Math.random في أي شاشة — كل رقم من API/DB فعلي، ومتوفر ليس موجوداً تُعرض حالة empty صادقة. الاستثناء الوحيد المتفق عليه: أسعار المنصة (super-admin) بالجنيه المصري.
+
+---
+
+## 🎯 تخصص لوحة مدير الصالة بمعايير السوق (§32–§34) — الدفعات بالترتيب
+
+**معيار المنافسة (Mindbody/Glofox/TeamUp/Trainera + Gym Engine/eclubs/جيمستا):** لوحة صاحب الجيم تُقاس بمؤشرات تشغيلية يومية لا كروت شكلية — MRR (نمو شهري صحي 3–5%)، churn (شهري صحي 3–5%)، إيراد متوسط لكل عضو (ARPM/ARPU)، معدل زيارات العضو (8–12 شهرياً)، إشغال الكلاسات (70–85%)، تحويل الليدز/التجارب (20–30%)، LTV، ودفاتر كاش/تسويات يومية.
+
+**نتيجة التدقيق الكامل (كل صفحة/endpoint — LOCAL_TESTING_REPORT §34):** السيرفر نظيف من الـmocks عدا PT-revenue «×50» (أُصلح §32)؛ الفعلي في الفرونت: لوحة المدرب/تقدم العملاء mocks كاملة (أُعيد بناؤهما §32) · MarketingAutomation رسوم Math.random + funnel ثابت · BranchAnalytics الثلاثة معطوبة contract · MigrationTab استيراد وهمي · IntegrationsTab مفاتيح لا يقرأها أحد · أزرار toast-only متفرقة · مسارات 403 (classes للمدير، referrals بلا باريتر tenant، notifications يعيد استخدام منصة).
+
+| دفعة | النطاق | الحالة |
+|---|---|---|
+| **§32** | حذف mocks المسار المدرب (TrainerDashboard/ClientProgress/SmsGateway/BreachLog) + PT revenue حقيقي + `mine=true` + إصلاح route-order لـ customer360/search | 🔄 جارية |
+| **§34أ** | KPIs مالية في لوحة القيادة: `GET /api/analytics/business-metrics` → MRR من price_paid النشطة، churn% (ملغيات/نشطي الشهر)، ARPU، صافي النمو | ⏳ |
+| **§34ب** | معدل زيارات العضو (8–12) + إشغال الكلاسات (70–85%) من class_bookings/schedule_capacity + إصلاح BranchAnalytics (retention/forecast/peak-hours عقود مكسورة) | ⏳ |
+| **§34ت** | قمع التسويق الحقيقي من gym_leads (بدل Math.random) + funnel بالمصدر + تحويل الليد% + مسار tenant لـ referrals | ⏳ |
+| **§34ث** | دفتر يومية كاش + تسوية إغلاق الوردية مقابل financial_transactions + member_name في الفواتير (join ناقص finance.ts:13) + عدادات الفواتير من الإجمالي لا شريحة الصفحة + صافي SalesPage | ⏳ |
+| **§34ج** | طرد الأوهام: أزرار toast-only/ميتة (INVITE/PRINT/Import/ADD NOTE/CREATE CHARGE…) — تُوصَّل أو تُحذف؛ endpoint classes للمدير؛ MigrationTab الاستيراد أو يُزال؛ Integrations أو تُزال؛ /admin/notifications؛ WebsiteGenerator Coming-soon؛ toggleActive الباقات؛ حقول offers | ⏳ |
+
+**ملاحظة فجوة بيانات واحدة تحتاج migration:** ملاحظات الأعضاء (member_notes) لا جدول لها — تُنشأ في §34ج إن اختار المستخدم توصيل الزر بدل حذفه. بقية كل الأرقام لها جداول فعلية (84 جدولاً — الجاهزة موثقة أسفل التقرير §34).
+
+---
+
 ## 📋 بعد المرحلة الحالية (بالترتيب)
 
 ### 2) سد فجوات الترجمة الإنجليزية

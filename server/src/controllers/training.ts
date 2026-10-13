@@ -25,12 +25,16 @@ export const listPtSessions = async (req: Request, res: Response) => {
   const gym_id = req.staff?.gym_id;
   const member_id = req.query.member_id as string;
   const trainer_id = req.query.trainer_id as string;
+  // §32: mine=true scopes to the authenticated coach (trainer dashboard must
+  // show MY sessions, not the whole gym's).
+  const mine = req.query.mine === 'true';
   try {
     let sql = `SELECT ps.*, pkg.name AS package_name, m.full_name AS member_name, su.full_name AS trainer_name FROM pt_sessions ps JOIN pt_packages pkg ON ps.package_id=pkg.id JOIN members m ON ps.member_id=m.id JOIN staff_users su ON ps.trainer_id=su.id WHERE ps.gym_id=$1`;
     const params: unknown[] = [gym_id];
     let idx = 2;
     if (member_id) { sql += ` AND ps.member_id=$${idx++}`; params.push(member_id); }
     if (trainer_id) { sql += ` AND ps.trainer_id=$${idx++}`; params.push(trainer_id); }
+    if (mine && req.staff?.staff_user_id) { sql += ` AND ps.trainer_id=$${idx++}`; params.push(req.staff.staff_user_id); }
     sql += ' ORDER BY ps.scheduled_at DESC';
     const r = await query(sql, params);
     res.json({ data: r.rows });

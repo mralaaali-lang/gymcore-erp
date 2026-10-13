@@ -31,10 +31,11 @@ export default function BreachLogTab() {
   const overview = overviewQuery.data?.data;
   const isLoading = overviewQuery.isLoading;
 
-  // Build mock breach data from real overview data
+  // §32: there is NO breach-events table/source yet — the log stays honestly
+  // empty (no fabricated rows). The failed-logins counter below is real
+  // overview data; wire breach entries when an event source exists.
   const breachLogs: BreachEntry[] = [];
 
-  // Derive some from failed logins if available
   const failedLogins = overview?.failed_logins || 0;
 
   const filtered = breachLogs.filter((entry) => {
