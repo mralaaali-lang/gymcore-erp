@@ -52,7 +52,7 @@
 | دفعة | النطاق | الحالة |
 |---|---|---|
 | **§32** | حذف mocks المسار المدرب (TrainerDashboard/ClientProgress/SmsGateway/BreachLog) + PT revenue حقيقي + `mine=true` + إصلاح route-order لـ customer360/search | ✅ (2026-10-13 — 6e10270) |
-| **§33أ** | لوحة القيادة = مركز الإجراءات: شريط 6 إجراءات يفتح Drawers داخل اللوحة على endpoints موجودة فعلاً (إضافة عضو بعروض حقيقية + PIN يُعرض مرة واحدة، إضافة كابتن/ريسبشن، حضور يدوي، دفعة بعضو-سيرش، مصروف بتصنيفات DB) + invalidation لكروت اللوحة | ⏳ |
+| **§33أ** | لوحة القيادة = مركز الإجراءات: شريط 6 إجراءات يفتح Drawers داخل اللوحة على endpoints موجودة فعلاً (إضافة عضو بعروض حقيقية + PIN يُعرض مرة واحدة، إضافة كابتن/ريسبشن، حضور يدوي، دفعة بعضو-سيرش، مصروف بتصنيفات DB) + invalidation لكروت اللوحة | ✅ (2026-10-13 — f92edfa) |
 | **§33ب** | «تحديد الأسعار والعروض»: `POST/PUT /api/membership-offers` + Drawer إدارة العروض في اللوحة + توحيد عقد الحقول مع SubscriptionManagement (title/duration_days/price) وجعل toggleActive حقيقياً | ⏳ |
 | **§34أ** | KPIs مالية في لوحة القيادة: `GET /api/analytics/business-metrics` → MRR من price_paid النشطة، churn% (ملغيات/نشطي الشهر)، ARPU، صافي النمو | ⏳ |
 | **§34ب** | معدل زيارات العضو (8–12) + إشغال الكلاسات (70–85%) من class_bookings/schedule_capacity + إصلاح BranchAnalytics (retention/forecast/peak-hours عقود مكسورة) | ⏳ |
