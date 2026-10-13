@@ -8,13 +8,15 @@ import {
   getPlatformGym,
 } from '../services/api';
 import { useApp } from '../context/GymBrandContext';
+import { formatMoney } from '../utils/currency';
 
-function formatCurrency(amount: number): string {
-  return `${amount.toLocaleString('ar-EG')} ج.م`;
+// §30: currency follows the gym's setting (formatMoney), not a hardcoded ج.م
+function formatCurrency(amount: number, code?: string | null): string {
+  return formatMoney(amount, code);
 }
 
 export function useGymDashboard() {
-  const { tenantId } = useApp();
+  const { tenantId, gymProfile } = useApp();
   
   const { data: gymInfo } = useQuery({
     queryKey: ['gym', 'info', tenantId],
@@ -89,7 +91,7 @@ export function useGymDashboard() {
       },
       {
         label: 'الإيرادات الشهرية',
-        value: isLoading ? '—' : formatCurrency(finance?.monthly_revenue ?? 0),
+        value: isLoading ? '—' : formatCurrency(finance?.monthly_revenue ?? 0, gymProfile?.currency),
         icon: 'payments',
         trend: undefined,
         color: 'secondary' as const,
@@ -103,7 +105,7 @@ export function useGymDashboard() {
       },
       {
         label: 'الديون المعلقة',
-        value: isLoading ? '—' : formatCurrency(finance?.outstanding_debts ?? 0),
+        value: isLoading ? '—' : formatCurrency(finance?.outstanding_debts ?? 0, gymProfile?.currency),
         icon: 'receipt_long',
         trend: undefined,
         color: 'error' as const,

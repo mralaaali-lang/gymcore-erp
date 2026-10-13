@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import type { MetricCard, PTSession } from '../../types';
 import PageHeader from '../../components/shared/PageHeader';
 import StatsGrid from '../../components/shared/StatsGrid';
@@ -10,7 +11,8 @@ import StatusBadge from '../../components/ui/StatusBadge';
 const metrics: MetricCard[] = [
   { label: 'العملاء النشطين', value: 24, icon: 'fitness_center', trend: { value: '+3 هذا الأسبوع', positive: true }, color: 'primary' },
   { label: 'جلسات اليوم', value: 8, icon: 'calendar_today', trend: { value: '2 قادمة', positive: true }, color: 'secondary' },
-  { label: 'المدفوعات الشهرية', value: '12,450 ر.س', icon: 'payments', trend: { value: '4 متأخرة', positive: false }, color: 'error' },
+  // §30: demo figure rendered through the gym's currency (money() below)
+  { label: 'المدفوعات الشهرية', value: 'PAYMENTS_MOCK', icon: 'payments', trend: { value: '4 متأخرة', positive: false }, color: 'error' },
 ];
 
 const todaySessions: PTSession[] = [
@@ -35,8 +37,11 @@ const sessionVariant: Record<PTSession['status'], 'success' | 'warning' | 'error
 };
 
 export default function TrainerDashboard() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
   const isRtl = language === 'ar';
+  // §30: money() — gym currency symbol everywhere on this page
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const [, setSelectedSession] = useState<string | null>(null);
 
   return (
@@ -52,7 +57,7 @@ export default function TrainerDashboard() {
         stats={metrics.map((m) => ({
           key: m.label,
           label: m.label,
-          value: m.value,
+          value: m.value === 'PAYMENTS_MOCK' ? money(12450) : m.value,
           icon: m.icon,
           trend: m.trend,
           color: m.color === 'error' ? ('error' as const) : ('primary' as const),
@@ -110,8 +115,8 @@ export default function TrainerDashboard() {
                     </span>
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>{s.totalAmount.toLocaleString()} ر.س</span>
-                    <span>{isRtl ? 'مدفوع' : 'Paid'}: {s.paidAmount.toLocaleString()} ر.س</span>
+                    <span>{money(s.totalAmount)}</span>
+                    <span>{isRtl ? 'مدفوع' : 'Paid'}: {money(s.paidAmount)}</span>
                   </div>
                 </div>
               );

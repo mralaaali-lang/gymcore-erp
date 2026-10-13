@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
+import { formatMoney } from '../../utils/currency';
 import { useToast } from '../../context/ToastContext';
 import { createMember, listOffers, uploadMemberPhoto } from '../../services/api';
 import Spinner from '../../components/ui/Spinner';
@@ -39,7 +40,10 @@ interface FormState {
 }
 
 export default function MemberRegistrationForm() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  // §30: money() — gym currency symbol everywhere on this page
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const { showToast } = useToast();
   const navigate = useNavigate();
   const rtl = language === 'ar';
@@ -236,7 +240,7 @@ export default function MemberRegistrationForm() {
               <select name="planId" value={form.planId} onChange={handleChange} className={selectCls}>
                 <option value="">{rtl ? '— بدون باقة —' : '— No Plan —'}</option>
                 {offers.map((o) => (
-                  <option key={o.id} value={o.id}>{o.title} — {o.duration_days} {rtl ? 'يوم' : 'days'} — {o.price} EGP</option>
+                  <option key={o.id} value={o.id}>{o.title} — {o.duration_days} {rtl ? 'يوم' : 'days'} — {money(o.price)}</option>
                 ))}
               </select>
             </Field>

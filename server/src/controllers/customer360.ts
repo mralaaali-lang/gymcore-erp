@@ -40,9 +40,18 @@ export async function getCustomer360(req: Request, res: Response): Promise<void>
        ORDER BY created_at DESC LIMIT 20`,
       [gym_id]
     );
+    // §30 side-fix: migration 044 dropped loyalty_points and replaced it with
+    // loyalty_accounts/loyalty_tiers, but this endpoint still queried the old
+    // table → every /customer360 call 500'd. Read from the live schema while
+    // keeping the exact response contract (points_balance/tier/earned/redeemed).
     const loyaltyResult = await query(
-      `SELECT points_balance, tier, points_earned, points_redeemed
-       FROM loyalty_points WHERE member_id = $1 AND gym_id = $2`,
+      `SELECT la.current_points AS points_balance,
+              COALESCE(lt.name, 'Bronze') AS tier,
+              la.lifetime_points AS points_earned,
+              la.total_redeemed AS points_redeemed
+       FROM loyalty_accounts la
+       LEFT JOIN loyalty_tiers lt ON lt.id = la.tier_id
+       WHERE la.member_id = $1 AND la.gym_id = $2`,
       [member_id, gym_id]
     );
     const checkinResult = await query(

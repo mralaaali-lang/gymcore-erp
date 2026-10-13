@@ -8,6 +8,7 @@ import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useApiQuery } from '../../hooks/useApiQuery';
+import { formatMoney } from '../../utils/currency';
 
 const PROFILE_TABS = ['profile', 'messaging', 'attendance', 'documents', 'ranks'] as const;
 type ProfileTab = typeof PROFILE_TABS[number];
@@ -21,7 +22,10 @@ const TAB_ICONS: Record<ProfileTab, string> = {
 };
 
 export default function MemberProfileView() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  // §30: money() — gym currency symbol everywhere on this page
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const { showToast } = useToast();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -294,7 +298,7 @@ export default function MemberProfileView() {
                     {payments.slice(0, 5).map((p: Record<string, unknown>, i: number) => (
                       <div key={i} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-xl">
                         <span className="text-sm text-gray-900">{String(p.description || p.payment_method || '-')}</span>
-                        <span className="text-sm font-semibold text-gray-900">{String(p.amount || '0')} EGP</span>
+                        <span className="text-sm font-semibold text-gray-900">{money(p.amount as number | string)}</span>
                       </div>
                     ))}
                   </div>

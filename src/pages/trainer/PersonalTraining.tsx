@@ -7,6 +7,7 @@ import PageLoader from '../../components/shared/PageLoader';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
+import { formatMoney } from '../../utils/currency';
 
 const sessionStatusVariant: Record<string, 'success' | 'warning' | 'error' | 'neutral'> = {
   active: 'success', completed: 'neutral', cancelled: 'error',
@@ -16,7 +17,10 @@ const sessionStatusLabel = (status: string): string =>
   status === 'active' ? 'نشط' : status === 'completed' ? 'مكتمل' : 'ملغي';
 
 export default function PersonalTraining() {
-  const { language } = useApp();
+  const { language, gymProfile } = useApp();
+  // §30: money() — gym currency symbol everywhere on this page
+  const money = (v: number | string | null | undefined) =>
+    v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
   const queryClient = useQueryClient();
   const [showPkgForm, setShowPkgForm] = useState(false);
   const [showSessionForm, setShowSessionForm] = useState(false);
@@ -156,7 +160,7 @@ export default function PersonalTraining() {
                 </div>
                 <StatusBadge status={sessionStatusLabel(pkg.status || 'active')} variant={sessionStatusVariant[pkg.status || 'active'] || 'neutral'} />
               </div>
-              <p className="text-xl font-bold text-emerald-600">{pkg.total_price?.toLocaleString()} ر.س</p>
+              <p className="text-xl font-bold text-emerald-600">{money(pkg.total_price)}</p>
             </Card>
           ))}
         </div>

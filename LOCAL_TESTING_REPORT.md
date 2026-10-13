@@ -605,3 +605,15 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 
 **التحقق الحي (نجح من أول تجربة — commit التوثيق `ccb0bb4` نفسه هو الاختبار):** الدفع على main أنشأ بناءين تلقائيًا للخدمتين في نفس اللحظة (`f7a7955a` باك-إند + `9530e710` فرونت، branch=main وcommitHash=ccb0bb4) وكلاهما **SUCCESS** خلال ~4 دقائق. فحوصات staging بعد النشر: backend `/health` 200 · `/api/v1/auth/me` بلا جلسة 401 (متوقع) · route الـ§24 الجديدة `/api/v1/dashboard/expiring-soon` ترجع **401 وليس 404** = كود §22–§28 حيّ على staging · frontend `/` و`/admin/settings?tab=backup` 200. وسجل إقلاع الباك-إند أظهر **تنفيذ `057_gym_trials.sql` على قاعدة staging** («Running 057…» فوق 56 ميجريشن مطبقة) — الرفع التلقائي ينفذ ميجريشناته بنفسه. من هنا كل push = deploy؛ لا حاجة لكلمة «ارفع» في staging.
 
+---
+
+## 30) استكمال عملة الصالة: المدرب + hook الداشبورد + إصلاح customer360 (2026-10-13)
+
+**(أ) المسح الشامل:** grep لكل تنسيقات العملة الثابتة في `src` كشف المتبقي خارج §28: `trainer/TrainerDashboard` (ر.س ×3 + كارت mock)، `trainer/PersonalTraining` (سعر الباقة)، `hooks/useGymDashboard` (formatCurrency خاص بـ«ج.م» ثابت يغذّي كروت داشبورد المدير)، `MemberProfileView` (كتلة المدفوعات نصّ EGP خام)، `MemberRegistrationForm` (خيارات الباقات EGP). استثناءات **مقصودة**: كل صفحات super-admin وتبويبات platform (أسعار المنصة للسوق المصري — قرار §28) و`StatsGrid` (مثال داخل تعليق توثيقي) و`DebtsPanel` (صحيح أصلاً — `formatMoney(n, currency)`).
+
+**(ب) التنفيذ (نمط §28 حرفياً):** `money(v)=formatMoney(Number(v), gymProfile?.currency)` في الملفات الخمسة، والـhook صار `formatCurrency(amount, gymProfile?.currency)` بدل الـlocale الثابت. كارت الـmock في لوحة المدرب صار يُرندر عبر money() من داخل الـmap بدل نص «12,450 ر.س» المكتوم.
+
+**(ج) Discovery على طريق التحقق:** فتح صفحة عضو أعاد **500 من `/api/customer360/:id`** — السجل: `relation "loyalty_points" does not exist`. السبب الجذري: migration 044 حذفت `loyalty_points` وأبدلتها `loyalty_accounts/loyalty_tiers`، لكن **ولا controller واحد هُجِّر للاستعلام الجديد** (customer360، mobile ×2، stitchService، platformMarketing، controller الـloyalty نفسه — كلها ما زال على الجدول الميت). أُصلح في هذه الجولة `customer360.ts` فقط (أدنى إصلاح على مسار التحقق، مع الحفاظ على شكل الاستجابة: points_balance/tier/points_earned/points_redeemed وCOALESCE للـtier). **الباقي ديون موثقة في TODO** — نقطة wellness كاملة لوحدها.
+
+**التحقق الحي (docker :9000):** `tsc` فرونت EXIT=0 · `tsc` سيرفر EXIT=0 · `vite build` ✓ 14.7s · إعادة بناء حاويتي frontend+backend. داشبورد المدير: «0 ج.م» في كرتي الإيرادات/الديون وصفر «ر.س/EGP». نموذج تسجيل عضو: «شهر واحد — 30 يوم — **200 ج.م**» … «سنة كاملة — **1,500 ج.م**». صفحة العضو بعد إصلاح الـ500 (200 الآن): أدراج صف مدفوعات مؤقت (350) أظهر **«350 ج.م»** في الكتلة ثم **حُذف الصف** وأُعيد العداد إلى ما كان (الـDB تُركت كما كانت). لوحة المدرب/PersonalTraining لم تُفتح حياً (تتطلب جلسة مدرب — التحقق التفاعلي بالأدوار للمستخدم) لكن الكود نفس النمط المُختبَر + tsc/build.
+
