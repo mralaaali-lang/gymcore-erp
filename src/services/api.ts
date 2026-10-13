@@ -731,8 +731,28 @@ export async function manualCheckInByPhone(memberPhone: string) {
   return res.data;
 }
 
-export async function getTodayAttendance() {
-  const res = await api.get('/api/attendance/today');
+// §35ب — check in by member UUID (resolved from the unified lookup field).
+export async function manualCheckInById(memberId: string) {
+  const res = await api.post('/api/attendance/manual', { member_id: memberId });
+  return res.data;
+}
+
+// §35ب — candidate rows for the unified check-in field (name/phone/UUID).
+export interface CheckInMemberHit {
+  id: string;
+  full_name: string;
+  phone_number?: string | null;
+  is_blacklisted?: boolean;
+  sub_status?: string | null;
+}
+
+export async function lookupMembersForCheckIn(q: string) {
+  const res = await api.get('/api/attendance/lookup', { params: { q } });
+  return (res.data?.data ?? []) as CheckInMemberHit[];
+}
+
+export async function getTodayAttendance(date?: string) {
+  const res = await api.get('/api/attendance/today', { params: date ? { date } : undefined });
   return { records: (res.data.data || []) as Record<string, unknown>[] };
 }
 

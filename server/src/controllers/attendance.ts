@@ -211,9 +211,64 @@ export const verifyAndRegisterAttendance = async (req: Request, res: Response): 
   }
 };
 
+/**
+ * §35ب — unified check-in lookup for the front-desk smart field.
+ * One query string is matched against the four real identity keys a
+ * receptionist can actually have on hand: full name (ILIKE), phone
+ * (plaintext column or hash), and the member UUID itself (the "code"
+ * printed on some member cards / used by the pass payload). There is no
+ * separate membership-code column in the members table, so we resolve
+ * against what exists rather than inventing a fake one.
+ */
+export const lookupMembersForCheckIn = async (req: Request, res: Response): Promise<void> => {
+  const gym_id = req.staff?.gym_id;
+  const q = String(req.query.q ?? '').trim();
+
+  if (!gym_id) {
+    res.status(401).json({ error: 'Access denied.' });
+    return;
+  }
+  if (q.length < 2) {
+    res.status(200).json({ data: [] });
+    return;
+  }
+
+  try {
+    const result = await query(
+      `SELECT m.id, m.full_name, m.is_blacklisted,
+              decrypt_sensitive(m.phone_encrypted) AS phone_number,
+              (SELECT status FROM member_subscriptions
+               WHERE member_id = m.id AND gym_id = m.gym_id
+               ORDER BY created_at DESC LIMIT 1) AS sub_status
+       FROM members m
+       WHERE m.gym_id = $1 AND m.deleted_at IS NULL
+         AND (m.full_name ILIKE $2 OR m.phone_number ILIKE $2
+              OR m.phone_hash = phone_hash($3) OR m.id::text = $3)
+       ORDER BY m.full_name ILIKE $4 DESC, m.created_at DESC
+       LIMIT 6`,
+      [gym_id, `%${q}%`, q, `${q}%`]
+    );
+    res.status(200).json({ data: result.rows, count: result.rows.length });
+  } catch (error) {
+    logger.error('Attendance member lookup failed', { requestId: (req as any).requestId, error: (error as Error).message });
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+};
+
 export const getTodayAttendance = async (req: Request, res: Response): Promise<void> => {
   const gym_id = req.staff?.gym_id;
   const role = req.staff?.role;
+
+  // §35ب — optional ?date=YYYY-MM-DD turns the today-list into a day log
+  // (اليوم / أمس / تاريخ مختار in the redesigned attendance page).
+  // Strict format guard before any cast; stale-session cleanup stays
+  // today-only because it operates on open sessions, not history.
+  const dateParam = String(req.query.date ?? '').trim();
+  const dateFilter = /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : null;
+  if (dateParam && !dateFilter) {
+    res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+    return;
+  }
 
   try {
     // §34ح — settle forgotten exits first so the list's checkout state is
@@ -226,9 +281,9 @@ export const getTodayAttendance = async (req: Request, res: Response): Promise<v
        FROM attendance_logs al
        JOIN members m ON al.member_id = m.id
        LEFT JOIN staff_users su ON al.verified_by_staff_id = su.id
-       WHERE al.gym_id = $1 AND al.check_in_time >= CURRENT_DATE
+       WHERE al.gym_id = $1 AND al.check_in_time::date = COALESCE($2::date, CURRENT_DATE)
        ORDER BY al.check_in_time DESC`,
-      [gym_id]
+      [gym_id, dateFilter]
     );
 
     const rows = result.rows.map((row: Record<string, unknown>) => {

@@ -34,7 +34,7 @@ export function useGymDashboard() {
       },
       {
         queryKey: ['dashboard', 'attendance'],
-        queryFn: getTodayAttendance,
+        queryFn: () => getTodayAttendance(),
         staleTime: 30_000,
       },
       {

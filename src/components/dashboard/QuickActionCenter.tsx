@@ -458,7 +458,7 @@ function TodayAttendance() {
   const rtl = language === 'ar';
   const { data, isLoading } = useApiQuery(
     ['gym', 'attendance', 'today'],
-    getTodayAttendance,
+    () => getTodayAttendance(),
     { staleTime: 15_000 },
   );
   const records = (data?.records ?? []) as unknown as AttendanceRow[];

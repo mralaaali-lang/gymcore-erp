@@ -15,7 +15,7 @@ function useTrainerDashboard() {
   );
   const { data: attendanceData, isLoading: aLoading } = useApiQuery(
     ['trainer', 'attendance'],
-    getTodayAttendance,
+    () => getTodayAttendance(),
     { staleTime: 30_000 },
   );
   const isLoading = sLoading || aLoading;

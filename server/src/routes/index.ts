@@ -34,6 +34,7 @@ import {
   getTodayAttendance,
   manualCheckIn,
   checkOutAttendance, // §34ح
+  lookupMembersForCheckIn, // §35ب
   verifyPublicQrPass,
 } from '../controllers/attendance';
 import {
@@ -240,6 +241,8 @@ router.put('/api/membership-offers/:id', requireRole('manager'), validate(update
 // ====================================================================
 router.post('/api/attendance/qr', qrRateLimit, requireRole('manager', 'receptionist'), validate(qrAttendanceSchema), verifyAndRegisterAttendance);
 router.post('/api/attendance/manual', requireRole('manager', 'receptionist'), validate(manualCheckinSchema), manualCheckIn);
+// §35ب — unified check-in field lookup (name / phone / member UUID).
+router.get('/api/attendance/lookup', requireRole('manager', 'receptionist'), lookupMembersForCheckIn);
 router.get('/api/attendance/today', requireRole('manager', 'receptionist', 'coach'), getTodayAttendance);
 // §34ح — manual check-out of an open session (front desk button).
 router.post('/api/attendance/checkout', requireRole('manager', 'receptionist'), checkOutAttendance);

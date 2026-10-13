@@ -11,7 +11,7 @@ import { DashboardPage } from '../../components/dashboard';
 function useReceptionDashboard() {
   const { data: attendanceData, isLoading: aLoading } = useApiQuery(
     ['reception', 'attendance'],
-    getTodayAttendance,
+    () => getTodayAttendance(),
     { staleTime: 30_000 },
   );
   const { data: membersData, isLoading: mLoading } = useApiQuery(

@@ -14,10 +14,11 @@ import {
 import { formatMoney } from '../../utils/currency';
 import {
   Gift, Plus, TrendingUp, Users, DollarSign,
-  Clock, AlertTriangle, UserX, UserPlus, ChevronLeft, QrCode,
+  Clock, AlertTriangle, UserX, UserPlus, ChevronLeft,
 } from 'lucide-react';
-import { StatCard, Panel, Banner, DashboardPage, PrimaryAction, AccentAction } from '../../components/dashboard';
+import { StatCard, Panel, Banner, DashboardPage, PrimaryAction } from '../../components/dashboard';
 import { QuickActionBar, QuickActionModals, PRESENT_WINDOW_HOURS, type ActionKey } from '../../components/dashboard/QuickActionCenter';
+import CheckInCard from '../../components/attendance/CheckInCard';
 
 // §24 redesign — "today's tasks first" (competitor pattern: Mindbody/Glofox/
 // Wodify owner dashboards lead with what needs action today, not vanity KPIs).
@@ -139,7 +140,7 @@ export default function GymAdminDashboard() {
     { staleTime: 60_000 }
   );
   const { data: financeRes } = useApiQuery(['gym', 'finance', 'summary'], getFinanceSummary, { staleTime: 60_000 });
-  const { data: attendanceRes } = useApiQuery(['gym', 'attendance', 'today'], getTodayAttendance, { staleTime: 30_000 });
+  const { data: attendanceRes } = useApiQuery(['gym', 'attendance', 'today'], () => getTodayAttendance(), { staleTime: 30_000 });
 
   // ── "Needs your action" feeds (§24 new manager-only endpoints) ──
   const { data: expiring } = useApiQuery(
@@ -224,6 +225,10 @@ export default function GymAdminDashboard() {
           />
         )}
 
+        {/* §35ب — the unified check-in card is now the FIRST card of the page
+            (same component as the top of /admin/attendance — one source). */}
+        <CheckInCard />
+
         {/* §33 دفعة 1 — every daily admin action starts here (real endpoints, no page detour) */}
         <QuickActionBar onOpen={setAction} />
 
@@ -305,20 +310,9 @@ export default function GymAdminDashboard() {
         <div>
           <h2 className="text-lg font-bold text-gray-900 mb-4">{t('dashboard.todaysTasks', 'مهام اليوم')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            <Panel
-              icon={QrCode}
-              accent="emerald"
-              title={t('dashboard.checkInCard', 'تسجيل حضور')}
-              subtitle={t('dashboard.checkInCardSub', 'مسح باركود · كود · رقم هاتف')}
-            >
-              <p className="text-sm text-gray-500 leading-relaxed">
-                {t('dashboard.checkInCardDesc', 'افتح شاشة الحضور: كاميرا تمسح QR/الباركود وتسجّل تلقائيًا بشكل مستمر، أو أدخل الكود/رقم الهاتف يدويًا.')}
-              </p>
-              <AccentAction className="mt-4 w-full" onClick={() => setAction('checkin')}>
-                <QrCode size={16} />
-                {t('dashboard.openCheckIn', 'فتح شاشة الحضور')}
-              </AccentAction>
-            </Panel>
+            {/* §35ب — the old «تسجيل حضور» launcher panel is gone: the real
+                CheckInCard now opens the page, so a modal shortcut here
+                would just duplicate it (dashboard layout rule). */}
             <Panel
               icon={Users}
               accent="violet"
