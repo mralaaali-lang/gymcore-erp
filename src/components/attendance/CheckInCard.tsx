@@ -244,86 +244,91 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
 
   return (
     <section
-      aria-label={rtl ? 'تسجيل الحضور والانصراف' : 'Check in / check out'}
-      className={`bg-white rounded-3xl border border-gray-100 shadow-sm p-5 md:p-6 relative ${className}`}
+      aria-label={rtl ? 'تسجيل الحضور' : 'Check in'}
+      className={`bg-white rounded-3xl border border-gray-100 shadow-sm p-5 md:p-6 ${className}`}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Activity size={19} className="text-emerald-600" />
-            {rtl ? 'تسجيل الحضور والانصراف' : 'Check In / Check Out'}
+      {/* مينيمال: سطر واحد — أيقونة + عنوان صغير يمين، والأرقام badges خفيفة شمال */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0">
+          <Activity size={20} className="text-emerald-600" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-base font-bold text-gray-900 leading-tight">
+            {rtl ? 'تسجيل الحضور' : 'Check In'}
           </h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-xs text-gray-500 mt-0.5">
             {rtl
               ? 'امسح الباركود أو أدخل كود العضو أو رقم الهاتف أو الاسم'
               : 'Scan a barcode/pass, or enter the member code, phone, or name'}
           </p>
         </div>
 
-        {/* §35ت — «حضور اليوم» lives inside the card (the old standalone
-            dashboard panel and the presence circle are gone).
-            §35ث — same place, but enlarged: bigger numbers and padding. */}
-        <div className="shrink-0 rounded-2xl bg-emerald-50 border border-emerald-100 px-6 py-4 text-center min-w-[220px]">
-          <p className="text-sm font-bold text-emerald-700">{rtl ? 'حضور اليوم' : 'Checked in today'}</p>
-          <div className="flex items-end justify-center gap-6 mt-2">
-            <div>
-              <p className="text-4xl font-extrabold text-emerald-700 tabular-nums leading-none">{todayCount}</p>
-              <p className="text-xs font-semibold text-emerald-600 mt-1.5">{rtl ? 'حضور' : 'visits'}</p>
-            </div>
-            <div>
-              <p className="text-4xl font-extrabold text-violet-700 tabular-nums leading-none">{presentCount}</p>
-              <p className="text-xs font-semibold text-violet-600 mt-1.5">{rtl ? 'متواجدون الآن' : 'inside now'}</p>
-            </div>
-          </div>
-          {listTo && (
+        <div className="ms-auto flex items-center gap-2 flex-wrap">
+          {listTo ? (
             <button
               onClick={() => navigate(listTo)}
-              className="mt-2.5 text-sm font-semibold text-emerald-700 hover:underline"
+              title={rtl ? 'عرض سجل الحضور' : 'View attendance log'}
+              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 tabular-nums hover:bg-emerald-100 transition cursor-pointer"
             >
-              {rtl ? 'عرض القائمة' : 'View full list'}
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              {todayCount} {rtl ? 'حضور اليوم' : 'today'}
             </button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 tabular-nums">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              {todayCount} {rtl ? 'حضور اليوم' : 'today'}
+            </span>
           )}
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 tabular-nums">
+            <span className={`h-1.5 w-1.5 rounded-full ${presentCount > 0 ? 'bg-violet-500 animate-pulse' : 'bg-violet-300'}`} />
+            {presentCount} {rtl ? 'متواجدون الآن' : 'inside'}
+          </span>
         </div>
       </div>
 
       {canCheckIn ? (
         <>
           <div className="relative mt-4">
-            {/* §35ث — DOM order [submit, camera, input]: in Arabic RTL the
-                first child renders rightmost, so «حضور» + camera sit on the
-                right of the row as requested (buttons-right in RTL). */}
+            {/* DOM order [input, camera, submit]: في RTL الأول يترسم يمين،
+                فالإنبوت يبدأ من اليمين طبيعي والأزرار على الشمال */}
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => void submitQuery()}
-                disabled={busy || !q}
-                className="shrink-0 h-12 md:h-11 px-5 rounded-xl bg-emerald-600 text-white text-base md:text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 min-w-[96px]"
-              >
-                {busy ? (rtl ? 'جارٍ التسجيل…' : 'Saving…') : (rtl ? 'حضور' : 'Check in')}
-              </button>
+              <div className="relative flex-1 min-w-0">
+                <Scan
+                  size={18}
+                  className="absolute start-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                />
+                <input
+                  value={query}
+                  onChange={(e) => { setQuery(e.target.value); setHighlight(0); setLast(null); }}
+                  onKeyDown={(e) => {
+                    if (showList && e.key === 'ArrowDown') { e.preventDefault(); setHighlight((h) => Math.min(h + 1, candidates.length - 1)); }
+                    else if (showList && e.key === 'ArrowUp') { e.preventDefault(); setHighlight((h) => Math.max(h - 1, 0)); }
+                    else if (e.key === 'Enter') { e.preventDefault(); void submitQuery(); }
+                  }}
+                  placeholder={rtl ? 'باركود / كود / هاتف / اسم…' : 'Barcode / code / phone / name…'}
+                  dir="auto"
+                  aria-label={rtl ? 'بحث العضو لتسجيل الحضور' : 'Member lookup for check-in'}
+                  className="w-full h-12 md:h-11 ps-10 pe-4 text-base md:text-sm rounded-xl border border-gray-200 bg-gray-50/50 text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 focus:bg-white outline-none transition"
+                />
+              </div>
               <button
                 type="button"
                 onClick={cameraOn ? stopCamera : startCamera}
                 aria-label={cameraOn ? (rtl ? 'إيقاف الكاميرا' : 'Stop camera') : (rtl ? 'مسح بالكاميرا' : 'Scan with camera')}
                 className={`shrink-0 w-12 h-12 md:h-11 md:w-11 rounded-xl border font-bold flex items-center justify-center transition ${
-                  cameraOn ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                  cameraOn ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700'
                 }`}
               >
                 <Camera size={20} />
               </button>
-              <input
-                value={query}
-                onChange={(e) => { setQuery(e.target.value); setHighlight(0); setLast(null); }}
-                onKeyDown={(e) => {
-                  if (showList && e.key === 'ArrowDown') { e.preventDefault(); setHighlight((h) => Math.min(h + 1, candidates.length - 1)); }
-                  else if (showList && e.key === 'ArrowUp') { e.preventDefault(); setHighlight((h) => Math.max(h - 1, 0)); }
-                  else if (e.key === 'Enter') { e.preventDefault(); void submitQuery(); }
-                }}
-                placeholder={rtl ? 'باركود / كود / هاتف / اسم…' : 'Barcode / code / phone / name…'}
-                dir="auto"
-                aria-label={rtl ? 'بحث العضو لتسجيل الحضور' : 'Member lookup for check-in'}
-                className="flex-1 h-12 md:h-11 px-4 text-base md:text-sm rounded-xl border border-gray-200 bg-white text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
-              />
+              <button
+                type="button"
+                onClick={() => void submitQuery()}
+                disabled={busy || !q}
+                className="shrink-0 h-12 md:h-11 px-5 rounded-xl bg-emerald-600 text-white text-base md:text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 min-w-[96px] transition"
+              >
+                {busy ? (rtl ? 'جارٍ التسجيل…' : 'Saving…') : (rtl ? 'حضور' : 'Check in')}
+              </button>
             </div>
 
             {/* Live suggestions — clicking one registers that member directly */}

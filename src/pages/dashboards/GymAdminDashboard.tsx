@@ -258,7 +258,7 @@ export default function GymAdminDashboard() {
           />
           <StatCard
             icon={ShoppingCart}
-            label={t('dashboard.sales', 'مبيعات')}
+            label={t('dashboard.sales', 'مبيعات المتجر')}
             value={formatMoney(Number(fin?.today_sales_sum ?? 0), currency)}
             sub={`${fin?.today_sales_count ?? 0} ${t('dashboard.ordersToday', 'طلب اليوم')}`}
             accent="sky"
