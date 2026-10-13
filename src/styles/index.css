@@ -157,45 +157,27 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   §34و — Mobile-app baseline (applied project-wide)
+   §34و — Mobile-app baseline (mobile-only: max-width 768px)
+   Desktop keeps its original 14px type and compact controls; the
+   competitor sizing (16px + 48px touch) applies to phones/tablets only.
    ══════════════════════════════════════════════════════════════════ */
 
-/* Base 16px root so rem/utility sizes are predictable and mobile
-   browsers never trigger the annoying auto-zoom on focus. */
 html {
-  font-size: 16px;
   -webkit-text-size-adjust: 100%; /* iOS must not rescale text */
   text-size-adjust: 100%;
 }
 
-/* Any tappable form control is at least 16px — below that iOS/Android
-   zoom the viewport when the field is focused. This is a hard floor. */
-input,
-select,
-textarea {
-  font-size: 16px;
-}
-
-/* Members table: manual table inside .members-table — 16px type, and on
-   desktop no horizontal scroll (fits); only small screens may scroll-x. */
-.members-table {
-  font-size: 16px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.members-table table {
-  font-size: 16px;
-}
-@media (min-width: 992px) {
-  .members-table {
-    overflow-x: hidden; /* desktop: no horizontal scrollbar */
+@media (max-width: 768px) {
+  /* Any tappable form control is at least 16px — below that mobile
+     browsers auto-zoom the viewport when the field is focused. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
   }
-}
 
-/* Touch-target floor on coarse-pointer (touch) devices: primary actions
-   and inputs are at least 48px tall so a finger can hit them reliably.
-   Icon-only controls opt out with .touch-auto. */
-@media (hover: none) and (pointer: coarse) {
+  /* Touch floor: anything pressed by a finger is at least 48px tall.
+     Icon-only controls opt out with .touch-auto. */
   button:not(.touch-auto),
   [role="button"]:not(.touch-auto),
   input:not([type="checkbox"]):not([type="radio"]):not(.touch-auto),
@@ -203,4 +185,19 @@ textarea {
   textarea:not(.touch-auto) {
     min-height: 48px;
   }
+
+  /* Members table on phones: 16px type + horizontal scroll allowed. */
+  .members-table {
+    font-size: 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .members-table table {
+    font-size: 16px;
+  }
+}
+
+/* Desktop (≥769px): the table never scrolls horizontally. */
+.members-table {
+  overflow-x: hidden;
 }

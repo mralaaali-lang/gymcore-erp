@@ -248,7 +248,7 @@ export default function MembersPage() {
       {!loading && members.length > 0 && (
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="members-table">
-            <table className="w-full text-base text-gray-900">
+            <table className="w-full text-sm text-gray-900">
               <thead>
                 <tr className="bg-gray-50">
                   <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'المشترك' : 'MEMBER'}</th>

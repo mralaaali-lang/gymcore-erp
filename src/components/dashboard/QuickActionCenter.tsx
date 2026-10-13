@@ -47,7 +47,7 @@ function apiError(e: unknown, fallback: string): string {
 }
 
 const inputCls =
-  'w-full min-h-[48px] rounded-xl border border-gray-200 bg-white px-3 py-2 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500';
+  'w-full min-h-[48px] md:min-h-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-base md:text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500';
 const labelCls = 'block text-xs font-semibold text-gray-600 mb-1';
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
@@ -93,7 +93,7 @@ function SubmitButton({ pending, disabled, label }: { pending: boolean; disabled
     <button
       type="submit"
       disabled={pending || disabled}
-      className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-base font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+      className="w-full min-h-[48px] md:min-h-0 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-base md:text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
     >
       {pending && <Spinner size="sm" />}
       {label}
@@ -367,7 +367,7 @@ function CheckInForm() {
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`flex-1 min-h-[48px] rounded-xl px-3 py-2 text-base font-bold ${tab === k ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            className={`flex-1 min-h-[48px] md:min-h-0 rounded-xl px-3 py-2 text-base md:text-sm font-bold ${tab === k ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
             {k === 'qr' ? (rtl ? 'مسح باركود / كود' : 'Scan / code') : (rtl ? 'بالهاتف' : 'By phone')}
           </button>
@@ -385,7 +385,7 @@ function CheckInForm() {
                 <p className="text-xs text-gray-500 mb-3">
                   {rtl ? 'وجّه الكاميرا إلى رمز الدخول في تطبيق العضو (الرمز يتجدد كل ٣٠ ثانية)' : 'Point the camera at the member app pass (rotates every 30s)'}
                 </p>
-                <button onClick={startCamera} className="min-h-[58px] rounded-xl bg-gray-900 text-white px-5 py-2 text-base font-bold hover:bg-gray-700">
+                <button onClick={startCamera} className="min-h-[58px] md:min-h-0 rounded-xl bg-gray-900 text-white px-5 md:px-4 py-2 text-base md:text-sm font-bold hover:bg-gray-700">
                   {rtl ? 'تشغيل الكاميرا' : 'Start camera'}
                 </button>
               </div>
@@ -404,7 +404,7 @@ function CheckInForm() {
             onSubmit={(e) => { e.preventDefault(); submitToken(code, 'paste'); }}
           >
             <input
-              className={`${inputCls} !min-h-[49px] !text-[17px]`}
+              className={`${inputCls} !min-h-[49px] !text-[17px] md:!min-h-0 md:!text-sm`}
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder={rtl ? 'أو الصق كود البطاقة هنا' : 'Or paste the pass code here'}
