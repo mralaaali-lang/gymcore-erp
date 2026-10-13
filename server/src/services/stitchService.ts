@@ -108,20 +108,29 @@ export async function completeStitchOrder(
     if (earnLoyalty && price > 0) {
       pointsEarned = Math.floor(price / 10);
       if (pointsEarned > 0) {
+        // §31: 044 schema — aggregate row in loyalty_accounts, ledger in
+        // loyalty_transactions (keyed by account_id, type 'earned').
+        const accRes = await client.query(
+          `INSERT INTO loyalty_accounts (member_id, gym_id, current_points, lifetime_points, tier_id)
+           VALUES ($1, $2, $3, $3, (SELECT id FROM loyalty_tiers WHERE is_active AND min_points <= $3 ORDER BY min_points DESC LIMIT 1))
+           ON CONFLICT (member_id, gym_id) DO UPDATE SET
+             current_points = loyalty_accounts.current_points + $3,
+             lifetime_points = loyalty_accounts.lifetime_points + $3,
+             updated_at = NOW()
+           RETURNING id, current_points, lifetime_points`,
+          [order.member_id, order.gym_id, pointsEarned]
+        );
+        const acc = accRes.rows[0];
         await client.query(
-          `INSERT INTO loyalty_transactions
-             (member_id, gym_id, points, type, reason, reference_type, reference_id)
-           VALUES ($1, $2, $3, 'earn', 'stitch_order_completed', 'stitch_order', $4)`,
-          [order.member_id, order.gym_id, pointsEarned, orderId]
+          `UPDATE loyalty_accounts SET tier_id =
+             (SELECT id FROM loyalty_tiers WHERE is_active AND min_points <= lifetime_points ORDER BY min_points DESC LIMIT 1)
+           WHERE id = $1`,
+          [acc.id]
         );
         await client.query(
-          `INSERT INTO loyalty_points (member_id, gym_id, points_earned, points_redeemed, points_balance, tier)
-           VALUES ($1, $2, $3, 0, $3, 'bronze')
-           ON CONFLICT (member_id, gym_id) DO UPDATE
-             SET points_earned = loyalty_points.points_earned + $3,
-                 points_balance = loyalty_points.points_balance + $3,
-                 updated_at = NOW()`,
-          [order.member_id, order.gym_id, pointsEarned]
+          `INSERT INTO loyalty_transactions (account_id, type, points, balance_after, description, reference_type, reference_id)
+           VALUES ($1, 'earned', $2, $3, 'stitch_order_completed', 'stitch_order', $4)`,
+          [acc.id, pointsEarned, acc.current_points, orderId]
         );
       }
     }

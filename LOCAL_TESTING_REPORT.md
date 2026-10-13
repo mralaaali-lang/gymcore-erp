@@ -617,3 +617,18 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 
 **التحقق الحي (docker :9000):** `tsc` فرونت EXIT=0 · `tsc` سيرفر EXIT=0 · `vite build` ✓ 14.7s · إعادة بناء حاويتي frontend+backend. داشبورد المدير: «0 ج.م» في كرتي الإيرادات/الديون وصفر «ر.س/EGP». نموذج تسجيل عضو: «شهر واحد — 30 يوم — **200 ج.م**» … «سنة كاملة — **1,500 ج.م**». صفحة العضو بعد إصلاح الـ500 (200 الآن): أدراج صف مدفوعات مؤقت (350) أظهر **«350 ج.م»** في الكتلة ثم **حُذف الصف** وأُعيد العداد إلى ما كان (الـDB تُركت كما كانت). لوحة المدرب/PersonalTraining لم تُفتح حياً (تتطلب جلسة مدرب — التحقق التفاعلي بالأدوار للمستخدم) لكن الكود نفس النمط المُختبَر + tsc/build.
 
+
+---
+
+## 31) تهجير كامل الولاء إلى مخطط 044: مسار المتدرب حيّ من الجدول الجديد (2026-10-13)
+
+**(أ) النطاق:** ديون §30 سُدّدت بالكامل — كل ما يستعلم `loyalty_points`/`loyalty_redemptions` المحذوفين هُجِّر إلى `loyalty_accounts` (تجميع لكل عضو) + `loyalty_tiers` (سلّم thresholds مُعرّف بالبيانات: Bronze 0 / Silver 500 / Gold 2000 / Platinum 5000) + `loyalty_transactions` (دفتر أستاذ بمفاتيح account_id ونوع ∈ earned|redeemed|expired|adjusted|refunded):
+1. `controllers/loyalty.ts` — **إعادة كتابة كاملة**: getPointsBalance/getPointsHistory/earnPoints/redeemPoints/listRewards/createReward. عقد الاستجابة محفوظ حرفيًا (`points_balance` + `tier` صغيرة + points_earned/points_redeemed)، مع `upsertAccount` مشترك (إدراج/تحديث + إعادة تقييم الشريحة من lifetime_points) وحد المطالبات لكل عضو بدل الـstock الميت (044 ألغته لصالح max_claims_per_member/claims_count).
+2. `controllers/mobile.ts` — getMyPoints وgetMy360 (مسار جوال المتدرب).
+3. `services/stitchService.ts` — أرباح نقاط طلب الخياطة داخل معاملته (INSERT بحساب فرعي للشريحة بنفس نمط الـcontroller).
+4. `controllers/platformMarketing.ts` — getLoyaltySummary (منصة): مجاميع من loyalty_accounts، وby_plan عبر `gyms.plan_id` مباشرة (كان يمر بـ`member_profiles` غير الموجود).
+5. فرونت: `TIER_LABELS` في AthleteProgress أضيف `platinum: 'بلاتيني'` (كان ناقصًا مع أن السلّم 4 شرائح).
+
+**(ب) Bug ضُبط أثناء التحقق الحي:** `POST /api/loyalty/earn` كان 500 بـ«inconsistent types deduced for parameter $1» — الاستعلام الفرعي للشفرة كان يُدمج نصيًا ومعّه `$1` تعني member_id (UUID) في موضع INSERT وmin_points (integer) في آخر، فـnode-pg يرفض. الإصلاح: `tierFor(placeholder)` تُستدعى بالترقيم الصحيح (`$3` للنقاط داخل الـINSERT، `$1` لـlifetime_points في تحديث الشريحة). **GOTCHA للتحقق الحي من API عبر المتصفح:** (1) مسارات الولاء الصحيحة `/api/loyalty/...` بدون بادئة `/v1` — الروtier داخليًا يعرف نفسه بـ`/api/*` ويُركب على الجذر (خطأ `/api/v1/loyalty` يعطي 404 بصمت). (2) الـaccess_token cookie صلاحيته 300 ث (§ fixes user) — أي سكربت فحص يجب أن يبدأ بـ`POST /api/v1/auth/refresh (credentials:'include')` ثم الطلبات، وكوكيز httpOnly تعني أن fetch وحده يعمل داخل صفحات التطبيق وليس curl.
+
+**التحقق الحي (docker :9000، جلسة مدير AMLGYM، عضو اختبار 347f0365):** `tsc` سيرفر+فرونت EXIT=0 · إعادة بناء backend. `GET /api/loyalty/points/:id` → 200 أصفار افتراضية (bronze) · `earn {120}` → 200 `points_balance:120, tier:bronze` · الرصيد بعده 120 · history يرجع صف «earned/test-31/balance_after 120» · `earn {400}` إضافي → **520 وترقية تلقائية إلى silver** (سلّم الـtiers يعمل) · `GET /api/loyalty/rewards` 200 من الجدول الجديد · `/api/customer360/:id` 200 وكتلة الولاء «المستوى: Silver» (الاسم المعروض capitalized عمدًا — عرض خام، والعقد lowercase في مسارات اللاعب). **ثم نُظفت البيانات المؤقتة**: حُذف صفّا ledger وحساب الولاء للعضو، والعدّاد عاد أصفارًا افتراضية عبر API (الـ1639 صف التاريخية belongs لبيانات صالات أخرى — لم تُمس). redeem/stitch/mobile لم تُفتح حياً (تتطلب جلسة عضو/طلب خياطة — تفاعلي للمستخدم) لكن نفس SQL المُختبَر + tsc.

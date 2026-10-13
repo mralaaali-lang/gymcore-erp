@@ -13,6 +13,7 @@ const TIER_LABELS: Record<string, string> = {
   bronze: 'برونزي',
   silver: 'فضي',
   gold: 'ذهبي',
+  platinum: 'بلاتيني',
 };
 
 const WEEKDAYS_AR = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];

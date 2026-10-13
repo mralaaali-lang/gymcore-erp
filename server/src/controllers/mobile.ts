@@ -127,7 +127,10 @@ export async function getMyPoints(req: Request, res: Response): Promise<void> {
   const gymId = req.staff?.gym_id;
   try {
     const result = await query(
-      `SELECT points_balance, tier FROM loyalty_points WHERE member_id = $1 AND gym_id = $2`,
+      `SELECT la.current_points AS points_balance, LOWER(COALESCE(lt.name, 'bronze')) AS tier
+       FROM loyalty_accounts la
+       LEFT JOIN loyalty_tiers lt ON lt.id = la.tier_id
+       WHERE la.member_id = $1 AND la.gym_id = $2`,
       [memberId, gymId]
     );
     res.json({ data: result.rows[0] || { points_balance: 0, tier: 'bronze' } });
@@ -151,7 +154,9 @@ export async function getMy360(req: Request, res: Response): Promise<void> {
       query(`SELECT ms.*, mo.title AS plan_name FROM member_subscriptions ms LEFT JOIN membership_offers mo ON ms.offer_id = mo.id WHERE ms.member_id = $1 AND ms.gym_id = $2 ORDER BY ms.created_at DESC`, [memberId, gymId]),
       query(`SELECT id, check_in_time, entry_method FROM attendance_logs WHERE member_id = $1 AND gym_id = $2 ORDER BY check_in_time DESC LIMIT 30`, [memberId, gymId]),
       query(`SELECT id, created_at, amount, description, 'cash' AS payment_method FROM financial_transactions WHERE gym_id = $1 AND type = 'payment' ORDER BY created_at DESC LIMIT 20`, [gymId]),
-      query(`SELECT points_balance, tier FROM loyalty_points WHERE member_id = $1 AND gym_id = $2`, [memberId, gymId]),
+      query(`SELECT la.current_points AS points_balance, LOWER(COALESCE(lt.name, 'bronze')) AS tier
+       FROM loyalty_accounts la LEFT JOIN loyalty_tiers lt ON lt.id = la.tier_id
+       WHERE la.member_id = $1 AND la.gym_id = $2`, [memberId, gymId]),
       query(`SELECT COUNT(*) AS total_checkins, COUNT(*) FILTER (WHERE check_in_time >= CURRENT_DATE - INTERVAL '30 days') AS checkins_30d, COUNT(*) FILTER (WHERE check_in_time >= CURRENT_DATE - INTERVAL '7 days') AS checkins_7d, MAX(check_in_time) AS last_checkin FROM attendance_logs WHERE member_id = $1 AND gym_id = $2`, [memberId, gymId]),
     ]);
     res.json({

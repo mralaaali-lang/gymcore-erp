@@ -65,7 +65,7 @@
 ---
 
 ## 🧹 ديون تقنية (عند الفرصة)
-- **ترحيل جدول loyalty (§30 discovery):** migration 044 استبدلت `loyalty_points` بـ`loyalty_accounts/loyalty_tiers` لكن الكود لم يُهجَّر — ما زال يستعلم الجدول المحذوف في: `mobile.ts` (×2)، `stitchService.ts`، `platformMarketing.ts`، `loyalty` controller نفسه. كل مسار نقاط/ولاء مكسور runtime (500). أُصلح `customer360.ts` فقط في §30 — الباقي دفعة واحدة بمراجعة الـendpoints.
+- [x] ~~**ترحيل جدول loyalty (§30 discovery):**~~ — **تم بالكامل في §31 (2026-10-13):** هُجِّر `loyalty.ts` (إعادة كتابة) + `mobile.ts` ×2 + `stitchService.ts` + `platformMarketing.ts` إلى `loyalty_accounts/loyalty_tiers/loyalty_transactions` بعقد الاستجابة المحفوظ، وتحقق حي (earn→520→silver ثم مسح الأثر). التفاصيل `LOCAL_TESTING_REPORT.md` §31.
 
 - [x] ~~`src/routes/routeConfigs/` قديم ومتجاوز~~ — **حُذف بالكامل 2026-10-11 (§19)**
 - [ ] `UIContext` غير مُmount
@@ -90,6 +90,7 @@
 - 2026-10-12: **إعادة نشر staging (§25)** — §22–§24 أصبحت Online على Railway؛ السبب أن CLI ويندوز محجور بـ Smart App Control والنشر نجح فقط عبر `git archive` + WSL-native (الوصفة الثابتة موثقة §25)؛ فحوصات حية: backend /health 200 والـ3 endpoints الجديدة 401-as-expected، frontend 200 والـ proxy شغال.
 - 2026-10-12: **رفع تلقائي GitHub→Railway (§29)** — ربط خدمتي gymcore-staging بالمستودع (GitHub App + trigger فرع main)؛ إصلاح جذر البناء: backend rootDirectory فارغ + `/server/Dockerfile.prod`، frontend `.`؛ لم يعد «ارفع» اليدوي لازماً لـ staging.
 - 2026-10-13: **استكمال العملة (§30)** — TrainerDashboard/PersonalTraining/useGymDashboard/MemberProfileView/MemberRegistrationForm على formatMoney؛ وإصلاح أدراج: customer360 كان 500 لكل الأعضاء لأن migration 044 حذفت `loyalty_points` — الجدول لم يُهجَّر في أي controller (ديون موثقة).
+- 2026-10-13: **تهجير الولاء إلى 044 (§31)** — إعادة كتابة `loyalty.ts` + تهجير `mobile.ts`/`stitchService.ts`/`platformMarketing.ts` إلى `loyalty_accounts/loyalty_tiers/loyalty_transactions` مع حفظ عقد الاستجابة؛ ضبط وإصلاح bug «inconsistent types $1» (placeholder مشترك بين UUID والفرع العددي)؛ إضافة platinum لـ TIER_LABELS؛ تحقق حي: earn 120→bronze ثم 400→520→silver وترقية الشريحة تعمل، history/rewards/customer360 من الجداول الجديدة، ثم مسح كامل لصفوف الاختبار.
 - 2026-10-12: **إعادة تصميم داشبورد مدير الصالة (§24)** — «مهام اليوم أولاً» بنمط المنافسين: شريط اليوم + 4 كروت «يحتاج إجراءك» (3 endpoints سيرفر جديدة)، معلومات الصالة/العملة من /auth/me بدل platform 403، إخفاء onboarding بعد أول نشاط، رسوم بسلسلتين ومحاور صحيحة، صفر 403 حياً. **التالي:** تعميم formatMoney على بقية الصفحات، دمج debts/announcements ثم backup/migration، وتحقق تفاعلي بدخول كل دور
 - 2026-10-10: إعادة هيكلة كاملة لوحات السوبر أدمن (9 صفحات) — التفاصيل `LOCAL_TESTING_REPORT.md` §5-§6
 - 2026-10-11: حفظ المرحلة الثانية في git + تنظيف الملفات القديمة والمكررة من الجذر

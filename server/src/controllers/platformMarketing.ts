@@ -166,14 +166,15 @@ export const listReferrals = async (_req: Request, res: Response): Promise<void>
 export const getLoyaltySummary = async (_req: Request, res: Response): Promise<void> => {
   const client = await getAdminClient();
   try {
-    const totalPoints = await client.query('SELECT COALESCE(SUM(points), 0)::numeric(12,0) AS total FROM loyalty_points');
-    const activeMembers = await client.query('SELECT COUNT(DISTINCT member_id)::int AS count FROM loyalty_points WHERE points > 0');
-    const totalRedeemed = await client.query(`SELECT COALESCE(SUM(points::numeric), 0) AS total FROM loyalty_transactions WHERE type = 'redeem'`);
+    // §31: loyalty_points/member_profiles were dropped by migration 044 —
+    // read the live loyalty_accounts aggregate instead.
+    const totalPoints = await client.query('SELECT COALESCE(SUM(current_points), 0)::numeric(12,0) AS total FROM loyalty_accounts');
+    const activeMembers = await client.query('SELECT COUNT(DISTINCT member_id)::int AS count FROM loyalty_accounts WHERE current_points > 0');
+    const totalRedeemed = await client.query(`SELECT COALESCE(SUM(-points), 0)::numeric(12,0) AS total FROM loyalty_transactions WHERE type = 'redeemed'`);
     const summary = await client.query(`
-      SELECT gp.name AS plan_name, COUNT(DISTINCT lp.member_id)::int AS members
-      FROM loyalty_points lp
-      JOIN member_profiles mp ON mp.id = lp.member_id
-      JOIN gyms g ON g.id = mp.gym_id
+      SELECT gp.name AS plan_name, COUNT(DISTINCT la.member_id)::int AS members
+      FROM loyalty_accounts la
+      JOIN gyms g ON g.id = la.gym_id
       JOIN billing_plans gp ON gp.id = g.plan_id
       GROUP BY gp.name ORDER BY members DESC
     `);
