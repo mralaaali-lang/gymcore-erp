@@ -70,6 +70,15 @@ const timezones = [
   'Europe/London',
 ];
 
+// Subdomains must match the server schema: lowercase latin letters, digits and '-'.
+const slugifySubdomain = (v: string): string =>
+  v.toLowerCase()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 63);
+
 export default function OnboardingWizard() {
   const navigate = useNavigate();
   const { language } = useApp();
@@ -88,6 +97,10 @@ export default function OnboardingWizard() {
     subdomain: '',
     currency: 'EGP',
   });
+  // Subdomain UX: warn when typed characters were silently invalid (e.g. Arabic),
+  // and stop auto-deriving from the English name once the user edits it manually.
+  const [subdomainHadInvalidChars, setSubdomainHadInvalidChars] = useState(false);
+  const [subdomainTouched, setSubdomainTouched] = useState(false);
 
   // Step 3: Admin form
   const [adminForm, setAdminForm] = useState({
@@ -401,23 +414,54 @@ export default function OnboardingWizard() {
                 <input
                   type="text"
                   value={gymForm.name_en}
-                  onChange={(e) => setGymForm((prev) => ({ ...prev, name_en: e.target.value }))}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setGymForm((prev) => ({
+                      ...prev,
+                      name_en: v,
+                      // Auto-derive the subdomain until the user edits it manually.
+                      subdomain: subdomainTouched ? prev.subdomain : slugifySubdomain(v),
+                    }));
+                  }}
                   placeholder="Champions Gym"
                   className="w-full px-3 py-2.5 border border-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-white"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-gray-500">{t('الرابط الفرعي', 'Subdomain')}</label>
-                <div className="flex items-center border border-gray-100 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-accent bg-white">
+                <div className={`flex items-center border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-accent bg-white ${
+                  subdomainHadInvalidChars ? 'border-red-300 ring-2 ring-red-100' : 'border-gray-100'
+                }`}>
                   <input
                     type="text"
+                    dir="ltr"
                     value={gymForm.subdomain}
-                    onChange={(e) => setGymForm((prev) => ({ ...prev, subdomain: e.target.value.replace(/[^a-z0-9-]/g, '').toLowerCase() }))}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const clean = slugifySubdomain(raw);
+                      // Warn (never silently eat) only when characters are truly invalid
+                      // (e.g. Arabic) — spaces/underscores are legitimately mapped to '-'.
+                      setSubdomainHadInvalidChars(/[^a-z0-9\s_-]/.test(raw.toLowerCase()));
+                      setSubdomainTouched(true);
+                      setGymForm((prev) => ({ ...prev, subdomain: clean }));
+                    }}
                     placeholder="champions"
                     className="flex-1 px-3 py-2.5 text-sm focus:outline-none bg-transparent"
                   />
                   <span className="px-3 py-2.5 text-xs text-gray-500/60 bg-gray-50 border-s border-gray-100">.gymcore.app</span>
                 </div>
+                {subdomainHadInvalidChars ? (
+                  <p className="text-xs text-red-500 font-medium">
+                    {t(
+                      'يُسمح فقط بحروف إنجليزية صغيرة (a-z) وأرقام وشرطة (-). اكتب الاسم بالإنجليزية أو دعه يُشتق تلقائياً من اسم الصالة بالإنجليزي.',
+                      'Only lowercase English letters (a-z), numbers and dashes (-) are allowed. Type the name in English, or let it be derived automatically from the English gym name.'
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-500/60">
+                    {t('حروف إنجليزية صغيرة وأرقام وشرطة فقط — 3 أحرف على الأقل', 'Lowercase English letters, numbers and dashes only — min 3 characters')}
+                  </p>
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-gray-500">{t('العملة', 'Currency')}</label>
