@@ -298,3 +298,89 @@ export async function getEngagement(req: Request, res: Response): Promise<void> 
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+// §34ت — Marketing funnel on real contracts. gym_leads.status is the CURRENT state
+// (no status-history table exists), so stages count "reached at least this step"
+// along the lifecycle new → contacted → trial_booked → converted, and `lost`
+// is reported separately rather than silently inflating the funnel.
+// Series: daily new leads (source-filterable) + new members over the last 90 days.
+export async function getMarketingFunnel(req: Request, res: Response): Promise<void> {
+  const gym_id = req.staff?.gym_id;
+  const source = typeof req.query.source === 'string' && req.query.source && req.query.source !== 'all'
+    ? req.query.source
+    : null;
+  try {
+    const byStatus = await query(`
+      SELECT status, COUNT(*)::int AS count
+      FROM gym_leads
+      WHERE gym_id = $1 AND ($2::text IS NULL OR source = $2)
+      GROUP BY status
+    `, [gym_id, source]);
+    const m: Record<string, number> = {};
+    for (const r of byStatus.rows) m[r.status] = Number(r.count);
+    const total = Object.values(m).reduce((a, b) => a + b, 0);
+    const lost = m.lost || 0;
+    const converted = m.converted || 0;
+    const reachedInterest = (m.contacted || 0) + (m.trial_booked || 0) + converted;
+    const reachedDecision = (m.trial_booked || 0) + converted;
+    const pct = (n: number) => (total > 0 ? Math.round((n / total) * 1000) / 10 : null);
+
+    const bySource = await query(`
+      SELECT COALESCE(NULLIF(source, ''), 'unknown') AS source,
+             COUNT(*)::int AS total,
+             COUNT(*) FILTER (WHERE status = 'converted')::int AS converted
+      FROM gym_leads
+      WHERE gym_id = $1
+      GROUP BY 1
+      ORDER BY total DESC
+    `, [gym_id]);
+
+    const series = await query(`
+      WITH days AS (
+        SELECT generate_series(CURRENT_DATE - 89, CURRENT_DATE, INTERVAL '1 day')::date AS d
+      ),
+      leads AS (
+        SELECT created_at::date AS d, COUNT(*)::int AS c
+        FROM gym_leads
+        WHERE gym_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '89 days'
+          AND ($2::text IS NULL OR source = $2)
+        GROUP BY d
+      ),
+      signups AS (
+        SELECT created_at::date AS d, COUNT(*)::int AS c
+        FROM members
+        WHERE gym_id = $1 AND deleted_at IS NULL
+          AND created_at >= CURRENT_DATE - INTERVAL '89 days'
+        GROUP BY d
+      )
+      SELECT to_char(days.d, 'YYYY-MM-DD') AS date,
+             COALESCE(l.c, 0) AS leads,
+             COALESCE(s.c, 0) AS signups
+      FROM days
+      LEFT JOIN leads l ON l.d = days.d
+      LEFT JOIN signups s ON s.d = days.d
+      ORDER BY days.d
+    `, [gym_id, source]);
+
+    res.status(200).json({
+      data: {
+        funnel: {
+          total_leads: total,
+          lost,
+          conversion_pct: pct(converted),
+          stages: [
+            { key: 'leads', count: total, pct: pct(total) },
+            { key: 'interest', count: reachedInterest, pct: pct(reachedInterest) },
+            { key: 'decision', count: reachedDecision, pct: pct(reachedDecision) },
+            { key: 'converted', count: converted, pct: pct(converted) },
+          ],
+        },
+        by_source: bySource.rows,
+        series: series.rows,
+      },
+    });
+  } catch (error) {
+    logger.error('Marketing funnel query failed', { error: (error as Error).message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}

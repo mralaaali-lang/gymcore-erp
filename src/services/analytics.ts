@@ -117,3 +117,42 @@ export async function getEngagement(): Promise<{ data: Engagement }> {
   const res = await api.get('/api/analytics/engagement');
   return res.data;
 }
+
+// §34ت — marketing funnel computed server-side from gym_leads + members.
+// funnel stages are "reached at least this step" (new→contacted→trial_booked→converted);
+// pct is null when there are zero leads (honest no-base, render as '—' / empty state).
+export interface FunnelStage {
+  key: 'leads' | 'interest' | 'decision' | 'converted';
+  count: number;
+  pct: number | null;
+}
+
+export interface FunnelSourceRow {
+  source: string;
+  total: number;
+  converted: number;
+}
+
+export interface FunnelSeriesPoint {
+  date: string; // YYYY-MM-DD
+  leads: number;
+  signups: number;
+}
+
+export interface MarketingFunnel {
+  funnel: {
+    total_leads: number;
+    lost: number;
+    conversion_pct: number | null;
+    stages: FunnelStage[];
+  };
+  by_source: FunnelSourceRow[];
+  series: FunnelSeriesPoint[];
+}
+
+export async function getMarketingFunnel(source?: string): Promise<{ data: MarketingFunnel }> {
+  const res = await api.get('/api/analytics/marketing-funnel', {
+    params: source && source !== 'all' ? { source } : undefined,
+  });
+  return res.data;
+}
