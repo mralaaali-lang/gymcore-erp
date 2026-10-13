@@ -7,7 +7,7 @@ export async function getCustomer360(req: Request, res: Response): Promise<void>
   const { member_id } = req.params;
   try {
     const memberResult = await query(
-      `SELECT id, full_name, decrypt_sensitive(phone_encrypted) as phone_number, email, birth_date, photo_url, medical_notes, is_blacklisted, created_at
+      `SELECT id, full_name, decrypt_sensitive(phone_encrypted) as phone_number, email, birth_date, photo_url, decrypt_sensitive(notes_encrypted) AS medical_notes, is_blacklisted, created_at
        FROM members WHERE id = $1 AND gym_id = $2`,
       [member_id, gym_id]
     );

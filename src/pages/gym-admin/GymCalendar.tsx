@@ -10,12 +10,12 @@ import PageLoader from '../../components/shared/PageLoader';
 import Card from '../../components/ui/Card';
 import StatusBadge from '../../components/ui/StatusBadge';
 
-const GYM_TABS = ['Schedule', 'Bookings', 'Staff', 'Payroll', 'Programs'] as const;
+// §34ج — 'Bookings' tab hidden: nothing behind it but a "قيد التطوير" card.
+const GYM_TABS = ['Schedule', 'Staff', 'Payroll', 'Programs'] as const;
 type GymTab = typeof GYM_TABS[number];
 
 const TAB_LABELS: Record<GymTab, { en: string; ar: string }> = {
   Schedule: { en: 'Schedule', ar: 'الجدول' },
-  Bookings: { en: 'Bookings', ar: 'الحجوزات' },
   Staff: { en: 'Managers & Staff', ar: 'المديرين والموظفين' },
   Payroll: { en: 'Payroll', ar: 'الرواتب' },
   Programs: { en: 'Programs', ar: 'البرامج' },
@@ -23,7 +23,6 @@ const TAB_LABELS: Record<GymTab, { en: string; ar: string }> = {
 
 const TAB_ICONS: Record<GymTab, string> = {
   Schedule: 'calendar_month',
-  Bookings: 'calendar_month',
   Staff: 'group',
   Payroll: 'payments',
   Programs: 'fitness_center',
@@ -422,16 +421,6 @@ export default function GymCalendar() {
     </div>
   );
 
-  const renderPlaceholder = (tab: GymTab) => (
-    <Card className="p-12 text-center">
-      <span className="material-symbols-outlined text-5xl text-gray-500/30 block mb-3">
-        {TAB_ICONS[tab]}
-      </span>
-      <p className="text-gray-500 font-medium">{rtl ? TAB_LABELS[tab].ar : TAB_LABELS[tab].en}</p>
-      <p className="text-sm text-gray-500/60 mt-1">{rtl ? 'قيد التطوير' : 'Coming soon'}</p>
-    </Card>
-  );
-
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
       {/* §35ث — heading moved to the top bar */}
@@ -451,7 +440,6 @@ export default function GymCalendar() {
       {activeTab === 'Staff' && renderStaff()}
       {activeTab === 'Payroll' && renderPayroll()}
       {activeTab === 'Programs' && renderPrograms()}
-      {activeTab === 'Bookings' && renderPlaceholder(activeTab)}
     </div>
   );
 }

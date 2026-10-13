@@ -30,21 +30,20 @@ interface SaleItemRow {
   product_id: string; product_name: string; quantity: number; unit_price: number;
 }
 
-const POS_TABS = ['Create Sale', 'Sales', 'Products', 'Report', 'Settings'] as const;
+// §34ج — 'Settings' tab removed: nothing behind it but a "قيد التطوير" card.
+const POS_TABS = ['Create Sale', 'Sales', 'Products', 'Report'] as const;
 type PosTab = typeof POS_TABS[number];
 const TAB_LABEL: Record<PosTab, { en: string; ar: string }> = {
   'Create Sale': { en: 'Create Sale', ar: 'إنشاء فاتورة' },
   'Sales': { en: 'Sales', ar: 'المبيعات' },
   'Products': { en: 'Products', ar: 'المنتجات' },
   'Report': { en: 'Report', ar: 'التقارير' },
-  'Settings': { en: 'Settings', ar: 'الإعدادات' },
 };
 const TAB_ICONS: Record<PosTab, string> = {
   'Create Sale': 'add_shopping_cart',
   'Sales': 'point_of_sale',
   'Products': 'inventory',
   'Report': 'bar_chart',
-  'Settings': 'settings',
 };
 
 const paymentMethods = [
@@ -302,14 +301,6 @@ export default function SalesPage() {
     />
   );
 
-  const renderPlaceholder = (tab: PosTab) => (
-    <Card className="p-12 text-center">
-      <span className="material-symbols-outlined text-5xl text-gray-500/30 block mb-3">settings</span>
-      <p className="text-gray-500 font-medium">{rtl ? TAB_LABEL[tab].ar : TAB_LABEL[tab].en}</p>
-      <p className="text-sm text-gray-500/60 mt-1">{rtl ? 'قيد التطوير' : 'Coming soon'}</p>
-    </Card>
-  );
-
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
       {/* §35ث — heading moved to the top bar */}
@@ -329,7 +320,6 @@ export default function SalesPage() {
       {activeTab === 'Sales' && renderSalesList()}
       {activeTab === 'Products' && renderProducts()}
       {activeTab === 'Report' && renderReport()}
-      {activeTab === 'Settings' && renderPlaceholder('Settings')}
     </div>
   );
 }

@@ -76,9 +76,9 @@
 | **§35ت** | لوحة القيادة: 4 كروت أرقام (مشتركين/اشتراكات/إيراد اليوم/مبيعات بأرقام فرعية داخلها) + «حضور اليوم» داخل كارت الحضور بدل الدائرة + 6 كروت إجراءات تستبدل QuickActionBar + ماسح jsQR أنهى رسالة «متصفحك لا يدعم» من المشروع + `today_sales` حقيقي من السيرفر + deep-link `subscriptions?new=1` | ✅ (2026-10-13) |
 | **§35ث** | تعديلات الواجهة الخمسة: سايدبار بلا «الرئيسية» (يبدأ بالأعضاء) + عنوان+وصف كل تبويب في الشريط العلوي (PAGE_TITLES/resolvePageHeading) وتجريد 19 صفحة + كارت الحضور أول اللوحة ببلوك حضور مكبر وأزرار يمين + حذف «+ إضافة عضو» + Statish أفقي وبلا السابق/التالي في الاشتراكات | ✅ (2026-10-14) |
 | **§34ج-أ** | أمني: `platform_admins.onboarding_data` يخزن كلمات مرور المدير نصيًا (step_2_data) — تُنظف الحقول الحساسة عند الحفظ/الإكمال + migration تنقية للصفوف القائمة | ⏳ |
-| **§34ج** | طرد الأوهام: أزرار toast-only/ميتة (INVITE/PRINT/Import/ADD NOTE/CREATE CHARGE…) — تُوصَّل أو تُحذف؛ endpoint classes للمدير؛ MigrationTab الاستيراد أو يُزال؛ Integrations أو تُزال؛ /admin/notifications؛ WebsiteGenerator Coming-soon (toggleActive الباقات وحقول offers تمّا في §33ب) + مسارات SetupChecklist القديمة (/subscriptions…) | ⏳ |
+| **§34ج** | طرد الأوهام: MigrationTab صار استيراد CSV حقيقيًا (endpoint `/api/import/:type` لستة كيانات + templates + تقرير صف-بصف) بقرار «اريد تشغيلها اصلا» · مودال EDIT حقيقي على PUT /api/members · صفحة العضو: ملاحظات طبية معروضة (decrypt) وحُذفت أزرار بلا ظهر (بطاقة/Recurring/ADD NOTE/CREATE CHARGE) · MemberList «عرض» navigate حقيقي · تبويبات قيد التطوير حُذفت من Sales/Billing/Gym/Marketing + كارت Quick Actions الوهمي · SetupChecklist حُذف · Dockerfile COPY public/ أصلح خطوط be-vietnam-pro (200 font/woff2). **المتبقي منه:** WebsiteGenerator Coming-soon (أُجل إلى §33) · Integrations · /admin/notifications | ✅ (2026-10-14 — النطاق المُقر) |
 
-**ملاحظة فجوة بيانات واحدة تحتاج migration:** ملاحظات الأعضاء (member_notes) لا جدول لها — تُنشأ في §34ج إن اختار المستخدم توصيل الزر بدل حذفه. بقية كل الأرقام لها جداول فعلية (84 جدولاً — الجاهزة موثقة أسفل التقرير §34).
+**ملاحظة فجوة بيانات (حُلّت في §34ج):** ملاحظات الأعضاء لا جدول مستقلًا لها — كان مُقرَّرًا إنشاء member_notes إن اختار المستخدم توصيل الزر؛ الواقع: اختار توصيل ADD NOTE بحقل `medical_notes` الموجود (المشفَّر بـtrigger) عبر مودال EDIT، فلا الحاجة لجدول جديد. بقية كل الأرقام لها جداول فعلية (84 جدولاً — الجاهزة موثقة أسفل التقرير §34).
 
 ---
 

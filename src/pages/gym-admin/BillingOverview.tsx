@@ -14,31 +14,25 @@ import DebtsPanel from './billing/DebtsPanel';
 
 // §26: DebtsPage merged in as the "Debts" tab; ?tab= deep links keep the old
 // /admin/debts URL working through a redirect.
-const BILLING_TABS = ['Overview', 'Payments', 'Recurring', 'Discounts', 'Payment Forms', 'Accounting', 'Debts', 'Growth', 'Settings'] as const;
+// §34ج — Discounts/Payment Forms/Growth/Settings removed: they only rendered
+// a "قيد التطوير" card; they return when real screens exist.
+const BILLING_TABS = ['Overview', 'Payments', 'Recurring', 'Accounting', 'Debts'] as const;
 type BillingTab = typeof BILLING_TABS[number];
 
 const TAB_LABELS: Record<BillingTab, { en: string; ar: string }> = {
   Overview: { en: 'Overview', ar: 'نظرة عامة' },
   Payments: { en: 'Payments', ar: 'المدفوعات' },
   Recurring: { en: 'Recurring', ar: 'المتكررة' },
-  Discounts: { en: 'Discounts', ar: 'الخصومات' },
-  'Payment Forms': { en: 'Payment Forms', ar: 'نماذج الدفع' },
   Accounting: { en: 'Accounting', ar: 'المحاسبة' },
   Debts: { en: 'Debts', ar: 'الديون' },
-  Growth: { en: 'Growth', ar: 'النمو' },
-  Settings: { en: 'Settings', ar: 'الإعدادات' },
 };
 
 const TAB_ICONS: Record<BillingTab, string> = {
   Overview: 'dashboard',
   Payments: 'receipt_long',
   Recurring: 'autorenew',
-  Discounts: 'sell',
-  'Payment Forms': 'credit_card',
   Accounting: 'account_balance',
   Debts: 'account_balance_wallet',
-  Growth: 'trending_up',
-  Settings: 'settings',
 };
 
 // §34هـ: month labels are ISO (2026-10), never names, in both languages.
@@ -366,16 +360,6 @@ export default function BillingOverview() {
     </div>
   );
 
-  const renderPlaceholder = (tab: BillingTab) => (
-    <Card className="p-12 text-center">
-      <span className="material-symbols-outlined text-5xl text-gray-500/30 block mb-3">
-        {TAB_ICONS[tab]}
-      </span>
-      <p className="text-gray-500 font-medium">{rtl ? TAB_LABELS[tab].ar : TAB_LABELS[tab].en}</p>
-      <p className="text-sm text-gray-500/60 mt-1">{rtl ? 'قيد التطوير' : 'Coming soon'}</p>
-    </Card>
-  );
-
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
       {/* §35ث — heading moved to the top bar */}
@@ -396,7 +380,6 @@ export default function BillingOverview() {
       {activeTab === 'Recurring' && renderRecurring()}
       {activeTab === 'Accounting' && renderAccounting()}
       {activeTab === 'Debts' && <DebtsPanel />}
-      {['Discounts', 'Payment Forms', 'Growth', 'Settings'].includes(activeTab) && renderPlaceholder(activeTab)}
     </div>
   );
 }

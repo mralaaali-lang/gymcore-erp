@@ -127,10 +127,13 @@ export default function MemberList() {
                         variant="ghost"
                         className="text-emerald-600 hover:text-emerald-700 text-sm px-3 py-1.5"
                         onClick={() => {
+                          // §34ج — real navigation for staff too: /admin/members/:id
+                          // (MemberProfileView) has worked all along; only the
+                          // trainer path was wired and managers got a fake toast.
                           if (role === 'trainer') {
                             navigate(`/trainer/clients/${m.id}`);
                           } else {
-                            showToast(rtl ? 'صفحة العضو قادمة قريباً' : 'Member profile coming soon', 'success');
+                            navigate(`/admin/members/${m.id}`);
                           }
                         }}
                       >

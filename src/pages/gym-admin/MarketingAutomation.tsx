@@ -13,27 +13,22 @@ import AnnouncementsPanel from './marketing/AnnouncementsPanel';
 
 // §26: AnnouncementsPage merged in as the "Announcements" tab; the old
 // /admin/announcements route redirects here with ?tab=Announcements.
-const MARKETING_TABS = ['Dashboard', 'Referrals', 'Announcements', 'Leads', 'Messaging', 'Automations', 'Settings'] as const;
+// §34ج — Leads/Messaging/Automations/Settings tabs hidden: they only rendered
+// a "قيد التطوير" card (real leads live in /admin/crm). They return when the
+// real screens are built.
+const MARKETING_TABS = ['Dashboard', 'Referrals', 'Announcements'] as const;
 type MarketingTab = typeof MARKETING_TABS[number];
 
 const TAB_LABELS: Record<MarketingTab, { en: string; ar: string }> = {
   Dashboard: { en: 'Dashboard', ar: 'لوحة البيانات' },
   Referrals: { en: 'Referrals', ar: 'الإحالات' },
   Announcements: { en: 'Announcements', ar: 'الإعلانات' },
-  Leads: { en: 'Leads', ar: 'العملاء المحتملين' },
-  Messaging: { en: 'Messaging', ar: 'الرسائل' },
-  Automations: { en: 'Automations', ar: 'الأتمتة' },
-  Settings: { en: 'Settings', ar: 'الإعدادات' },
 };
 
 const TAB_ICONS: Record<MarketingTab, string> = {
   Dashboard: 'dashboard',
   Referrals: 'group',
   Announcements: 'campaign',
-  Leads: 'leaderboard',
-  Messaging: 'chat',
-  Automations: 'settings_automation',
-  Settings: 'settings',
 };
 
 // §34ت: the dropdown now filters by the REAL gym_leads.source codes (what LeadForm
@@ -119,12 +114,7 @@ function MiniBars({ buckets, field, colorClass, rtl, loading }: {
   );
 }
 
-const ACTION_BLOCKS = [
-  { icon: 'settings_automation', labelEn: 'Create an automation', labelAr: 'إنشاء أتمتة', color: 'bg-purple-50 text-purple-600' },
-  { icon: 'dynamic_form', labelEn: 'Create a lead capture form', labelAr: 'إنشاء نموذج التقاط العملاء', color: 'bg-blue-50 text-blue-600' },
-  { icon: 'group_add', labelEn: 'Set up a referral program', labelAr: 'إعداد برنامج إحالة', color: 'bg-green-50 text-green-600' },
-  { icon: 'settings', labelEn: 'More Marketing settings', labelAr: 'المزيد من إعدادات التسويق', color: 'bg-amber-50 text-amber-600' },
-];
+// §34ج — ACTION_BLOCKS (dead Quick Actions buttons) deleted.
 
 function referralStatusVariant(status: string): 'success' | 'warning' | 'error' | 'neutral' {
   const s = (status || '').toLowerCase();
@@ -245,22 +235,8 @@ export default function MarketingAutomation() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-bold text-gray-900">{rtl ? 'إجراءات سريعة' : 'Quick Actions'}</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {ACTION_BLOCKS.map((block) => (
-              <button
-                key={block.labelEn}
-                className={`${block.color} rounded-2xl p-4 text-right hover:shadow-sm transition text-sm font-medium flex items-center gap-3`}
-              >
-                <span className="material-symbols-outlined text-2xl">{block.icon}</span>
-                <span>{rtl ? block.labelAr : block.labelEn}</span>
-              </button>
-            ))}
-          </div>
-        </Card>
+        {/* §34ج — the dead «إجراءات سريعة» card (4 buttons with no handler and
+            no screens behind them) was removed entirely. */}
 
         <Card>
           <div className="flex items-center justify-between mb-4">
@@ -349,16 +325,6 @@ export default function MarketingAutomation() {
     </Card>
   );
 
-  const renderPlaceholder = (tab: MarketingTab) => (
-    <Card className="p-12 text-center">
-      <span className="material-symbols-outlined text-5xl text-gray-500/30 block mb-3">
-        {TAB_ICONS[tab]}
-      </span>
-      <p className="text-gray-500 font-medium">{rtl ? TAB_LABELS[tab].ar : TAB_LABELS[tab].en}</p>
-      <p className="text-sm text-gray-500/60 mt-1">{rtl ? 'قيد التطوير' : 'Coming soon'}</p>
-    </Card>
-  );
-
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
       {/* §35ث — heading moved to the top bar */}
@@ -377,7 +343,6 @@ export default function MarketingAutomation() {
       {activeTab === 'Dashboard' && renderDashboard()}
       {activeTab === 'Referrals' && renderReferrals()}
       {activeTab === 'Announcements' && <AnnouncementsPanel />}
-      {activeTab !== 'Dashboard' && activeTab !== 'Referrals' && activeTab !== 'Announcements' && renderPlaceholder(activeTab)}
     </div>
   );
 }

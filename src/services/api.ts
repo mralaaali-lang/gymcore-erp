@@ -716,6 +716,39 @@ export async function blacklistMember(id: string, reason: string) {
   return res.data;
 }
 
+// §34ج — real member edit (the profile page's EDIT button was a fake toast;
+// the PUT endpoint has existed server-side all along).
+export async function updateMember(id: string, data: {
+  full_name?: string;
+  phone_number?: string;
+  email?: string;
+  birth_date?: string;
+  photo_url?: string;
+  medical_notes?: string;
+}) {
+  const res = await api.put(`/api/members/${id}`, data);
+  return res.data;
+}
+
+// ====================================================================
+// §34ج — REAL CSV IMPORT (replaces the MigrationTab fake setTimeout import)
+// The browser parses the CSV file into raw row objects and posts them; the
+// server inserts every row and reports exactly what landed and what failed.
+// ====================================================================
+export type ImportType = 'members' | 'memberships' | 'attendance' | 'leads' | 'payments' | 'products';
+
+export interface ImportResult {
+  type: ImportType;
+  imported: number;
+  failed: number;
+  errors: { row: number; message: string }[];
+}
+
+export async function importCsv(type: ImportType, rows: Record<string, string>[]): Promise<ImportResult> {
+  const res = await api.post(`/api/import/${type}`, { rows });
+  return res.data.data as ImportResult;
+}
+
 // ====================================================================
 // ATTENDANCE
 // ====================================================================

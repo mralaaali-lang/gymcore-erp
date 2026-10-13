@@ -15,6 +15,10 @@ COPY package.json ./
 RUN for i in 1 2 3; do npm install && break; sleep 2; done
 
 COPY tsconfig.json vite.config.ts postcss.config.js tailwind.config.js index.html ./
+# §34ج — public/ (self-hosted be-vietnam-pro woff2 files) must reach the Vite
+# build; without it dist/ had no /fonts/* and nginx served index.html (text/html)
+# for every font URL — the offline font was silently broken.
+COPY public/ ./public/
 COPY src/ ./src/
 RUN npm run build
 

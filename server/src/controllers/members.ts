@@ -104,7 +104,7 @@ export const listMembers = async (req: Request, res: Response): Promise<void> =>
     const dataResult = await query(
       `SELECT m.id, m.gym_id, m.full_name, decrypt_sensitive(m.phone_encrypted) as phone_number,
               m.email, m.photo_url, m.is_blacklisted, m.blacklist_reason,
-              m.created_at, m.birth_date, m.medical_notes,
+              m.created_at, m.birth_date, decrypt_sensitive(m.notes_encrypted) AS medical_notes,
               s.status as subscription_status, s.end_date as subscription_end_date,
               s.start_date as subscription_start_date,
               o.title as plan_name,
@@ -166,7 +166,7 @@ export const getMemberById = async (req: Request, res: Response): Promise<void> 
     const result = await query(
       `SELECT m.id, m.gym_id, m.full_name, decrypt_sensitive(m.phone_encrypted) as phone_number,
               m.email, m.photo_url, m.is_blacklisted, m.blacklist_reason,
-              m.created_at, m.birth_date, m.medical_notes,
+              m.created_at, m.birth_date, decrypt_sensitive(m.notes_encrypted) AS medical_notes,
               json_agg(DISTINCT jsonb_build_object(
                 'id', s.id, 'status', s.status, 'start_date', s.start_date,
                 'end_date', s.end_date, 'is_frozen', s.is_frozen,
@@ -181,7 +181,7 @@ export const getMemberById = async (req: Request, res: Response): Promise<void> 
        LEFT JOIN attendance_logs al ON al.member_id = m.id AND al.gym_id = m.gym_id AND al.check_in_time >= CURRENT_DATE - INTERVAL '30 days'
        WHERE m.id = $1 AND m.gym_id = $2
        GROUP BY m.id, m.gym_id, m.full_name, m.phone_encrypted, m.email, m.photo_url,
-                m.is_blacklisted, m.blacklist_reason, m.created_at, m.birth_date, m.medical_notes`,
+                m.is_blacklisted, m.blacklist_reason, m.created_at, m.birth_date, m.notes_encrypted`,
       [id, gym_id]
     );
 

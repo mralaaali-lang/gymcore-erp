@@ -23,7 +23,7 @@ class AICoachService {
   async getMemberInsights(gymId: string, memberId: string): Promise<MemberInsight | null> {
     try {
       const subResult = await query(
-        `SELECT m.id, m.full_name, m.medical_notes,
+        `SELECT m.id, m.full_name, decrypt_sensitive(m.notes_encrypted) AS medical_notes,
                 (SELECT COUNT(*) FROM attendance_logs al WHERE al.member_id = m.id AND al.gym_id = m.gym_id AND al.check_in_time >= CURRENT_DATE - INTERVAL '30 days') AS checkins_30d,
                 (SELECT COUNT(*) FROM attendance_logs al WHERE al.member_id = m.id AND al.gym_id = m.gym_id AND al.check_in_time >= CURRENT_DATE - INTERVAL '7 days') AS checkins_7d,
                 (SELECT status FROM member_subscriptions WHERE member_id = m.id AND gym_id = m.gym_id ORDER BY created_at DESC LIMIT 1) AS sub_status
@@ -98,7 +98,7 @@ class AICoachService {
   async generateWorkoutRecommendation(gymId: string, memberId: string): Promise<string[]> {
     try {
       const member = await query(
-        `SELECT m.full_name, m.medical_notes,
+        `SELECT m.full_name, decrypt_sensitive(m.notes_encrypted) AS medical_notes,
                 (SELECT COUNT(*) FROM attendance_logs al WHERE al.member_id = m.id AND al.gym_id = m.gym_id AND al.check_in_time >= CURRENT_DATE - INTERVAL '30 days') AS checkins
          FROM members m WHERE m.id = $1 AND m.gym_id = $2`,
         [memberId, gymId]

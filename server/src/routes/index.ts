@@ -145,6 +145,8 @@ import {
   listCashboxSessions, openCashbox, closeCashbox, getFinanceSummary,
   getCashbook, listSessionLedger,
 } from '../controllers/finance';
+// §34ج — الاستيراد الحقيقي (CSV) لستة كيانات
+import { importData } from '../controllers/importData';
 import {
   completeStitchOrderHandler, listStitchOrdersHandler, getStitchOrderHandler,
 } from '../controllers/stitch';
@@ -220,6 +222,9 @@ router.get('/api/members/:id', requireRole('manager', 'receptionist', 'coach'), 
 router.post('/api/members', requireRole('manager', 'receptionist'), planGuard({ checkMembers: true }), validate(createMemberSchema), createMember);
 router.put('/api/members/:id', requireRole('manager', 'receptionist'), validate(updateMemberSchema), updateMember);
 router.put('/api/members/:id/blacklist', requireRole('manager'), validate(blacklistMemberSchema), blacklistMember);
+// §34ج — استيراد CSV الحقيقي (tabs/Settings→MigrationTab) — كل صف يُكتب فعلًا
+// أو يُرفض برسالة صادقة، بلا أي توست وهمي.
+router.post('/api/import/:type', requireRole('manager'), importData);
 router.post('/api/subscriptions/:subscriptionId/cancel', requireRole('manager'), validate(cancelSubscriptionSchema), cancelSubscription);
 // §34ي — صفحة الاشتراكات: قائمة مفلترة + إحصائيات من نفس الصفوف، وإنشاء
 // اشتراك يولّد دفعة ودينًا عند الجزئي/الآجل (كل الحسابات سيرفرية).

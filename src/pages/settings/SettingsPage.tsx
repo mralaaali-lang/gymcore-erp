@@ -41,7 +41,8 @@ const ALL_TABS: TabDef[] = [
   { id: 'integrations', icon: 'link', labelEn: 'Integrations', labelAr: 'التكامل', roles: ['manager'] },
   // §27 — merged standalone pages (was /admin/backup and /admin/settings/migration)
   { id: 'backup', icon: 'backup', labelEn: 'Backup', labelAr: 'النسخ الاحتياطي', roles: ['manager'] },
-  { id: 'migration', icon: 'move_to_inbox', labelEn: 'Migration', labelAr: 'الترحيل', roles: ['manager'] },
+  // §34ج — renamed: the tab no longer fakes provider migrations, it does real CSV import.
+  { id: 'migration', icon: 'import_export', labelEn: 'Data Import', labelAr: 'استيراد البيانات', roles: ['manager'] },
 ];
 
 const TAB_COMPONENTS: Record<string, React.ComponentType> = {
