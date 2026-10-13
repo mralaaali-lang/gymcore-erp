@@ -1225,6 +1225,19 @@ export async function getOverdueDebts() {
   return res.data as { data: OverdueDebtRow[]; total_amount: number };
 }
 
+// §35أ — live sidebar badges (attendance/present-now, active debts, expiring
+// subscriptions within 7 days, unread notifications). Single cheap read call.
+export interface NavBadges {
+  attendance: number;
+  payments: number;
+  alerts: number;
+  messages: number;
+}
+export async function getNavBadges(): Promise<NavBadges> {
+  const res = await api.get('/api/nav/badges');
+  return (res.data?.data ?? { attendance: 0, payments: 0, alerts: 0, messages: 0 }) as NavBadges;
+}
+
 // ====================================================================
 // STAFF / USERS / TRAINERS
 // ====================================================================

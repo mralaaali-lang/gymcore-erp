@@ -1,16 +1,18 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
+import { resolvePageTitle } from './navConfig';
+import type { NavItem } from '../../types';
 import {
   getNotificationHistory,
   markNotificationRead,
   getNotifications,
   markGymNotificationRead,
 } from '../../services/api';
-import { Bell as BellIcon } from 'lucide-react';
+import { Bell as BellIcon, Menu as MenuIcon } from 'lucide-react';
 
 interface FeedItem {
   id: string;
@@ -44,9 +46,10 @@ function timeAgo(iso: string | null, t: (k: string, o?: any) => string): string 
   return t('header.daysAgo', { n: Math.floor(hours / 24) });
 }
 
-export default function TopNav() {
-  const { role, language, setLanguage } = useApp();
+export default function TopNav({ navItems }: { navItems: NavItem[] }) {
+  const { role, language, setLanguage, toggleSidebar } = useApp();
   const { t } = useTranslation();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -114,20 +117,23 @@ export default function TopNav() {
 
   const historyPath = isPlatform ? '/super-admin/notifications' : '/admin/notifications';
 
+  const page = resolvePageTitle(navItems, location.pathname);
+
   return (
     <header className="bg-gradient-to-br from-petrol-dark via-petrol to-petrol-light w-full sticky top-0 z-30 shrink-0">
-      <div className="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-5 md:py-6">
-        {/* Left (geometric left, per spec): page title only — the gym name,
-            date and plan now live in the sidebar brand block (§33أ-تنظيف),
-            so repeating them here was the duplicate the owner flagged. */}
-        <div>
-          <h1 className="text-headline-md md:text-headline-lg font-bold text-white tracking-tight">
-            {t('sidebar.dashboard')}
+      <div className="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-5 md:py-6 gap-3">
+        {/* Start: page title (§35أ — per-tab, resolved from the nav config).
+            The gym name, date and plan live in the sidebar brand block, so
+            they are deliberately not repeated here. */}
+        <div className="min-w-0">
+          <h1 className="text-headline-md md:text-headline-lg font-bold text-white tracking-tight truncate">
+            {page?.label ?? t('sidebar.dashboard')}
           </h1>
         </div>
 
-        {/* Right: language toggle + "What's new?" pill with live unread badge */}
-        <div className="flex items-center gap-2">
+        {/* End (geometric left in Arabic): mobile menu button + language
+            toggle + "What's new?" pill with live unread badge. */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
@@ -213,6 +219,18 @@ export default function TopNav() {
             </div>
           )}
         </div>
+          {/* §35أ — mobile menu button: last child so in Arabic RTL it lands
+              on the geometric left (far side from the page title); md:hidden
+              because desktop keeps the permanent sidebar. */}
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={t('header.menu', 'القائمة')}
+            title={t('header.menu', 'القائمة')}
+            className="md:hidden order-last flex items-center justify-center w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all duration-200"
+          >
+            <MenuIcon size={20} />
+          </button>
         </div>
       </div>
     </header>

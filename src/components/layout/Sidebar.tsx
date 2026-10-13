@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { formatDate } from '../../utils/date';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/GymBrandContext';
 import type { NavItem, UserRole } from '../../types';
@@ -10,6 +10,7 @@ import {
   Database, Brain, Palette, Bell, Tv, LogOut, Sparkles,
   Receipt, Megaphone, Globe, Dumbbell, Armchair, CircleUserRound, HelpCircle, Code,
   CreditCard, Banknote, Percent, Target, CalendarDays, UserCog,
+  DoorOpen, HandCoins, FileSpreadsheet, BellRing,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -47,6 +48,13 @@ const iconMap: Record<string, LucideIcon> = {
   team: UserCog,
   schedule: CalendarDays,
   analytics: BarChart3, // §34ح — sidebar entry for /admin/analytics
+  // §35أ — new IA entries
+  portal: DoorOpen,        // بوابة الأعضاء
+  debts: HandCoins,        // ديون الأعضاء
+  statements: FileSpreadsheet, // الشيتات
+  alerts: BellRing,        // التنبيهات
+  announcements: Megaphone, // الإعلانات
+  coaches: Dumbbell,       // المدربون
 };
 
 const ROLE_BASE: Record<UserRole, string> = {
@@ -89,8 +97,23 @@ function groupNavItems(items: NavItem[]): NavGroup[] {
 }
 
 export default function Sidebar({ items }: SidebarProps) {
-  const { isSidebarOpen, role, logout, gymProfile } = useApp();
+  const { isSidebarOpen, toggleSidebar, role, language, logout, gymProfile } = useApp();
   const { t } = useTranslation();
+  const location = useLocation();
+  const rtl = language === 'ar';
+
+  // §35أ — mobile drawer lifecycle: the sidebar is permanent on desktop
+  // (md:static) and an off-canvas drawer below md. It starts hidden on
+  // phones regardless of the desktop default, and closes itself after any
+  // navigation so a tapped link never leaves the drawer covering the page.
+  useEffect(() => {
+    if (window.innerWidth < 768 && isSidebarOpen) toggleSidebar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (window.innerWidth < 768 && isSidebarOpen) toggleSidebar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   // §33أ-تنظيف: the gym's own identity (name · today's date · plan) lives
   // here in the brand block — the dashboard no longer repeats it. Platform
@@ -160,12 +183,23 @@ export default function Sidebar({ items }: SidebarProps) {
   };
 
   return (
-    <aside
-      dir="rtl"
-      className={`bg-white border-e border-gray-100 hidden md:flex flex-col h-screen sticky start-0 top-0 overflow-y-auto w-64 z-40 shrink-0 transition-all duration-200 ${
-        isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}
-    >
+    <>
+      {/* Drawer backdrop — mobile only, tap to dismiss */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={toggleSidebar}
+          aria-hidden="true"
+        />
+      )}
+      {/* §35أ — Arabic RTL: drawer docks on the geometric RIGHT; English LTR:
+          on the left. Desktop (md+) keeps the permanent in-flow column. */}
+      <aside
+        dir="rtl"
+        className={`bg-white border-e border-gray-100 flex flex-col w-64 shrink-0 overflow-y-auto fixed inset-y-0 top-0 ${rtl ? 'right-0' : 'left-0'} z-50 md:static md:z-40 md:h-screen md:sticky md:start-0 md:translate-x-0 transition-transform duration-200 ${
+          isSidebarOpen ? 'translate-x-0' : rtl ? 'translate-x-full' : '-translate-x-full'
+        }`}
+      >
       <div className="py-4 px-4 flex items-center gap-2.5 border-b border-gray-100 shrink-0">
         <NavLink to={`${ROLE_BASE[role]}/dashboard`} className="flex items-center gap-2.5 min-w-0">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-emerald-500/30 shrink-0">
@@ -202,6 +236,7 @@ export default function Sidebar({ items }: SidebarProps) {
           <span>{t('sidebar.logout')}</span>
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

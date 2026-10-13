@@ -117,7 +117,7 @@ import {
   listLeads, getLeadById, createLead, updateLead, deleteLead, getLeadStats,
 } from '../controllers/crm';
 import { getRetentionRate, getPeakHours, getRevenueForecast, getEnrollmentTrend, getRevenueBreakdown, getBusinessMetrics, getEngagement, getMarketingFunnel } from '../controllers/analytics';
-import { getExpiringSoon, getInactiveMembers, getOverdueDebts } from '../controllers/dashboard';
+import { getExpiringSoon, getInactiveMembers, getOverdueDebts, getNavBadges } from '../controllers/dashboard';
 import { handlePaymentWebhook } from '../controllers/webhooks';
 import { webhookIdempotency } from '../middleware/webhookIdempotency';
 import { verifyPaymentWebhookSignature } from '../middleware/webhookAuth';
@@ -308,6 +308,7 @@ router.get('/api/analytics/marketing-funnel', requireRole('manager'), getMarketi
 router.get('/api/dashboard/expiring-soon', requireRole('manager'), getExpiringSoon);
 router.get('/api/dashboard/inactive-members', requireRole('manager'), getInactiveMembers);
 router.get('/api/dashboard/overdue-debts', requireRole('manager'), getOverdueDebts);
+router.get('/api/nav/badges', requireRole('manager', 'receptionist'), getNavBadges); // §35أ
 
 // ====================================================================
 // LOYALTY POINTS & REWARDS

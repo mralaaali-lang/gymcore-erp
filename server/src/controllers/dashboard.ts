@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { query } from '../config/database';
+import { closeStaleSessions } from './attendance';
 import logger from '../config/logger';
 
 // Manager dashboard "needs your action" feeds (§24). All read-only, all
@@ -108,4 +109,60 @@ export const getOverdueDebts = async (req: Request, res: Response): Promise<void
     logger.error('overdue-debts query failed', { error: (error as Error).message });
     res.status(500).json({ error: 'Internal server error' });
   }
+};
+
+/**
+ * GET /api/nav/badges
+ * §35أ — the four live sidebar badges in one cheap read-only call, all
+ * tenant-scoped and all backed by real data (no invented numbers):
+ *  - attendance: members physically present right now (open sessions, after
+ *    the §34ح lazy-close so forgotten check-outs never inflate it)
+ *  - payments:  active member debts still owed (member_debts.status='active')
+ *  - alerts:    active subscriptions expiring within 7 days (same predicate
+ *    as /dashboard/expiring-soon?days=7, just counted instead of listed)
+ *  - messages:  unread platform notifications addressed to this staff role
+ *    (or 'all'), same audience rule as /api/notifications
+ * Polled lightly by the frontend layout; a failing badge degrades to 0 for
+ * that key rather than dropping the whole response.
+ */
+export const getNavBadges = async (req: Request, res: Response): Promise<void> => {
+  const gym_id = req.staff?.gym_id;
+  const role = req.staff?.role;
+  const counts = { attendance: 0, payments: 0, alerts: 0, messages: 0 };
+  const badge = async (key: keyof typeof counts, sql: string, params: unknown[]): Promise<void> => {
+    try {
+      const r = await query(sql, params);
+      counts[key] = Number(r.rows[0]?.count ?? 0);
+    } catch (error) {
+      logger.error(`nav-badge ${key} query failed`, { error: (error as Error).message });
+    }
+  };
+  try {
+    await closeStaleSessions(gym_id);
+  } catch (error) {
+    logger.error('nav-badges stale-session close failed', { error: (error as Error).message });
+  }
+  await Promise.all([
+    badge('attendance',
+      `SELECT COUNT(*)::int AS count FROM attendance_logs
+       WHERE gym_id = $1 AND check_out_time IS NULL AND deleted_at IS NULL`,
+      [gym_id]),
+    badge('payments',
+      `SELECT COUNT(*)::int AS count FROM member_debts
+       WHERE gym_id = $1 AND status = 'active'`,
+      [gym_id]),
+    badge('alerts',
+      `SELECT COUNT(*)::int AS count FROM member_subscriptions ms
+       JOIN members m ON m.id = ms.member_id
+       WHERE ms.gym_id = $1 AND ms.status = 'active' AND ms.deleted_at IS NULL
+         AND m.deleted_at IS NULL
+         AND ms.end_date <= CURRENT_DATE + INTERVAL '7 days'`,
+      [gym_id]),
+    badge('messages',
+      `SELECT COUNT(*)::int AS count FROM platform_notifications
+       WHERE gym_id = $1 AND read_at IS NULL
+         AND (recipient_role = $2 OR recipient_role = 'all')`,
+      [gym_id, role]),
+  ]);
+  res.json({ data: counts });
 };

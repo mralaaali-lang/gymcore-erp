@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { formatDate } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
@@ -64,7 +65,13 @@ export default function SalesPage() {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const rtl = language === 'ar';
-  const [activeTab, setActiveTab] = useState<PosTab>('Create Sale');
+  // §35أ — sidebar «مبيعات الموظفين» deep-links /admin/sales?tab=Report;
+  // honour any valid ?tab= on first mount (same pattern as the hubs pages).
+  const [searchParams] = useSearchParams();
+  const initialTab = POS_TABS.find(
+    (t) => t.toLowerCase().replace(/\s+/g, '') === (searchParams.get('tab') ?? '').toLowerCase().replace(/[\s_-]/g, '')
+  );
+  const [activeTab, setActiveTab] = useState<PosTab>(initialTab ?? 'Create Sale');
   const [page, setPage] = useState(1);
 
   const [selectedMemberId, setSelectedMemberId] = useState('');
