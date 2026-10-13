@@ -153,6 +153,25 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
       await checkInMember(picked);
       return;
     }
+    // §35ج — a typed 6-digit printed-card code with candidates not loaded yet:
+    // resolve through the same lookup endpoint (server matches card_code
+    // exactly) — never a blind check-in, always the pick path.
+    if (/^\d{6}$/.test(raw)) {
+      busyRef.current = true;
+      setBusy(true);
+      try {
+        const fresh = await lookupMembersForCheckIn(raw);
+        if (fresh.length === 1) await checkInMember(fresh[0]);
+        else if (fresh.length > 1) fail(rtl ? 'اختر العضو من القائمة' : 'Pick the member from the list');
+        else fail(rtl ? `لا يوجد عضو بالكود ${raw}` : `No member with code ${raw}`);
+      } catch (e) {
+        fail(errorFrom(e, rtl ? 'فشل البحث عن الكود' : 'Card code lookup failed'));
+      } finally {
+        busyRef.current = false;
+        setBusy(false);
+      }
+      return;
+    }
     if (/^[+0-9\s-]{7,}$/.test(raw)) {
       busyRef.current = true;
       setBusy(true);
@@ -186,6 +205,21 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
     const now = Date.now();
     if (lastTokenRef.current.token === token && now - lastTokenRef.current.at < 3000) return;
     lastTokenRef.current = { token, at: now };
+    // §35ج — a scanned printed membership card carries the plain 6-digit
+    // card_code, not a rotating token. Fill the field so the same lookup
+    // suggestions appear and the receptionist confirms — per the owner's
+    // decision, scanning never checks in blindly.
+    if (/^\d{6}$/.test(token)) {
+      stopCamera();
+      setQuery(token);
+      try {
+        const found = await lookupMembersForCheckIn(token);
+        if (found.length === 0) fail(rtl ? `لا يوجد عضو بالكود ${token}` : `No member with code ${token}`);
+      } catch {
+        fail(rtl ? 'فشل البحث عن الكود' : 'Card code lookup failed');
+      }
+      return;
+    }
     busyRef.current = true;
     setBusy(true);
     try {

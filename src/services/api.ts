@@ -777,6 +777,7 @@ export interface CheckInMemberHit {
   phone_number?: string | null;
   is_blacklisted?: boolean;
   sub_status?: string | null;
+  card_code?: string | null;
 }
 
 export async function lookupMembersForCheckIn(q: string) {

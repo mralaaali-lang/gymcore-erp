@@ -10,6 +10,9 @@ import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { formatMoney } from '../../utils/currency';
+// §35ج — real printed membership card: 6-digit per-gym card_code (migration 063)
+// encoded in a QR that the unified check-in field understands.
+import { printMemberCard, latestActiveEnd } from '../../utils/memberCard';
 
 // §34ج — messaging/documents/ranks tabs removed: no screens exist behind them
 // and they only rendered a "Coming soon" card. The tab bar now shows truth.
@@ -83,6 +86,7 @@ export default function MemberProfileView() {
   const fullName = m.full_name || '';
   const initials = fullName ? fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : '??';
   const pinCode = m.pin_code || m.generated_pin || '----';
+  const cardCode = m.card_code || '';
   const joinDate = m.join_date || m.created_at?.split('T')[0] || '-';
   const phone = m.phone_number || '-';
   const gender = m.gender || '-';
@@ -176,6 +180,32 @@ export default function MemberProfileView() {
               <p className="text-4xl font-mono font-bold tracking-[0.3em] text-emerald-600">{pinCode}</p>
             </div>
 
+            {/* §35ج — كود العضوية الحقيقي: رقم تسلسلي لكل صالة + طباعة بطاقة بـQR */}
+            {cardCode ? (
+              <div className="text-center py-3 bg-gray-50 rounded-2xl border border-gray-100">
+                <p className="text-xs text-gray-500 mb-1">{rtl ? 'كود العضوية' : 'MEMBERSHIP CODE'}</p>
+                <p dir="ltr" className="text-2xl font-mono font-bold tracking-[0.25em] text-gray-900">{cardCode}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ok = printMemberCard({
+                      gymName: gymProfile?.name,
+                      fullName,
+                      cardCode,
+                      validUntil: latestActiveEnd(memberData.subscriptions),
+                    });
+                    if (!ok) showToast(rtl ? 'المتصفح منع نافذة الطباعة' : 'Print popup blocked', 'error');
+                  }}
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 min-h-[40px]"
+                >
+                  <span className="material-symbols-outlined text-base">print</span>
+                  {rtl ? 'طباعة البطاقة' : 'Print card'}
+                </button>
+              </div>
+            ) : (
+              <p className="text-center text-xs text-gray-400">{rtl ? 'لم يُصدر كود بطاقة لهذا العضو بعد' : 'No card code issued for this member yet'}</p>
+            )}
+
             {/* Quick Actions */}
             <div className="flex justify-center gap-3">
               <button
@@ -192,8 +222,8 @@ export default function MemberProfileView() {
               >
                 <span className="material-symbols-outlined text-xl">chat</span>
               </button>
-              {/* §34ج — «بطاقة» removed: it fired a fake 'coming soon' toast; the
-                  printed member card is a real feature pending in §35ج. */}
+              {/* §34ج — fake «بطاقة» toast button removed; §35ج shipped the real
+                  printed card above (كود العضوية + طباعة البطاقة). */}
             </div>
 
             {/* Tags */}

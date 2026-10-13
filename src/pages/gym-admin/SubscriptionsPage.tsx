@@ -292,17 +292,40 @@ export default function SubscriptionsPage() {
               <label className="flex items-center gap-2 text-sm text-gray-500">
                 {rtl ? 'عرض' : 'Show'}
                 <select
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm"
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm min-h-[40px]"
                   value={limit}
                   onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
                 >
                   <option value={50}>50</option>
                   <option value={100}>100</option>
+                  <option value={300}>300</option>
                 </select>
                 {rtl ? 'صف' : 'rows'} · {fmtNum(pagination.total)} {rtl ? 'إجمالي' : 'total'}
+                · {rtl ? `صفحة ${pagination.page} من ${pagination.total_pages}` : `page ${pagination.page} of ${pagination.total_pages}`}
               </label>
-              {/* §35ث — السابق/التالي removed per owner; «إجمالي» above carries the count. */}
-              <span className="text-sm text-gray-600">{fmtNum(pagination.page)} / {fmtNum(pagination.total_pages)}</span>
+              {/* §35ج — numbered pages replace the deleted «السابق/التالي»: a click
+                  jumps straight to the page, and 300-per-view shrinks the window. */}
+              {pagination.total_pages > 1 && (
+                <div className="flex items-center gap-2" dir="ltr">
+                  {Array.from({ length: Math.min(pagination.total_pages, 5) }, (_, i) => {
+                    const start = pagination.total_pages <= 5 ? 1
+                      : Math.max(1, Math.min(pagination.page - 2, pagination.total_pages - 4));
+                    const p = start + i;
+                    if (p > pagination.total_pages) return null;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPage(p)}
+                        aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
+                        className={`w-9 h-9 rounded-xl text-sm font-medium transition min-w-[44px] ${page === p ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </Panel>

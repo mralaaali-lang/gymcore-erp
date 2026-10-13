@@ -8,7 +8,7 @@ import logger from '../config/logger';
 // وإنشاء اشتراك يولّد دفعة + دينًا عند الدفع الجزئي/الآجل.
 // ====================================================================
 
-const PAGE_LIMITS = [50, 100];
+const PAGE_LIMITS = [50, 100, 300];
 
 interface FilterBits {
   clauses: string[];
@@ -52,7 +52,7 @@ function buildFilters(gym_id: string, req: Request): FilterBits {
     const p1 = push(`%${search}%`);
     const p2 = push(search);
     const p3 = push(search);
-    clauses.push(`(m.full_name ILIKE ${p1} OR m.phone_hash = phone_hash(${p2}) OR LEFT(m.id::text, 8) ILIKE ${p3})`);
+    clauses.push(`(m.full_name ILIKE ${p1} OR m.phone_hash = phone_hash(${p2}) OR LEFT(m.id::text, 8) ILIKE ${p3} OR m.card_code = ${p3})`);
   }
 
   return { clauses, params };

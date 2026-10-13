@@ -235,7 +235,7 @@ export const lookupMembersForCheckIn = async (req: Request, res: Response): Prom
 
   try {
     const result = await query(
-      `SELECT m.id, m.full_name, m.is_blacklisted,
+      `SELECT m.id, m.full_name, m.is_blacklisted, m.card_code,
               decrypt_sensitive(m.phone_encrypted) AS phone_number,
               (SELECT status FROM member_subscriptions
                WHERE member_id = m.id AND gym_id = m.gym_id
@@ -243,7 +243,8 @@ export const lookupMembersForCheckIn = async (req: Request, res: Response): Prom
        FROM members m
        WHERE m.gym_id = $1 AND m.deleted_at IS NULL
          AND (m.full_name ILIKE $2 OR m.phone_number ILIKE $2
-              OR m.phone_hash = phone_hash($3) OR m.id::text = $3)
+              OR m.phone_hash = phone_hash($3) OR m.id::text = $3
+              OR m.card_code = $3)
        ORDER BY m.full_name ILIKE $4 DESC, m.created_at DESC
        LIMIT 6`,
       [gym_id, `%${q}%`, q, `${q}%`]
