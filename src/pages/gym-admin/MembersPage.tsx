@@ -7,7 +7,6 @@ import FilterBar from '../../components/shared/FilterBar';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
 import ExportButton from '../../components/shared/ExportButton';
-import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Card from '../../components/ui/Card';
 import { formatDate, daysUntil } from '../../utils/date';
@@ -65,13 +64,9 @@ export default function MembersPage() {
   const [members, setMembers] = useState<MemberResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   // §34د-5 — adding a member starts right here, with the SAME centered modal
   // the dashboard uses (real offers + PIN shown once), not a page detour.
   const [action, setAction] = useState<ActionKey | null>(null);
-  const [showBillingAlert, setShowBillingAlert] = useState(() => {
-    return localStorage.getItem('gymcore_billing_alert_dismissed') !== '1';
-  });
   const perPage = 10;
 
   useEffect(() => {
@@ -117,36 +112,22 @@ export default function MembersPage() {
   const isEmpty = !loading && total === 0 && !search && filter === 'all';
   const isEmptySearch = !loading && members.length === 0 && (search || filter !== 'all');
 
-  const toggleSelectAll = () => {
-    if (selected.size === members.length) { setSelected(new Set()); }
-    else { setSelected(new Set(members.map((m) => m.id))); }
-  };
-
-  const toggleSelect = (id: string) => {
-    setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-  };
-
+  // §34د-3 — tabs that exist: the duplicate "check-in" (same route as
+  // attendance) and the route-less "rosters"/"documents" (toast-only) are gone.
   const sectionTabs = [
     { id: 'members', labelEn: 'Members', labelAr: 'المشتركين', route: '/admin/members' },
-    { id: 'checkin', labelEn: 'Check-in', labelAr: 'تسجيل الدخول', route: '/admin/attendance' },
     { id: 'attendance', labelEn: 'Attendance', labelAr: 'الحضور', route: '/admin/attendance' },
     { id: 'memberships', labelEn: 'Memberships', labelAr: 'الباقات', route: '/admin/subscriptions' },
-    { id: 'rosters', labelEn: 'Rosters', labelAr: 'القوائم', route: null },
-    { id: 'documents', labelEn: 'Documents', labelAr: 'المستندات', route: null },
     { id: 'content', labelEn: 'Content', labelAr: 'المحتوى', route: '/admin/marketing?tab=Announcements' },
     { id: 'growth', labelEn: 'Growth', labelAr: 'النمو', route: '/admin/analytics' },
     { id: 'settings', labelEn: 'Settings', labelAr: 'الإعدادات', route: '/admin/settings' },
   ];
 
   const navigateTab = (tab: typeof sectionTabs[0]) => {
-    if (tab.route) {
-      navigate(tab.route);
-    } else {
-      showToast(rtl ? 'هذه الميزة قادمة قريباً' : 'This feature is coming soon', 'success');
-    }
+    navigate(tab.route);
   };
 
-  const activeTabKey = sectionTabs.find((t) => t.route && (location.pathname === t.route || location.pathname.startsWith(t.route + '/')))?.id ?? 'members';
+  const activeTabKey = sectionTabs.find((t) => location.pathname === t.route || location.pathname.startsWith(t.route.split('?')[0] + '/'))?.id ?? 'members';
 
   return (
     <DashboardPage
@@ -197,12 +178,7 @@ export default function MembersPage() {
         onFilterChange={(_key, val) => { setFilter(val || 'all'); setPage(1); }}
         onRefresh={fetchMembers}
         extraActions={
-          <>
-            <Button variant="outline" className="h-10 px-3 text-sm font-medium">
-              <span className="material-symbols-outlined text-lg">print</span>
-              {rtl ? 'طباعة' : 'PRINT'}
-            </Button>
-            <ExportButton
+          <ExportButton
               columns={[
                 { key: 'full_name', label: rtl ? 'المشترك' : 'Member' },
                 { key: 'phone_number', label: rtl ? 'جهة الاتصال' : 'Contact' },
@@ -214,8 +190,7 @@ export default function MembersPage() {
               ]}
               data={members as unknown as Record<string, unknown>[]}
               filename="members"
-            />
-          </>
+          />
         }
       />
 
@@ -227,34 +202,8 @@ export default function MembersPage() {
         </div>
       )}
 
-      {/* Billing Setup Alert */}
-      {showBillingAlert && members.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl px-4 py-3 flex items-center justify-between gap-2 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-amber-600">info</span>
-            {rtl ? 'أكمل الإعدادات: قم بإعداد الفواتير لبدء تحصيل المدفوعات' : 'Continue Setup: Set up billing to start collecting payments'}
-          </div>
-          <button
-            onClick={() => {
-              navigate('/admin/settings?tab=billing');
-              localStorage.setItem('gymcore_billing_alert_dismissed', '1');
-              setShowBillingAlert(false);
-            }}
-            className="px-3 py-1.5 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700 transition shrink-0"
-          >
-            {rtl ? 'إعداد الفواتير' : 'SET UP BILLING'}
-          </button>
-          <button
-            onClick={() => {
-              localStorage.setItem('gymcore_billing_alert_dismissed', '1');
-              setShowBillingAlert(false);
-            }}
-            className="p-1 text-amber-600 hover:text-amber-800 transition"
-          >
-            <span className="material-symbols-outlined text-lg">close</span>
-          </button>
-        </div>
-      )}
+      {/* §34د-3 — the fake "set up billing" localStorage banner is gone:
+          setup truth belongs in الإعدادات, not as a permanent nag here. */}
 
       {/* Loading */}
       {loading && (
@@ -263,82 +212,25 @@ export default function MembersPage() {
         </Card>
       )}
 
-      {/* Empty State — How To Add Members */}
+      {/* §34د-4 — one honest empty state: the three "coming soon" toast cards
+          (reception sign-up / Excel import / email invite) were fake options.
+          The only real way to add a member today is the same centered modal
+          the dashboard uses. */}
       {isEmpty && !loading && (
-        <Card className="p-8 md:p-12">
-          <div className="text-center mb-10">
-            <span className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4">
-              <span className="material-symbols-outlined text-4xl">group_add</span>
-            </span>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              {rtl ? 'كيفية إضافة مشتركين' : 'How To Add Members'}
-            </h2>
-            <p className="text-sm text-gray-500 max-w-md mx-auto">
-              {rtl ? 'اختر الطريقة المناسبة لإضافة أعضاء إلى صالتك الرياضية' : 'Choose the method that works best to add members to your gym'}
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            {/* Card 1 */}
-            <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 flex flex-col items-center text-center">
-              <span className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
-                <span className="material-symbols-outlined text-2xl">person_add</span>
-              </span>
-              <p className="text-sm font-semibold text-gray-900 mb-1">{rtl ? 'إدخال بيانات المشترك يدوياً' : 'Enter member information through your account'}</p>
-              <p className="text-xs text-gray-500 mb-4">{rtl ? 'أضف العضو من خلال لوحة التحكم' : 'Manually create a new member profile'}</p>
-              <Button
-                variant="primary"
-                className="mt-auto px-4 py-2 text-xs"
-                onClick={() => setAction('member')}
-              >
-                {rtl ? '+ إضافة مشترك' : '+ ADD A MEMBER'}
-              </Button>
-            </div>
-            {/* Card 2 */}
-            <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 flex flex-col items-center text-center">
-              <span className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
-                <span className="material-symbols-outlined text-2xl">desktop_mac</span>
-              </span>
-              <p className="text-sm font-semibold text-gray-900 mb-1">{rtl ? 'ملء البيانات في الاستقبال' : 'Have them fill out their information at your front desk'}</p>
-              <p className="text-xs text-gray-500 mb-4">{rtl ? 'دع العضو يملأ بياناته من شاشة الاستقبال' : 'Let members fill in their details at the reception screen'}</p>
-              <Button
-                variant="outline"
-                className="mt-auto px-4 py-2 text-xs"
-                onClick={() => showToast(rtl ? 'ميزة الاستقبال قادمة قريباً' : 'Reception sign-up coming soon', 'success')}
-              >
-                {rtl ? 'اعرف المزيد' : 'LEARN MORE'}
-              </Button>
-            </div>
-            {/* Card 3 */}
-            <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 flex flex-col items-center text-center">
-              <span className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
-                <span className="material-symbols-outlined text-2xl">upload_file</span>
-              </span>
-              <p className="text-sm font-semibold text-gray-900 mb-1">{rtl ? 'استيراد مشتركين من ملف Excel' : 'Import existing members using a spreadsheet file'}</p>
-              <p className="text-xs text-gray-500 mb-4">{rtl ? 'استورد قائمة الأعضاء من ملف CSV أو Excel' : 'Upload a CSV or Excel file with your member data'}</p>
-              <Button
-                variant="outline"
-                className="mt-auto px-4 py-2 text-xs"
-                onClick={() => showToast(rtl ? 'ميزة الاستيراد قادمة قريباً' : 'Import feature coming soon', 'success')}
-              >
-                {rtl ? 'استيراد...' : 'IMPORT...'}
-              </Button>
-            </div>
-            {/* Card 4 */}
-            <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 flex flex-col items-center text-center">
-              <span className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
-                <span className="material-symbols-outlined text-2xl">mail</span>
-              </span>
-              <p className="text-sm font-semibold text-gray-900 mb-1">{rtl ? 'دعوة عبر البريد الإلكتروني' : 'Invite members via Email to sign-up online'}</p>
-              <p className="text-xs text-gray-500 mb-4">{rtl ? 'أرسل رابط تسجيل للعضو عبر البريد الإلكتروني' : 'Send an online sign-up link to prospective members'}</p>
-              <Button
-                variant="outline"
-                className="mt-auto px-4 py-2 text-xs"
-                onClick={() => showToast(rtl ? 'ميزة الدعوة قادمة قريباً' : 'Invite feature coming soon', 'success')}
-              >
-                {rtl ? 'دعوة مشتركين' : 'INVITE MEMBERS'}
-              </Button>
-            </div>
-          </div>
+        <Card className="p-12 text-center">
+          <span className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4">
+            <span className="material-symbols-outlined text-4xl">group_add</span>
+          </span>
+          <h2 className="text-xl font-bold text-gray-900 mb-1">
+            {rtl ? 'لا يوجد مشتركون بعد' : 'No members yet'}
+          </h2>
+          <p className="text-sm text-gray-500 max-w-md mx-auto mb-6">
+            {rtl ? 'ابدأ بإضافة أول مشترك — ستظهر قائمتهم هنا مباشرة' : 'Add your first member — the directory will appear here'}
+          </p>
+          <PrimaryAction onClick={() => setAction('member')}>
+            <Plus size={16} />
+            {rtl ? 'إضافة مشترك' : 'Add member'}
+          </PrimaryAction>
         </Card>
       )}
 
@@ -359,14 +251,6 @@ export default function MembersPage() {
             <table className="w-full text-base text-gray-900">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="p-3 w-10">
-                    <input
-                      type="checkbox"
-                      checked={selected.size === members.length && members.length > 0}
-                      onChange={toggleSelectAll}
-                      className="w-4 h-4 rounded border-gray-300 accent-emerald-500"
-                    />
-                  </th>
                   <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'المشترك' : 'MEMBER'}</th>
                   <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'جهة الاتصال' : 'CONTACT'}</th>
                   <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'العمر / تاريخ الميلاد' : 'AGE / DOB'}</th>
@@ -391,14 +275,6 @@ export default function MembersPage() {
                       className="border-t border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
                       onClick={() => navigate(`/admin/members/${m.id}`)}
                     >
-                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selected.has(m.id)}
-                          onChange={() => toggleSelect(m.id)}
-                          className="w-4 h-4 rounded border-gray-300 accent-emerald-500"
-                        />
-                      </td>
                       <td className="p-3">
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-2xl flex items-center justify-center text-xs font-bold text-white shrink-0 ${subAvatarClass(meta)}`}>
@@ -428,22 +304,13 @@ export default function MembersPage() {
                         <StatusBadge status={meta.label} variant={meta.variant} />
                       </td>
                       <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => navigate(`/admin/members/${m.id}`)}
-                            className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-emerald-600 transition"
-                            title={rtl ? 'تعديل' : 'Edit'}
-                          >
-                            <span className="material-symbols-outlined text-lg">edit</span>
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); navigate(`/admin/members/${m.id}`); }}
-                            className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-red-500 transition"
-                            title={rtl ? 'عرض الملف الشخصي' : 'View profile'}
-                          >
-                            <span className="material-symbols-outlined text-lg">logout</span>
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => navigate(`/admin/members/${m.id}`)}
+                          className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-emerald-600 transition touch-auto"
+                          title={rtl ? 'ملف العضو' : 'Member profile'}
+                        >
+                          <span className="material-symbols-outlined text-lg">edit</span>
+                        </button>
                       </td>
                     </tr>
                   );
