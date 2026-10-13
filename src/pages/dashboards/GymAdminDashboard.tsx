@@ -15,6 +15,7 @@ import {
   Clock, AlertTriangle, UserX, UserPlus, ChevronLeft,
 } from 'lucide-react';
 import { StatCard, Panel, Banner, DashboardPage, PrimaryAction } from '../../components/dashboard';
+import QuickActionCenter from '../../components/dashboard/QuickActionCenter';
 
 // §24 redesign — "today's tasks first" (competitor pattern: Mindbody/Glofox/
 // Wodify owner dashboards lead with what needs action today, not vanity KPIs).
@@ -210,6 +211,9 @@ export default function GymAdminDashboard() {
             progressLabel={`${t('dashboard.progress')} · ${doneCount} / ${total}`}
           />
         )}
+
+        {/* §33 دفعة 1 — every daily admin action starts here (real endpoints, no page detour) */}
+        <QuickActionCenter />
 
         {/* ── Row 1: today at a glance ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
