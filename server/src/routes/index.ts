@@ -61,7 +61,8 @@ import {
   revokeSession,
   revokeAllOtherSessions,
 } from '../controllers/auth';
-import { listOffers } from '../controllers/offers';
+import { listOffers, listAllOffers, createOffer, updateOffer } from '../controllers/offers';
+import { createOfferSchema, updateOfferSchema } from '../validators/schemas';
 import {
   loginSchema,
   qrAttendanceSchema,
@@ -218,6 +219,11 @@ router.post('/api/subscriptions/:subscriptionId/cancel', requireRole('manager'),
 // MEMBERSHIP OFFERS
 // ====================================================================
 router.get('/api/membership-offers', requireRole('manager', 'receptionist', 'coach'), listOffers);
+// §33ب — offers are the single source of truth for plans: manager CRUD here,
+// and the only honest lifecycle is deactivate (subscriptions reference rows).
+router.get('/api/membership-offers/manage', requireRole('manager'), listAllOffers);
+router.post('/api/membership-offers', requireRole('manager'), validate(createOfferSchema), createOffer);
+router.put('/api/membership-offers/:id', requireRole('manager'), validate(updateOfferSchema), updateOffer);
 
 // ====================================================================
 // ATTENDANCE & QR CHECK-IN

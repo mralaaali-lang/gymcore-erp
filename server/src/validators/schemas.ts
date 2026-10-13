@@ -555,3 +555,17 @@ export const createSubscriptionPaymentSchema = z.object({
   return_url: z.string().url().optional(),
   cancel_url: z.string().url().optional(),
 });
+
+// §33ب — membership offers (single source of truth for gym plans)
+export const createOfferSchema = z.object({
+  title: sanitizedString({ min: 1, max: 255 }),
+  duration_days: z.number().int().min(1).max(3650),
+  price: z.number().min(0),
+});
+
+export const updateOfferSchema = z.object({
+  title: sanitizedString({ min: 1, max: 255 }).optional(),
+  duration_days: z.number().int().min(1).max(3650).optional(),
+  price: z.number().min(0).optional(),
+  is_active: z.boolean().optional(),
+});

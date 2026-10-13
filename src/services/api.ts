@@ -849,6 +849,31 @@ export async function listOffers() {
   return res.data;
 }
 
+// §33ب — membership_offers is the single source of truth for plans/offers.
+export interface MembershipOffer {
+  id: string;
+  title: string;
+  duration_days: number;
+  price: number | string;
+  is_active: boolean;
+  subscription_count?: number;
+}
+
+export async function listOffersManage(): Promise<{ data: MembershipOffer[] }> {
+  const res = await api.get('/api/membership-offers/manage');
+  return res.data;
+}
+
+export async function createOffer(input: { title: string; duration_days: number; price: number }): Promise<{ data: MembershipOffer }> {
+  const res = await api.post('/api/membership-offers', input);
+  return res.data;
+}
+
+export async function updateOffer(id: string, input: Partial<{ title: string; duration_days: number; price: number; is_active: boolean }>): Promise<{ data: MembershipOffer }> {
+  const res = await api.put(`/api/membership-offers/${id}`, input);
+  return res.data;
+}
+
 // ====================================================================
 // CRM / LEAD MANAGEMENT
 // ====================================================================
