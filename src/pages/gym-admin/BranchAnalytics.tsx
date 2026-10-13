@@ -1,121 +1,229 @@
-import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/GymBrandContext';
+import { useApiQuery } from '../../hooks/useApiQuery';
+import { DashboardPage, StatCard, Panel, EmptyState } from '../../components/dashboard';
 import { formatMoney } from '../../utils/currency';
-import api from '../../services/api';
+import { formatDate, formatDateTime, fmtNum } from '../../utils/date';
+import {
+  getPeakHours, getRetentionRate, getRevenueForecast, getEngagement,
+} from '../../services/analytics';
+import { Users, Calendar, Percent, DollarSign, Clock } from 'lucide-react';
 
+/**
+ * §34ب — Analytics page rebuilt on the real server contracts.
+ * The old version read fields that never existed (retention.rate, forecast
+ * as an array, peak-hours .count) so every card was silently '-' or 0.
+ * Every figure below comes from a typed endpoint; nulls render as '—'.
+ */
 export default function BranchAnalytics() {
-  const { language, gymProfile } = useApp();
+  const { t } = useTranslation();
+  const { gymProfile } = useApp();
+  const currency = gymProfile?.currency;
 
-  const { data: retentionData, isLoading: retentionLoading } = useQuery({
-    queryKey: ['retention-rate'],
-    queryFn: () => api.get('/api/analytics/retention-rate').then((r) => r.data),
-  });
+  const { data: eng } = useApiQuery(
+    ['analytics', 'engagement'],
+    async () => (await getEngagement()).data,
+    { staleTime: 5 * 60_000 }
+  );
+  const { data: retentionRows } = useApiQuery(
+    ['analytics', 'retention-rate'],
+    async () => (await getRetentionRate()).data,
+    { staleTime: 5 * 60_000 }
+  );
+  const { data: forecast } = useApiQuery(
+    ['analytics', 'revenue-forecast'],
+    async () => (await getRevenueForecast()).data,
+    { staleTime: 5 * 60_000 }
+  );
+  const { data: peakRows } = useApiQuery(
+    ['analytics', 'peak-hours'],
+    async () => (await getPeakHours()).data,
+    { staleTime: 5 * 60_000 }
+  );
 
-  const { data: peakHoursData, isLoading: peakLoading } = useQuery({
-    queryKey: ['peak-hours'],
-    queryFn: () => api.get('/api/analytics/peak-hours').then((r) => r.data),
-  });
+  // 12-month retention = total renewals / total new members (null = no base).
+  const rows = retentionRows ?? [];
+  const totalNew = rows.reduce((s, r) => s + Number(r.new_members), 0);
+  const totalRenewals = rows.reduce((s, r) => s + Number(r.renewals), 0);
+  const retentionPct = totalNew > 0 ? Math.round((totalRenewals / totalNew) * 1000) / 10 : null;
 
-  const { data: forecastData, isLoading: forecastLoading } = useQuery({
-    queryKey: ['revenue-forecast'],
-    queryFn: () => api.get('/api/analytics/revenue-forecast').then((r) => r.data),
-  });
+  // Peak hours: fill all 24 buckets so the chart shape is honest.
+  const peakByHour = new Map<number, number>();
+  (peakRows ?? []).forEach((h) => peakByHour.set(Number(h.hour), Number(h.check_ins)));
+  const peakBars = Array.from({ length: 24 }, (_, hour) => ({ hour, n: peakByHour.get(hour) ?? 0 }));
+  const peakMax = Math.max(...peakBars.map((b) => b.n), 1);
+  const hasPeakData = peakBars.some((b) => b.n > 0);
 
-  const retention = retentionData?.data || {};
-  const peakHours = peakHoursData?.data || [];
-  const forecast = forecastData?.data || [];
-
-  const maxForecast = Array.isArray(forecast) ? Math.max(...forecast.map((m: any) => m.value || 0), 1) : 1;
-
-  const isLoading = retentionLoading || peakLoading || forecastLoading;
-
-  if (isLoading) {
-    return (
-      <div dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">التحليلات</h1>
-        <div className="text-center py-12 text-gray-500">جاري التحميل...</div>
-      </div>
-    );
-  }
-
-  const statCards = [
-    { label: 'معدل الاحتفاظ', value: retention.rate ? `${retention.rate}%` : '-', icon: 'group', color: 'primary', trend: retention.trend },
-    { label: 'أوقات الذروة', value: Array.isArray(peakHours) ? `${peakHours.length} فترات` : '-', icon: 'schedule', color: '#006c49', trend: null },
-    { label: 'توقعات الإيرادات', value: forecast.current_month ? formatMoney(forecast.current_month, gymProfile?.currency) : '-', icon: 'trending_up', color: '#8b5cf6', trend: null },
-  ];
+  const visits = eng?.visits;
+  const classes = eng?.classes;
 
   return (
-    <div dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">التحليلات</h1>
+    <div className="bg-gray-50 min-h-screen -m-6 p-6">
+      <DashboardPage
+        title={t('analytics.title', 'التحليلات')}
+        subtitle={t('analytics.subtitle', 'زيارات الأعضاء وإشغال الكلاسات والاحتفاظ — كلها من بيانات الصالة الفعلية')}
+      >
+        {/* KPI row */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
+          <StatCard
+            icon={Users}
+            accent="emerald"
+            label={t('analytics.visitRate', 'معدل الزيارات')}
+            value={visits?.avg_per_member != null
+              ? `${fmtNum(visits.avg_per_member, { max: 1 })} ${t('analytics.visitsPerMonth', 'زيارة/شهر')}`
+              : '—'}
+            trend={visits ? `${fmtNum(visits.checkins_30d)} ${t('analytics.checkins30', 'حضور/30ي')} · ${fmtNum(visits.active_members)} ${t('analytics.activeShort', 'نشط')}` : undefined}
+            trendPositive
+          />
+          <StatCard
+            icon={Calendar}
+            accent="violet"
+            label={t('analytics.classOccupancy', 'إشغال الكلاسات')}
+            value={classes?.avg_occupancy_pct != null ? `${fmtNum(classes.avg_occupancy_pct, { max: 1 })}%` : '—'}
+            trend={classes ? `${fmtNum(classes.count)} ${t('analytics.classes30d', 'كلاس (30 يوم)')}` : undefined}
+            trendPositive={(classes?.avg_occupancy_pct ?? 0) >= 70}
+          />
+          <StatCard
+            icon={Percent}
+            accent="sky"
+            label={t('analytics.retention12', 'الاحتفاظ (12 شهر)')}
+            value={retentionPct != null ? `${fmtNum(retentionPct, { max: 1 })}%` : '—'}
+            trend={totalNew > 0 ? `${fmtNum(totalRenewals)}/${fmtNum(totalNew)}` : undefined}
+            trendPositive={(retentionPct ?? 0) >= 70}
+          />
+          <StatCard
+            icon={DollarSign}
+            accent="amber"
+            label={t('analytics.forecast30', 'توقع إيراد 30 يوم')}
+            value={forecast ? formatMoney(Number(forecast.forecast_revenue_30d), currency) : '—'}
+            trend={forecast ? `${fmtNum(forecast.renewing_next_30d)} ${t('analytics.renewNext30', 'يجدد خلال 30 يوم')}` : undefined}
+            trendPositive
+          />
+        </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        {statCards.map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl border border-surface-variant p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${s.color}15` }}>
-                <span className="material-symbols-outlined" style={{ color: s.color }}>{s.icon}</span>
-              </div>
-              {s.trend && (
-                <span className={`text-xs font-medium ${s.trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {s.trend > 0 ? '+' : ''}{s.trend}%
-                </span>
-              )}
+        {/* Peak hours bar chart (last 30 days) */}
+        <Panel
+          icon={Clock}
+          accent="rose"
+          title={t('analytics.peakHours', 'أوقات الذروة')}
+          subtitle={t('analytics.peakHoursSub', 'تسجيلات الحضور لكل ساعة — آخر 30 يوم')}
+        >
+          {hasPeakData ? (
+            <div className="flex items-end gap-1.5 h-40" dir="ltr">
+              {peakBars.map((b) => (
+                <div key={b.hour} className="flex-1 flex flex-col items-center justify-end gap-1 h-full" title={`${b.n}`}>
+                  <div
+                    className="w-full rounded-t-md bg-rose-400/80 hover:bg-rose-500 transition-colors"
+                    style={{ height: `${Math.max((b.n / peakMax) * 100, b.n > 0 ? 4 : 1)}%` }}
+                  />
+                  <span className="text-[10px] text-gray-400 tabular-nums">{String(b.hour).padStart(2, '0')}</span>
+                </div>
+              ))}
             </div>
-            <p className="text-xs text-gray-500 mb-1">{s.label}</p>
-            <p className="text-2xl font-bold text-gray-800">{s.value}</p>
-          </div>
-        ))}
-      </div>
+          ) : (
+            <EmptyState
+              icon={Clock}
+              title={t('analytics.noPeakData', 'لا توجد تسجيلات حضور في آخر 30 يومًا')}
+              description={t('analytics.noPeakDataDesc', 'سيظهر توزيع الساعات فور تسجيل أول حضور.')}
+            />
+          )}
+        </Panel>
 
-      {Array.isArray(forecast) && forecast.length > 0 && (
-        <div className="bg-white rounded-2xl border border-surface-variant p-5 mb-6">
-          <h2 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">trending_up</span>
-            توقعات الإيرادات
-          </h2>
-          <div className="flex items-end gap-3 h-40">
-            {forecast.map((m: any, i: number) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full rounded-t-lg transition-all hover:opacity-80" style={{ height: `${(m.value / maxForecast) * 100}%`, backgroundColor: 'primary', minHeight: '12px' }} />
-                <span className="text-xs text-gray-500 mt-1">{m.month || m.label || ''}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {Array.isArray(peakHours) && peakHours.length > 0 && (
-        <div className="bg-white rounded-2xl border border-surface-variant p-5">
-          <h2 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#006c49]">schedule</span>
-            أوقات الذروة
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-surface-variant">
-                  <th className="text-right p-3 font-medium text-gray-500">#</th>
-                  <th className="text-right p-3 font-medium text-gray-500">الفترة</th>
-                  <th className="text-right p-3 font-medium text-gray-500">عدد الزوار</th>
-                </tr>
-              </thead>
-              <tbody>
-                {peakHours.map((ph: any, i: number) => (
-                  <tr key={i} className="border-b border-surface-variant last:border-0">
-                    <td className="p-3 text-gray-500">{i + 1}</td>
-                    <td className="p-3 font-medium text-gray-800">{ph.hour || ph.time || ph.label || '-'}</td>
-                    <td className="p-3 text-gray-600">{ph.count || ph.visitors || 0}</td>
+        {/* Class occupancy (last 30 days + upcoming) */}
+        <Panel
+          icon={Calendar}
+          accent="violet"
+          title={t('analytics.classOccupancyTitle', 'إشغال الكلاسات')}
+          subtitle={t('analytics.classOccupancySub', 'محجوز ÷ سعة — آخر 30 يومًا والجدول القادم')}
+        >
+          {classes && classes.items.length > 0 ? (
+            <div className="overflow-x-auto -mx-2">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-start p-3 font-semibold text-gray-500">{t('analytics.class', 'الكلاس')}</th>
+                    <th className="text-start p-3 font-semibold text-gray-500">{t('analytics.when', 'الموعد')}</th>
+                    <th className="text-start p-3 font-semibold text-gray-500">{t('analytics.bookedOfCap', 'محجوز / سعة')}</th>
+                    <th className="text-start p-3 font-semibold text-gray-500 w-40">{t('analytics.occupancy', 'الإشغال')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                </thead>
+                <tbody>
+                  {classes.items.map((c) => {
+                    const pct = c.occupancy_pct ?? 0;
+                    return (
+                      <tr key={c.id} className="border-b border-gray-50 last:border-0">
+                        <td className="p-3 font-semibold text-gray-900">{c.title}</td>
+                        <td className="p-3 text-gray-500 whitespace-nowrap">{formatDateTime(c.start_time)}</td>
+                        <td className="p-3 text-gray-600 tabular-nums">{fmtNum(c.booked)} / {fmtNum(c.capacity)}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 flex-1 rounded-full bg-gray-100 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-400' : 'bg-gray-300'}`}
+                                style={{ width: `${Math.min(pct, 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-bold text-gray-600 tabular-nums w-12 text-end">{fmtNum(pct, { max: 1 })}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={Calendar}
+              title={t('analytics.noClasses', 'لا توجد كلاسات في آخر 30 يومًا')}
+              description={t('analytics.noClassesDesc', 'أنشئ كلاسات جماعية من الجدول وسيظهر إشغالها هنا.')}
+            />
+          )}
+        </Panel>
 
-      {!Array.isArray(forecast) && !Array.isArray(peakHours) && !retention.rate && (
-        <div className="text-center py-12 text-gray-400">لا توجد بيانات تحليلات متاحة</div>
-      )}
+        {/* Monthly retention table */}
+        <Panel
+          icon={Percent}
+          accent="sky"
+          title={t('analytics.retentionMonthly', 'الاحتفاظ الشهري')}
+          subtitle={t('analytics.retentionMonthlySub', 'تجديدات مقابل أعضاء جدد لكل شهر — 12 شهرًا')}
+        >
+          {rows.length > 0 ? (
+            <div className="overflow-x-auto -mx-2">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-start p-3 font-semibold text-gray-500">{t('analytics.month', 'الشهر')}</th>
+                    <th className="text-start p-3 font-semibold text-gray-500">{t('analytics.newMembers', 'أعضاء جدد')}</th>
+                    <th className="text-start p-3 font-semibold text-gray-500">{t('analytics.renewals', 'تجديدات')}</th>
+                    <th className="text-start p-3 font-semibold text-gray-500">{t('analytics.rate', 'النسبة')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.month} className="border-b border-gray-50 last:border-0">
+                      <td className="p-3 text-gray-900 font-medium tabular-nums">{formatDate(r.month)}</td>
+                      <td className="p-3 text-gray-600 tabular-nums">{fmtNum(r.new_members)}</td>
+                      <td className="p-3 text-gray-600 tabular-nums">{fmtNum(r.renewals)}</td>
+                      <td className="p-3 tabular-nums">
+                        <span className={`font-bold ${Number(r.retention_rate) >= 70 ? 'text-emerald-600' : 'text-gray-600'}`}>
+                          {fmtNum(Number(r.retention_rate), { max: 1 })}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={Percent}
+              title={t('analytics.noRetention', 'لا توجد اشتراكات بعد')}
+              description={t('analytics.noRetentionDesc', 'يُقاس الاحتفاظ عندما يبدأ تجدد الاشتراكات الشهرية.')}
+            />
+          )}
+        </Panel>
+      </DashboardPage>
     </div>
   );
 }

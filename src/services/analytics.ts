@@ -57,3 +57,63 @@ export async function getBusinessMetrics(): Promise<{ data: BusinessMetrics }> {
   const res = await api.get('/api/analytics/business-metrics');
   return res.data;
 }
+
+// §34ب — typed contracts for the analytics page (the old page read fields
+// the server never sent: retention.rate, forecast as an array, peak-hours
+// .count — every one of those was silently '-' or 0).
+
+/** One row per month (last 12): new subs that month vs renewals of them. */
+export interface RetentionRow {
+  month: string; // ISO month start (timestamp)
+  new_members: number;
+  renewals: number;
+  retention_rate: number; // % renewals/new that month
+}
+
+/** Single summary object — NOT an array. */
+export interface RevenueForecast {
+  active_subscriptions: number;
+  monthly_recurring_revenue: number;
+  renewing_next_7d: number;
+  renewing_next_30d: number;
+  forecast_revenue_30d: number;
+}
+
+export interface ClassOccupancyItem {
+  id: string;
+  title: string;
+  start_time: string;
+  capacity: number;
+  booked: number;
+  occupancy_pct: number | null;
+}
+
+export interface Engagement {
+  visits: {
+    checkins_30d: number;
+    visiting_members_30d: number;
+    active_members: number;
+    /** avg check-ins per active member, last 30 days; null = no base. */
+    avg_per_member: number | null;
+  };
+  classes: {
+    count: number;
+    avg_occupancy_pct: number | null;
+    items: ClassOccupancyItem[];
+  };
+}
+
+export async function getRetentionRate(): Promise<{ data: RetentionRow[] }> {
+  const res = await api.get('/api/analytics/retention-rate');
+  return res.data;
+}
+
+export async function getRevenueForecast(): Promise<{ data: RevenueForecast }> {
+  const res = await api.get('/api/analytics/revenue-forecast');
+  return res.data;
+}
+
+export async function getEngagement(): Promise<{ data: Engagement }> {
+  const res = await api.get('/api/analytics/engagement');
+  return res.data;
+}

@@ -233,3 +233,68 @@ export async function getBusinessMetrics(req: Request, res: Response): Promise<v
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+// §34ب — engagement metrics for the analytics page:
+// visit rate (attendance_logs check-ins per active member, last 30 days —
+// the unique daily index means one check-in per member per day) and class
+// occupancy (confirmed class_bookings vs fitness_classes.capacity, last 30
+// days + upcoming). Nulls are honest "no base" (no members / no classes).
+export async function getEngagement(req: Request, res: Response): Promise<void> {
+  const gym_id = req.staff?.gym_id;
+  try {
+    const visits = await query(`
+      SELECT
+        COUNT(*) AS checkins_30d,
+        COUNT(DISTINCT a.member_id) AS visiting_members_30d,
+        (SELECT COUNT(DISTINCT member_id) FROM member_subscriptions
+          WHERE gym_id = $1 AND status = 'active' AND deleted_at IS NULL) AS active_members
+      FROM attendance_logs a
+      WHERE a.gym_id = $1 AND a.deleted_at IS NULL
+        AND a.check_in_time >= CURRENT_DATE - INTERVAL '30 days'
+    `, [gym_id]);
+    const classes = await query(`
+      SELECT fc.id, fc.title, fc.start_time, fc.capacity,
+             COUNT(cb.id)::int AS booked
+      FROM fitness_classes fc
+      LEFT JOIN class_bookings cb ON cb.class_id = fc.id AND cb.status = 'confirmed'
+      WHERE fc.gym_id = $1 AND NOT fc.is_cancelled
+        AND fc.start_time >= CURRENT_TIMESTAMP - INTERVAL '30 days'
+      GROUP BY fc.id
+      ORDER BY fc.start_time DESC
+      LIMIT 50
+    `, [gym_id]);
+    const v = visits.rows[0] || {};
+    const checkins = Number(v.checkins_30d || 0);
+    const activeMembers = Number(v.active_members || 0);
+    const items = classes.rows.map((c) => ({
+      id: c.id,
+      title: c.title,
+      start_time: c.start_time,
+      capacity: Number(c.capacity),
+      booked: Number(c.booked),
+      occupancy_pct: c.capacity > 0 ? Math.round((Number(c.booked) / Number(c.capacity)) * 1000) / 10 : null,
+    }));
+    const withCap = items.filter((i) => i.occupancy_pct != null);
+    res.status(200).json({
+      data: {
+        visits: {
+          checkins_30d: checkins,
+          visiting_members_30d: Number(v.visiting_members_30d || 0),
+          active_members: activeMembers,
+          // avg visits per active member over the last 30 days (null = no base)
+          avg_per_member: activeMembers > 0 ? Math.round((checkins / activeMembers) * 10) / 10 : null,
+        },
+        classes: {
+          count: items.length,
+          avg_occupancy_pct: withCap.length > 0
+            ? Math.round((withCap.reduce((s, i) => s + (i.occupancy_pct as number), 0) / withCap.length) * 10) / 10
+            : null,
+          items,
+        },
+      },
+    });
+  } catch (error) {
+    logger.error('Engagement query failed', { error: (error as Error).message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
