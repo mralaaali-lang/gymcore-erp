@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useToast } from '../../context/ToastContext';
 import { formatMoney } from '../../utils/currency';
 import {
-  createMember, createStaff, manualCheckInByPhone, createPayment, createExpense,
-  listOffers, listExpenseCategories, searchMembers,
+  createMember, createStaff, manualCheckInByPhone, qrCheckIn, createPayment, createExpense,
+  listOffers, listExpenseCategories, searchMembers, getTodayAttendance,
 } from '../../services/api';
 import Spinner from '../../components/ui/Spinner';
-import { UserPlus, UserCog, Clock, Banknote, Receipt, X } from 'lucide-react';
+import { UserPlus, UserCog, QrCode, Users, Banknote, Receipt, X } from 'lucide-react';
 
 // ====================================================================
 // §33 دفعة 1 — Quick Action Center for the manager dashboard.
@@ -18,16 +18,22 @@ import { UserPlus, UserCog, Clock, Banknote, Receipt, X } from 'lucide-react';
 // Gym Engine dashboards put the whole front desk in the dashboard header),
 // and every action calls a REAL existing endpoint — no navigation to a
 // half-wired page, no placeholder buttons:
-//   إضافة عضو        → POST /api/members          (+ live offers from /api/membership-offers)
-//   إضافة كابتن/ريسبشن → POST /api/staff           (bcrypt + role allowlist server-side)
-//   تسجيل حضور       → POST /api/attendance/manual
-//   تسجيل دفعة       → POST /api/finance/payments (member via /api/customer360/search)
-//   تسجيل مصروف      → POST /api/finance/expenses (categories from the DB)
+//   إضافة عضو          → POST /api/members          (+ live offers from /api/membership-offers)
+//   إضافة كابتن/ريسبشن  → POST /api/staff            (bcrypt + role allowlist server-side)
+//   تسجيل حضور          → POST /api/attendance/qr (camera scan or pasted code)
+//                        POST /api/attendance/manual (phone)
+//   حضور اليوم          → GET  /api/attendance/today (count + who's in: last 3h window)
+//   تسجيل دفعة          → POST /api/finance/payments (member via /api/customer360/search)
+//   تسجيل مصروف         → POST /api/finance/expenses (categories from the DB)
 // On success the relevant dashboard queries are invalidated so the KPI
 // cards and action lists reflect the change immediately.
+//
+// UI feedback (2026-10-13): popups open CENTERED (not side drawers), and
+// the check-in popup stays open in continuous mode — each success resets
+// the input so the receptionist can scan the next member immediately.
 // ====================================================================
 
-type ActionKey = 'member' | 'coach' | 'reception' | 'checkin' | 'payment' | 'expense';
+type ActionKey = 'member' | 'coach' | 'reception' | 'checkin' | 'today' | 'payment' | 'expense';
 
 /** Extract the server's own error text so the UI never hides a real rejection. */
 function apiError(e: unknown, fallback: string): string {
@@ -55,21 +61,21 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
-/** Sliding side panel (opens from the trailing edge per RTL/LTR). */
-function Drawer({
+/** Centered modal dialog (user feedback 2026-10-13: popups in the middle of the screen). */
+function Modal({
   open, onClose, title, children,
 }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
   const { language } = useApp();
   const rtl = language === 'ar';
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
       <div
         dir={rtl ? 'rtl' : 'ltr'}
-        className={`absolute top-0 bottom-0 ${rtl ? 'left-0' : 'right-0'} w-full max-w-md bg-white shadow-2xl overflow-y-auto`}
+        className="relative w-full max-w-md max-h-[88vh] overflow-y-auto bg-white rounded-3xl shadow-2xl"
       >
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-3xl">
           <h3 className="font-bold text-gray-900">{title}</h3>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-gray-500" aria-label="close">
             <X size={18} />
@@ -246,37 +252,259 @@ function AddStaffForm({ defaultRole, onDone }: { defaultRole: 'coach' | 'recepti
   );
 }
 
-// ── 3. Manual check-in by phone ────────────────────────────────────
-function CheckInForm({ onDone }: { onDone: () => void }) {
+// ── 3. Check-in: QR camera scan / pasted code / phone ──────────────
+// Continuous mode by design: a success resets the input and keeps the
+// modal open so the receptionist can process the next member immediately.
+interface CheckInResult { ok: boolean; text: string }
+
+function CheckInForm() {
   const { language } = useApp();
-  const { showToast } = useToast();
   const queryClient = useQueryClient();
   const rtl = language === 'ar';
+  const [tab, setTab] = useState<'qr' | 'phone'>('qr');
+  const [code, setCode] = useState('');
   const [phone, setPhone] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [last, setLast] = useState<CheckInResult | null>(null);
+  const [sessionCount, setSessionCount] = useState(0);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const loopRef = useRef<number | null>(null);
+  const busyRef = useRef(false);
+  const lastTokenRef = useRef<{ token: string; at: number }>({ token: '', at: 0 });
 
-  const mut = useMutation({
+  const supportsBarcode = typeof window !== 'undefined' && 'BarcodeDetector' in window;
+
+  const stopCamera = () => {
+    if (loopRef.current !== null) { window.clearTimeout(loopRef.current); loopRef.current = null; }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setCameraOn(false);
+  };
+
+  useEffect(() => stopCamera, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tab !== 'qr') stopCamera(); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const submitToken = async (raw: string, source: 'scan' | 'paste') => {
+    const token = raw.trim();
+    if (!token || busyRef.current) return;
+    // The member pass rotates every 30s server-side; a camera frame can fire
+    // many times per second — dedupe the same token for 3s.
+    const now = Date.now();
+    if (lastTokenRef.current.token === token && now - lastTokenRef.current.at < 3000) return;
+    lastTokenRef.current = { token, at: now };
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      const res = await qrCheckIn(token);
+      if (res?.success) {
+        setLast({ ok: true, text: source === 'scan' ? (rtl ? '✓ تم المسح وتسجيل الحضور' : '✓ Scanned — checked in') : (rtl ? '✓ تم تسجيل الحضور' : '✓ Checked in') });
+        setSessionCount((c) => c + 1);
+        setCode('');
+        queryClient.invalidateQueries({ queryKey: ['gym', 'attendance', 'today'] });
+      } else {
+        setLast({ ok: false, text: res?.error || (rtl ? 'رفض السيرفر التسجيل' : 'Server rejected check-in') });
+      }
+    } catch (e) {
+      setLast({ ok: false, text: apiError(e, rtl ? 'فشل تسجيل الحضور' : 'Check-in failed') });
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
+
+  const startCamera = async () => {
+    setCameraError(null);
+    if (!supportsBarcode) {
+      setCameraError(rtl ? 'متصفحك لا يدعم قراءة الباركود — استخدم الإدخال اليدوي للكود أو الهاتف.' : 'This browser cannot decode barcodes — use manual code/phone entry.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream;
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        await video.play().catch(() => undefined);
+      }
+      setCameraOn(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const Detector = (window as any).BarcodeDetector;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const detector = new Detector({ formats: ['qr_code', 'code_128', 'ean_13'] });
+      const tick = async () => {
+        if (!streamRef.current || !videoRef.current) return;
+        try {
+          const codes = await detector.detect(videoRef.current);
+          if (codes.length > 0) await submitToken(codes[0].rawValue, 'scan');
+        } catch { /* transient frame errors are expected */ }
+        loopRef.current = window.setTimeout(tick, 350);
+      };
+      loopRef.current = window.setTimeout(tick, 350);
+    } catch {
+      setCameraError(rtl ? 'تعذر فتح الكاميرا — تحقق من إذن الكاميرا، أو استخدم الإدخال اليدوي.' : 'Camera unavailable — check permission, or use manual entry.');
+    }
+  };
+
+  const phoneMut = useMutation({
     mutationFn: () => manualCheckInByPhone(phone.trim()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['gym', 'attendance', 'today'] });
-      showToast(rtl ? 'تم تسجيل الحضور ✓' : 'Checked in ✓', 'success');
+      setLast({ ok: true, text: rtl ? '✓ تم تسجيل الحضور' : '✓ Checked in' });
+      setSessionCount((c) => c + 1);
       setPhone('');
-      onDone();
+      queryClient.invalidateQueries({ queryKey: ['gym', 'attendance', 'today'] });
     },
-    onError: (e) => showToast(apiError(e, rtl ? 'فشل تسجيل الحضور' : 'Check-in failed'), 'error'),
+    onError: (e) => setLast({ ok: false, text: apiError(e, rtl ? 'فشل تسجيل الحضور' : 'Check-in failed') }),
   });
 
   return (
-    <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); mut.mutate(); }}>
-      <Field label={rtl ? 'رقم هاتف العضو' : 'Member phone'} required>
-        <input className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} required inputMode="tel" placeholder="01xxxxxxxxx" autoFocus />
-      </Field>
-      <p className="text-xs text-gray-500">
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        {(['qr', 'phone'] as const).map((k) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={`flex-1 rounded-xl px-3 py-2 text-sm font-bold ${tab === k ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            {k === 'qr' ? (rtl ? 'مسح باركود / كود' : 'Scan / code') : (rtl ? 'بالهاتف' : 'By phone')}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'qr' ? (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-gray-100 bg-gray-50 overflow-hidden">
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video ref={videoRef} playsInline muted className={`w-full ${cameraOn ? 'block aspect-square object-cover' : 'hidden'}`} />
+            {!cameraOn && (
+              <div className="p-6 text-center">
+                <QrCode size={36} className="mx-auto text-gray-300 mb-2" />
+                <p className="text-xs text-gray-500 mb-3">
+                  {rtl ? 'وجّه الكاميرا إلى رمز الدخول في تطبيق العضو (الرمز يتجدد كل ٣٠ ثانية)' : 'Point the camera at the member app pass (rotates every 30s)'}
+                </p>
+                <button onClick={startCamera} className="rounded-xl bg-gray-900 text-white px-4 py-2 text-sm font-bold hover:bg-gray-700">
+                  {rtl ? 'تشغيل الكاميرا' : 'Start camera'}
+                </button>
+              </div>
+            )}
+            {cameraOn && (
+              <div className="p-2 text-center">
+                <button onClick={stopCamera} className="text-xs font-semibold text-rose-600 hover:underline">
+                  {rtl ? 'إيقاف الكاميرا' : 'Stop camera'}
+                </button>
+              </div>
+            )}
+          </div>
+          {cameraError && <p className="text-xs text-amber-700 bg-amber-50 rounded-xl p-3">{cameraError}</p>}
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => { e.preventDefault(); submitToken(code, 'paste'); }}
+          >
+            <input
+              className={inputCls}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder={rtl ? 'أو الصق كود البطاقة هنا' : 'Or paste the pass code here'}
+              dir="ltr"
+            />
+            <button
+              type="submit"
+              disabled={busy || !code.trim()}
+              className="shrink-0 rounded-xl bg-emerald-600 text-white px-4 text-sm font-bold disabled:opacity-50"
+            >
+              {rtl ? 'تسجيل' : 'Check in'}
+            </button>
+          </form>
+        </div>
+      ) : (
+        <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); phoneMut.mutate(); }}>
+          <Field label={rtl ? 'رقم هاتف العضو' : 'Member phone'} required>
+            <input className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} required inputMode="tel" placeholder="01xxxxxxxxx" autoFocus />
+          </Field>
+          <SubmitButton pending={phoneMut.isPending} disabled={phone.trim().length < 7} label={rtl ? 'تسجيل حضور' : 'Check in'} />
+        </form>
+      )}
+
+      {last && (
+        <p className={`text-sm font-bold rounded-xl px-3 py-2 ${last.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+          {last.text}
+        </p>
+      )}
+      <div className="flex items-center justify-between text-xs text-gray-500">
+        <span>{rtl ? 'نافذة الحضور مفتوحة — سجّل التالي مباشرة' : 'Window stays open — scan the next member'}</span>
+        <span className="font-bold text-gray-900">{rtl ? `تم في هذه الجلسة: ${sessionCount}` : `This session: ${sessionCount}`}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── 4. Today's attendance + who's in ───────────────────────────────
+interface AttendanceRow {
+  id: string;
+  check_in_time: string;
+  entry_method: string;
+  full_name: string;
+  verified_by_name?: string | null;
+}
+
+const PRESENT_WINDOW_HOURS = 3;
+
+function TodayAttendance() {
+  const { language } = useApp();
+  const rtl = language === 'ar';
+  const { data, isLoading } = useApiQuery(
+    ['gym', 'attendance', 'today'],
+    getTodayAttendance,
+    { staleTime: 15_000 },
+  );
+  const records = (data?.records ?? []) as unknown as AttendanceRow[];
+
+  const present = useMemo(() => {
+    const cutoff = Date.now() - PRESENT_WINDOW_HOURS * 3600_000;
+    return records.filter((r) => new Date(r.check_in_time).getTime() >= cutoff);
+  }, [records]);
+
+  const methodLabel = (m: string) => (m === 'qr_code' ? (rtl ? 'باركود' : 'QR') : m === 'manual_phone' ? (rtl ? 'هاتف' : 'Phone') : m);
+
+  if (isLoading) return <div className="py-8 text-center"><Spinner size="md" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4 text-center">
+          <p className="text-3xl font-black text-emerald-700">{records.length}</p>
+          <p className="text-xs font-semibold text-gray-600 mt-1">{rtl ? 'حضور اليوم' : 'Check-ins today'}</p>
+        </div>
+        <div className="rounded-2xl bg-violet-50 border border-violet-100 p-4 text-center">
+          <p className="text-3xl font-black text-violet-700">{present.length}</p>
+          <p className="text-xs font-semibold text-gray-600 mt-1">
+            {rtl ? `متواجدون الآن (آخر ${PRESENT_WINDOW_HOURS} ساعات)` : `In now (last ${PRESENT_WINDOW_HOURS}h)`}
+          </p>
+        </div>
+      </div>
+      <p className="text-[11px] text-gray-400">
         {rtl
-          ? 'يرفض السيرفر التسجيل إذا كان العضو غير موجود، أو بلا اشتراك نشط، أو على القائمة السوداء، أو حضر اليوم بالفعل — وستظهر رسالة السبب الحقيقية هنا.'
-          : 'The server rejects unknown members, inactive/expired subscriptions, blacklisted profiles, and double check-ins — the real reason surfaces as a toast.'}
+          ? 'ملاحظة: الصالة لا تسجّل خروجًا بعد — «متواجدون الآن» = من حضروا خلال آخر ٣ ساعات.'
+          : `Note: no check-out is recorded yet — "in now" = checked in within the last ${PRESENT_WINDOW_HOURS} hours.`}
       </p>
-      <SubmitButton pending={mut.isPending} disabled={phone.trim().length < 7} label={rtl ? 'تسجيل حضور' : 'Check in'} />
-    </form>
+      {records.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-6">{rtl ? 'لا حضور مسجّل اليوم بعد' : 'No check-ins recorded today'}</p>
+      ) : (
+        <ul className="divide-y divide-gray-50 max-h-72 overflow-y-auto rounded-2xl border border-gray-100">
+          {records.map((r) => (
+            <li key={r.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+              <span className="font-medium text-gray-900 truncate">{r.full_name}</span>
+              <span className="text-gray-500 shrink-0 text-xs">
+                {new Date(r.check_in_time).toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                {' · '}{methodLabel(r.entry_method)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -334,7 +562,7 @@ function MemberPicker({ value, onChange }: { value: { id: string; full_name: str
   );
 }
 
-// ── 4. Record payment ──────────────────────────────────────────────
+// ── 5. Record payment ──────────────────────────────────────────────
 function PaymentForm({ onDone, presetMember }: { onDone: () => void; presetMember?: { id: string; full_name: string; phone_number: string } | null }) {
   const { language, gymProfile } = useApp();
   const { showToast } = useToast();
@@ -386,7 +614,7 @@ function PaymentForm({ onDone, presetMember }: { onDone: () => void; presetMembe
   );
 }
 
-// ── 5. Record expense ──────────────────────────────────────────────
+// ── 6. Record expense ──────────────────────────────────────────────
 function ExpenseForm({ onDone }: { onDone: () => void }) {
   const { language, gymProfile } = useApp();
   const { showToast } = useToast();
@@ -447,7 +675,8 @@ const ACTIONS: { key: ActionKey; icon: typeof UserPlus; ar: string; en: string; 
   { key: 'member', icon: UserPlus, ar: 'إضافة عضو', en: 'Add member', accent: 'bg-emerald-600 text-white hover:bg-emerald-700' },
   { key: 'coach', icon: UserCog, ar: 'إضافة كابتن', en: 'Add coach', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
   { key: 'reception', icon: UserCog, ar: 'إضافة ريسبشن', en: 'Add reception', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
-  { key: 'checkin', icon: Clock, ar: 'تسجيل حضور', en: 'Check in', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
+  { key: 'checkin', icon: QrCode, ar: 'تسجيل حضور', en: 'Check in', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
+  { key: 'today', icon: Users, ar: 'حضور اليوم', en: 'Today', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
   { key: 'payment', icon: Banknote, ar: 'تسجيل دفعة', en: 'Record payment', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
   { key: 'expense', icon: Receipt, ar: 'تسجيل مصروف', en: 'Record expense', accent: 'bg-white text-gray-800 border border-gray-200 hover:bg-gray-50' },
 ];
@@ -456,7 +685,8 @@ const TITLES: Record<ActionKey, [string, string]> = {
   member: ['إضافة عضو جديد', 'Add new member'],
   coach: ['إضافة كابتن / مدرب', 'Add coach'],
   reception: ['إضافة عامل ريسبشن', 'Add receptionist'],
-  checkin: ['تسجيل حضور يدوي', 'Manual check-in'],
+  checkin: ['تسجيل حضور — مسح أو كود أو هاتف', 'Check-in — scan, code or phone'],
+  today: ['حضور اليوم والمتواجدون', "Today's attendance"],
   payment: ['تسجيل دفعة عضو', 'Record member payment'],
   expense: ['تسجيل مصروف صالة', 'Record gym expense'],
 };
@@ -480,15 +710,16 @@ export default function QuickActionCenter() {
         </button>
       ))}
 
-      <Drawer open={openKey !== null} onClose={close} title={openKey ? (rtl ? TITLES[openKey][0] : TITLES[openKey][1]) : ''}>
+      <Modal open={openKey !== null} onClose={close} title={openKey ? (rtl ? TITLES[openKey][0] : TITLES[openKey][1]) : ''}>
         {openKey === 'member' && <AddMemberForm key="m" onDone={close} />}
         {(openKey === 'coach' || openKey === 'reception') && (
           <AddStaffForm key={`s-${openKey}`} defaultRole={openKey === 'coach' ? 'coach' : 'receptionist'} onDone={close} />
         )}
-        {openKey === 'checkin' && <CheckInForm onDone={close} />}
+        {openKey === 'checkin' && <CheckInForm key="ci" />}
+        {openKey === 'today' && <TodayAttendance key="td" />}
         {openKey === 'payment' && <PaymentForm onDone={close} />}
         {openKey === 'expense' && <ExpenseForm onDone={close} />}
-      </Drawer>
+      </Modal>
     </div>
   );
 }
