@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDate } from '../../utils/date';
 import { lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -333,7 +334,7 @@ export default function GymAdminDashboard() {
                 key: r.member_id,
                 primary: r.member_name,
                 secondary: r.last_check_in
-                  ? t('dashboard.lastSeen', { defaultValue: 'آخر حضور' }) + ' ' + new Date(r.last_check_in).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' })
+                  ? t('dashboard.lastSeen', { defaultValue: 'آخر حضور' }) + ' ' + formatDate(r.last_check_in)
                   : t('dashboard.neverCheckedIn', 'لم يحضر قط'),
               }))}
               emptyText={t('dashboard.allClearInactive', 'كل الأعضاء النشطين يحضرون بانتظام')}

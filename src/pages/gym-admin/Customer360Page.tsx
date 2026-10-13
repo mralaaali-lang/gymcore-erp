@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { formatDate, formatDateTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
 import { getCustomer360, searchMembers } from '../../services/api';
@@ -145,8 +146,8 @@ export default function Customer360Page() {
             />
             <p className="text-xs text-gray-500 mt-1">
               {isRtl
-                ? `عضو منذ ${new Date((member as any).member?.created_at).toLocaleDateString('ar-EG')}`
-                : `Member since ${new Date((member as any).member?.created_at).toLocaleDateString()}`}
+                ? `عضو منذ ${formatDate((member as any).member?.created_at)}`
+                : `Member since ${formatDate((member as any).member?.created_at)}`}
             </p>
           </div>
         </div>
@@ -184,7 +185,7 @@ export default function Customer360Page() {
           )}
           {(member.attendance || []).map((a: any, i: number) => (
             <div key={i} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-              <span className="text-sm text-gray-900">{new Date(a.check_in_time).toLocaleString(isRtl ? 'ar-EG' : 'en-US')}</span>
+              <span className="text-sm text-gray-900">{formatDateTime(a.check_in_time)}</span>
               <span className="text-xs text-gray-500">{a.entry_method}</span>
             </div>
           ))}
@@ -211,7 +212,7 @@ export default function Customer360Page() {
           <div className="flex items-center gap-3 py-2">
             <div>
               <p className="text-sm font-bold text-gray-900">
-                {(member.loyalty?.points_balance || 0).toLocaleString()} {isRtl ? 'نقطة' : 'points'}
+                {(member.loyalty?.points_balance || 0).toLocaleString('en-US')} {isRtl ? 'نقطة' : 'points'}
               </p>
               <p className="text-xs text-gray-500">
                 {isRtl ? `المستوى: ${member.loyalty?.tier || 'N/A'}` : `Tier: ${member.loyalty?.tier || 'N/A'}`}

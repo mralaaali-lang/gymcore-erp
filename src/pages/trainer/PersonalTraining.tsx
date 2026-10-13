@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { formatDate } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { listPtPackages, createPtPackage, listPtSessions, createPtSession, completePtSession, listTrainers, listMembers } from '../../services/api';
 import PageHeader from '../../components/shared/PageHeader';
@@ -194,7 +195,7 @@ export default function PersonalTraining() {
                     <td className="p-4 text-gray-600">{s.package_name || s.package?.name || '-'}</td>
                     <td className="p-4">{s.session_number || '-'}</td>
                     <td className="p-4"><StatusBadge status={sessionStatusLabel(s.status)} variant={sessionStatusVariant[s.status] || 'neutral'} /></td>
-                    <td className="p-4 text-gray-600">{s.scheduled_at ? new Date(s.scheduled_at).toLocaleDateString('ar-EG') : '-'}</td>
+                    <td className="p-4 text-gray-600">{s.scheduled_at ? formatDate(s.scheduled_at) : '-'}</td>
                     <td className="p-4">
                       {s.status === 'active' && (
                         <button onClick={() => completeMut.mutate(s.id)} className="text-emerald-600 hover:text-emerald-600 transition-colors text-sm font-medium">إكمال</button>

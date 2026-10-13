@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { formatDateTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -195,7 +196,7 @@ export default function SecurityCenter() {
                     </td>
                     <td className="px-5 py-4 text-gray-600 text-xs">{s.device_name || s.user_agent || '-'}</td>
                     <td className="px-5 py-4 text-gray-600 font-mono text-xs">{s.ip_address || '-'}</td>
-                    <td className="px-5 py-4 text-gray-500">{new Date(s.last_active_at).toLocaleString(isRtl ? 'ar-EG' : 'en-US')}</td>
+                    <td className="px-5 py-4 text-gray-500">{formatDateTime(s.last_active_at)}</td>
                     <td className="px-5 py-4">
                       {!s.revoked_at && (
                         <button

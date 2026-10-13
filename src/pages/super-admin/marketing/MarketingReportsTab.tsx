@@ -53,7 +53,7 @@ export default function MarketingReportsTab() {
             <TrendUp size={16} className="text-green-600" />
             <span className="text-xs text-gray-500/60">{t('إجمالي الوصول', 'Total Reach')}</span>
           </div>
-          <p className="text-xl font-bold text-gray-900">{totalReach.toLocaleString()}</p>
+          <p className="text-xl font-bold text-gray-900">{totalReach.toLocaleString('en-US')}</p>
         </div>
         <div className="bg-white rounded-3xl border shadow-sm border-gray-100 p-4">
           <div className="flex items-center gap-2 mb-1">
@@ -107,15 +107,15 @@ export default function MarketingReportsTab() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <p className="text-xs text-gray-500/60">{t('إجمالي النقاط الممنوحة', 'Total Points Given')}</p>
-              <p className="text-lg font-bold text-gray-900">{(loyalty as any).total_points_given?.toLocaleString() || 0}</p>
+              <p className="text-lg font-bold text-gray-900">{(loyalty as any).total_points_given?.toLocaleString('en-US') || 0}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500/60">{t('النقاط المستخدمة', 'Points Used')}</p>
-              <p className="text-lg font-bold text-gray-900">{(loyalty as any).total_points_used?.toLocaleString() || 0}</p>
+              <p className="text-lg font-bold text-gray-900">{(loyalty as any).total_points_used?.toLocaleString('en-US') || 0}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500/60">{t('الأعضاء النشطون', 'Active Members')}</p>
-              <p className="text-lg font-bold text-gray-900">{(loyalty as any).active_members?.toLocaleString() || 0}</p>
+              <p className="text-lg font-bold text-gray-900">{(loyalty as any).active_members?.toLocaleString('en-US') || 0}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500/60">{t('معدل الاسترداد', 'Redemption Rate')}</p>

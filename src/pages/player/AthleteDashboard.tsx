@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { formatDate, formatTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { getMyProfile, getMySubscription, getUpcomingClasses, getMyVisits } from '../../services/api';
 import PageLoader from '../../components/shared/PageLoader';
@@ -62,7 +63,7 @@ export default function AthleteDashboard() {
             <div>
               <p className="text-sm font-medium text-gray-900">{sub.plan_name}</p>
               <p className="text-xs text-gray-500 mt-1">
-                {isRtl ? 'تنتهي في' : 'Expires'}: {new Date(sub.end_date).toLocaleDateString()}
+                {isRtl ? 'تنتهي في' : 'Expires'}: {formatDate(sub.end_date)}
               </p>
             </div>
             <StatusBadge
@@ -119,12 +120,12 @@ export default function AthleteDashboard() {
               </div>
               <div className="flex-1">
                 <p className="text-sm text-gray-900">
-                  {new Date(v.check_in_time).toLocaleDateString()}
+                  {formatDate(v.check_in_time)}
                 </p>
                 <p className="text-xs text-gray-500">{v.entry_method}</p>
               </div>
               <span className="text-xs text-gray-500">
-                {new Date(v.check_in_time).toLocaleTimeString()}
+                {formatTime(v.check_in_time)}
               </span>
             </div>
           ))}

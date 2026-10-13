@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
 import { useApp } from '../../context/GymBrandContext';
+import { formatDateTime } from '../../utils/date';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
@@ -122,7 +123,7 @@ export default function OtaUpdateManager() {
   const versionRows = (status?.versions ?? []).map((v) => ({
     folder: v.folder,
     version: v.version,
-    date: new Date(v.timestamp).toLocaleString(isRtl ? 'ar-EG' : 'en-US'),
+    date: formatDateTime(v.timestamp),
     size: formatBytes(v.sizeBytes),
     actions: (
       <span className="flex gap-2">

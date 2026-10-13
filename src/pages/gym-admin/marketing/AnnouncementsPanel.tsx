@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDate } from '../../../utils/date';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../../context/GymBrandContext';
 import { useToast } from '../../../context/ToastContext';
@@ -82,8 +83,6 @@ export default function AnnouncementsPanel() {
     },
   });
 
-  const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString(rtl ? 'ar-EG' : 'en-US');
   const inputCls = 'w-full px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none bg-white';
 
   if (isLoading) return <PageLoader />;

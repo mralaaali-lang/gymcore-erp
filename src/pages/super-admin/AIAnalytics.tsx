@@ -212,12 +212,12 @@ export default function AIAnalytics() {
                     {forecastData.map((forecast) => (
                       <div key={forecast.month} className="bg-white border border-[#d9e3f6] rounded-2xl p-5 shadow-sm">
                         <p className="text-sm text-[#584237] font-medium mb-1">{forecast.month}</p>
-                        <p className="text-2xl font-bold text-[#121c2a]">{forecast.predicted.toLocaleString()} EGP</p>
+                        <p className="text-2xl font-bold text-[#121c2a]">{forecast.predicted.toLocaleString('en-US')} EGP</p>
                         <div className="flex items-center gap-2 mt-2 text-xs text-[#584237]">
                           <span>{isRtl ? 'النطاق:' : 'Range:'}</span>
-                          <span className="text-green-600">{forecast.lower_bound.toLocaleString()}</span>
+                          <span className="text-green-600">{forecast.lower_bound.toLocaleString('en-US')}</span>
                           <span>-</span>
-                          <span className="text-red-600">{forecast.upper_bound.toLocaleString()}</span>
+                          <span className="text-red-600">{forecast.upper_bound.toLocaleString('en-US')}</span>
                         </div>
                         {forecast.growth_rate && (
                           <p className="text-xs text-primary mt-1">
@@ -248,7 +248,7 @@ export default function AIAnalytics() {
                                   <div className="h-full bg-gradient-to-r from-primary/60 to-primary rounded-full" style={{ width: `${pct}%` }} />
                                 </div>
                                 <span className="text-sm font-bold text-[#121c2a] w-24 text-right">
-                                  {f.predicted.toLocaleString()}
+                                  {f.predicted.toLocaleString('en-US')}
                                 </span>
                               </div>
                             </div>

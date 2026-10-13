@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { formatDateTime as isoFormatDateTime } from '../../../utils/date';
 import { useApp } from '../../../context/GymBrandContext';
 import { listSessions, revokeSession, revokeAllOtherSessions } from '../../../services/api';
 import { useToast } from '../../../context/ToastContext';
@@ -28,12 +29,9 @@ function parseOS(ua: string | null): string {
   return '-';
 }
 
-function formatTime(iso: string, lang: string): string {
+function formatTime(iso: string, _lang?: string): string {
   try {
-    const d = new Date(iso);
-    return d.toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US', {
-      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-    });
+    return isoFormatDateTime(iso);
   } catch { return iso; }
 }
 

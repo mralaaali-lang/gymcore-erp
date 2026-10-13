@@ -698,3 +698,21 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 - `MemberResponse` وسّع الحقول (`subscription_end_date`, `visit_count`, `code`, `blacklist_reason`) — كلها كانت تصل بالفعل من السيرفر.
 
 **تحقق حي (docker :9000):** tsc EXIT=0 · vite build ✓ · حاوية frontend. كريم/محمد: شارة خضراء واحدة «نشط» + «١٠ نوفمبر ٢٠٢٦ (٢٨ يوم)» + زيارات 1 + انضمام منسق ✓ — أحمد: «لا اشتراك» رمادي + «-» في الانتهاء/الزيارات ✓ — لا ISO ظاهر، لا تعارض بين عمودين (لقطة members_fix1). لم يُلمس السيرفر (الحقول كانت تُرجع بالفعل).
+
+### §34هـ — توحيد التواريخ والأرقام في كامل المشروع (2026-10-13)
+**الطلب:** «أريد جعل التواريخ في كامل المشروع والأرقام هكذا 2026-11-07 و123 — لا أرقام هندية ولا أسماء شهور (أكتوبر/نوفمبر)».
+
+**المعيار الجديد (sاري في العربية والإنجليزية معًا):** التواريخ دائمًا `YYYY-MM-DD`، الأوقات 24 ساعة `HH:mm`، الأرقام بأرقام غربية مع فواصل en-US (`1,500`). لا `ar-EG` ولا أسماء شهور في أي مكان.
+
+1. **`src/utils/date.ts` أُعيدت كتابته**: `formatDate` → `2026-11-07` · `formatDateTime` → `2026-11-07 14:35` · `formatTime` → `14:35` (+withSeconds) · `daysUntil` · `fmtNum` (en-US grouping). كل الأكواد السابقة التي كانت توطّن ar-EG حُذفت.
+2. **Codemod على 49 ملفًا** (شغّلته وحذفت السكربت): `new Date(x).toLocaleDateString(...)` → `formatDate(x)`، `toLocaleString(...)` → `formatDateTime(x)`، `toLocaleTimeString` → `formatTime`، وكل `toLocaleString('ar-EG'` → `'en-US'` مع إضافة الاستيراد تلقائيًا.
+3. **إصلاحات يدوية بعد الـcodemod**: ملفات كانت تعرّف دوالها المحلية فوق المستوردة (AnnouncementsPanel، DeveloperPortal، NotificationsEngine، SystemMonitor، TenantDirectory، SessionsTab، ClientProgress، SuperAdminDashboard `fmtTime`، superAdminUtils بأسماء بديلة `isoFormatDate/isoFormatDateTime`) — كلها صارت تفوّض لمركز `utils/date` أو تُصحح التوقيع، وإصلاح كتلة AttendanceRecords المكسورة، وأخطاء المتغيرات غير المستخدمة (Sidebar lang…).
+
+**تحقق حي:** grep نهائي = **صفر** `ar-EG` / `Intl.DateTimeFormat` / `toLocaleDateString` / `toLocaleTimeString` / أي toLocaleString غير en-US في `src/` (باستثناء utils/date.ts نفسه). tsc فرونت+سيرفر EXIT=0 · vite build ✓ · الحاويتان. السايدبار صار «ALAAGYM / basic · 2026-10-13» بالتاريخ ISO، وصفحة الأعضاء كل تواريخها ISO وأرقامها غربية (لقطة members_unified). ملاحظة: حقل `type="date"` الأصلي في الفورمات يعرض mask المتصفح (mm/dd/yyyy) — القيمة المخزونة والمرسلة ISO دائمًا.
+
+### §34د-2+5 — فلاتر حالة حقيقية + توحيد صفحة الأعضاء مع نمط اللوحة (2026-10-13)
+**البند 2 — الفلاتر سيرفر-side** (`server/src/controllers/members.ts`): `?status=` صار يُفلتر فعليًا بـSQL مشتق من **نفس** استعلام الحالة الفرعية (آخر اشتراك بترتيب created_at) فلا يمكن أن يتناقض الفلتر مع الشارة: `active/expired/suspended` على حالة آخر اشتراك · `none` = لا اشتراك أو ملغى · `expiring7` = EXISTS اشتراك نشط ينتهي خلال 7 أيام (نفس عتبة الكرت في اللوحة) · `blacklisted` = `m.is_blacklisted`. قائمة بيضاء `ALLOWED_STATUS` — أي قيمة أخرى تُتجاهل بأمان. الواجهة: 6 خيارات عربية مطابقة.
+
+**البند 5 — التوحيد**: `MembersPage` صارت تستخدم نفس أدوات اللوحة: `DashboardPage` (عنوان «إدارة المشتركين» + سطر فرعي حقيقي) + `PrimaryAction «إضافة مشترك»` في الهيدر (بدل زر «دعوة» الميت) + `QuickActionModals action='member'` — أي **نفس نافذة الإضافة المتمركزة** التي في لوحة القيادة (عروض حقيقية + PIN يُعرض مرة واحدة). الحالة الفارغة الأولى صارت تفتح نفس النافذة.
+
+**تحقق حي (docker :9000، refresh أولًا):** tsc سيرفر+فرونت EXIT=0 · build ✓ · الحاويتان. الفلاتر عبر API: الكل=3 · active=2 (كريم، محمد) · none=1 (أحمد) · expired=0 · expiring7=0 · blacklisted=0 — كلها صحيحة تمامًا مقابل البيانات الفعلية. بصريًا (لقطة members_unified): هيدر بنمط اللوحة، شارة واحدة، «2026-11-10 (28 يوم)»، زيارات 1/1/0. زر «إضافة مشترك» → Modal «إضافة عضو جديد» متمركز يفتح ويغلق بـEscape ✓.

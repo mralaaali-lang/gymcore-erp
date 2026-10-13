@@ -11,6 +11,7 @@
 // sessions, not payroll.
 // ====================================================================
 import { useMemo, useState } from 'react';
+import { formatDate, formatTime } from '../../utils/date';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
@@ -99,8 +100,8 @@ export default function TrainerDashboard() {
     }
   };
 
-  const timeOf = (iso: string) => new Date(iso).toLocaleTimeString(isRtl ? 'ar-EG' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
-  const dateSubtitle = new Intl.DateTimeFormat(isRtl ? 'ar-EG' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now);
+  const timeOf = (iso: string) => formatTime(iso);
+  const dateSubtitle = formatDate(now);
 
   if (isLoading) return <PageLoader />;
 

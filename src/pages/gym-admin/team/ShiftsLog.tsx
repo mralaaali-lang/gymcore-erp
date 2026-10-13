@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { formatDateTime } from '../../../utils/date';
 import { useApp } from '../../../context/GymBrandContext';
 import { listShifts, clockIn, clockOut } from '../../../services/api';
 import PageLoader from '../../../components/shared/PageLoader';
@@ -79,8 +80,8 @@ export default function ShiftsLog() {
                     <td className="p-4 text-gray-500">{i + 1}</td>
                     <td className="p-4 font-medium text-gray-900">{sh.staff_name || sh.full_name || '—'}</td>
                     <td className="p-4 text-gray-500">{sh.role || '—'}</td>
-                    <td className="p-4 text-gray-500">{sh.clock_in ? new Date(sh.clock_in).toLocaleString('ar-EG') : '—'}</td>
-                    <td className="p-4 text-gray-500">{sh.clock_out ? new Date(sh.clock_out).toLocaleString('ar-EG') : '—'}</td>
+                    <td className="p-4 text-gray-500">{sh.clock_in ? formatDateTime(sh.clock_in) : '—'}</td>
+                    <td className="p-4 text-gray-500">{sh.clock_out ? formatDateTime(sh.clock_out) : '—'}</td>
                     <td className="p-4 text-gray-500">{sh.duration || '—'}</td>
                   </tr>
                 ))}

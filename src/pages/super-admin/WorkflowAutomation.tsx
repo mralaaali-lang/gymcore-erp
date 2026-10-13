@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { formatDateTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { listWorkflows, updateWorkflow as apiUpdateWorkflow, triggerWorkflow as apiTriggerWorkflow, type WorkflowDefinition } from '../../services/api';
@@ -77,10 +78,7 @@ export default function WorkflowAutomation() {
                     <p className="text-xs text-gray-500">
                       {isRtl ? 'آخر تشغيل: ' : 'Last: '}
                       {wf.last_triggered_at
-                        ? new Date(wf.last_triggered_at).toLocaleString(isRtl ? 'ar-EG' : 'en-US', {
-                            year: 'numeric', month: '2-digit', day: '2-digit',
-                            hour: '2-digit', minute: '2-digit',
-                          })
+                        ? formatDateTime(wf.last_triggered_at)
                         : (isRtl ? 'لم يتم التشغيل بعد' : 'Never triggered')}
                     </p>
                   </div>

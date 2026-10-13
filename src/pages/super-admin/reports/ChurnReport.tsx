@@ -45,14 +45,14 @@ export default function ChurnReport({ data, isLoading, t }: Props) {
             <Users size={14} className="text-blue-600" />
             <span className="text-[10px] text-gray-500/60">{t('إجمالي الأعضاء', 'Total Members')}</span>
           </div>
-          <p className="text-lg font-bold text-gray-900">{stats?.total_members?.toLocaleString() || 0}</p>
+          <p className="text-lg font-bold text-gray-900">{stats?.total_members?.toLocaleString('en-US') || 0}</p>
         </div>
         <div className="bg-white rounded-3xl border shadow-sm border-gray-100 p-3">
           <div className="flex items-center gap-2 mb-1">
             <UserMinus size={14} className="text-red-600" />
             <span className="text-[10px] text-gray-500/60">{t('إجمالي المتبعدين', 'Total Churned')}</span>
           </div>
-          <p className="text-lg font-bold text-red-600">{stats?.total_churned?.toLocaleString() || 0}</p>
+          <p className="text-lg font-bold text-red-600">{stats?.total_churned?.toLocaleString('en-US') || 0}</p>
         </div>
         <div className="bg-white rounded-3xl border shadow-sm border-gray-100 p-3">
           <div className="flex items-center gap-2 mb-1">

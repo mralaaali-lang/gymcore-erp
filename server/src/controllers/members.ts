@@ -10,6 +10,7 @@ export const listMembers = async (req: Request, res: Response): Promise<void> =>
   const limit = parseInt(req.query.limit as string) || 20;
   const offset = (page - 1) * limit;
   const search = req.query.search as string;
+  const status = req.query.status as string;
 
   try {
     let whereClause = 'WHERE m.gym_id = $1';
@@ -18,6 +19,29 @@ export const listMembers = async (req: Request, res: Response): Promise<void> =>
     if (search) {
       whereClause += ' AND (m.full_name ILIKE $2 OR m.phone_number ILIKE $2 OR m.phone_hash = phone_hash($3))';
       params.push(`%${search}%`, search);
+    }
+
+    // §34د-2 — real subscription-status filters (the UI dropdown used to send
+    // `status` and the endpoint silently ignored it). Status is derived from
+    // the member's latest subscription, same row the LATERAL join below reads,
+    // so filter and displayed badge can never disagree.
+    const latestSubStatus = `(SELECT ms.status FROM member_subscriptions ms
+        WHERE ms.member_id = m.id AND ms.gym_id = m.gym_id
+        ORDER BY ms.created_at DESC LIMIT 1)`;
+    const ALLOWED_STATUS = ['active', 'expired', 'suspended', 'none', 'expiring7', 'blacklisted'] as const;
+    if (status && (ALLOWED_STATUS as readonly string[]).includes(status)) {
+      if (status === 'none') {
+        whereClause += ` AND (${latestSubStatus} IS NULL OR ${latestSubStatus} = 'cancelled')`;
+      } else if (status === 'expiring7') {
+        whereClause += ` AND EXISTS (SELECT 1 FROM member_subscriptions ms2
+          WHERE ms2.member_id = m.id AND ms2.gym_id = m.gym_id AND ms2.status = 'active'
+            AND ms2.end_date >= CURRENT_DATE AND ms2.end_date <= CURRENT_DATE + INTERVAL '7 days')`;
+      } else if (status === 'blacklisted') {
+        whereClause += ' AND m.is_blacklisted = true';
+      } else {
+        whereClause += ` AND ${latestSubStatus} = $${params.length + 1}`;
+        params.push(status);
+      }
     }
 
     const countResult = await query(

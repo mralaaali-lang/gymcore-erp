@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { formatDate } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -166,7 +167,7 @@ export default function GymCalendar() {
             <span className="material-symbols-outlined text-lg">chevron_left</span>
           </button>
           <span className="text-sm font-semibold text-gray-900 min-w-[180px] text-center">
-            {weekDates[0].toLocaleDateString(rtl ? 'ar-EG' : 'en-US', { month: 'long', day: 'numeric' })} – {weekDates[6].toLocaleDateString(rtl ? 'ar-EG' : 'en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            {formatDate(weekDates[0])} – {formatDate(weekDates[6])}
           </span>
           <button onClick={() => navWeek(1)} className="p-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition">
             <span className="material-symbols-outlined text-lg">chevron_right</span>
@@ -361,7 +362,7 @@ export default function GymCalendar() {
                     <tr key={p.id || i} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
                       <td className="py-2.5 px-3 font-medium text-gray-900">{p.staff_name || '—'}</td>
                       <td className="py-2.5 px-3 text-gray-500">{roleLabel(p.role, rtl)}</td>
-                      <td className="py-2.5 px-3 text-gray-500">{p.payment_date ? new Date(p.payment_date).toLocaleDateString(rtl ? 'ar-EG' : 'en-GB') : '—'}</td>
+                      <td className="py-2.5 px-3 text-gray-500">{p.payment_date ? formatDate(p.payment_date) : '—'}</td>
                       <td className="py-2.5 px-3 text-end text-gray-700">{money(p.base_salary_paid)}</td>
                       <td className="py-2.5 px-3 text-end text-gray-700">{money(p.commissions_paid)}</td>
                       <td className="py-2.5 px-3 text-end font-bold text-gray-900">{money(total)}</td>

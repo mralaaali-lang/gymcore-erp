@@ -1,5 +1,6 @@
 ﻿import { useMemo, useState } from 'react';
 import { useApp } from '../../context/GymBrandContext';
+import { formatDate, formatDateTime } from '../../utils/date';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { listPtSessions, listMembers } from '../../services/api';
 import PageLoader from '../../components/shared/PageLoader';
@@ -38,9 +39,7 @@ export default function TrainerMobileDashboard() {
       id: String(rec.id ?? idx),
       client: memberNameOf(rec),
       time: rec.scheduled_at
-        ? new Date(String(rec.scheduled_at)).toLocaleString(isRtl ? 'ar-EG' : 'en-US', {
-            hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short',
-          })
+        ? formatDateTime(String(rec.scheduled_at))
         : '—',
       detail: rec.session_number ? `${isRtl ? 'جلسة' : 'Session'} ${String(rec.session_number)}` : '—',
       completed: rec.status === 'completed',
@@ -99,7 +98,7 @@ export default function TrainerMobileDashboard() {
       <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 text-white">
         <h1 className="text-xl font-bold">{isRtl ? 'لوحة المدرب' : 'Trainer Dashboard'}</h1>
         <p className="text-white/70 text-sm mt-1">
-          {isRtl ? `اليوم: ${new Date().toLocaleDateString('ar-EG')}` : `Today: ${new Date().toLocaleDateString('en-US')}`}
+          {isRtl ? `اليوم: ${formatDate(new Date())}` : `Today: ${formatDate(new Date())}`}
         </p>
       </div>
 

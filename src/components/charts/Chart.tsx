@@ -89,7 +89,7 @@ export default function Chart({
               }).format(val);
             }
             if (yFormatter) return yFormatter(val);
-            return val.toLocaleString() + suffix;
+            return val.toLocaleString('en-US') + suffix;
           },
         },
       },
@@ -108,7 +108,7 @@ export default function Chart({
         // apexcharts renders 0.5/1.5 ticks that look broken to an owner.
         forceNiceScale: true,
         labels: {
-          formatter: yFormatter ?? ((v) => v.toLocaleString()),
+          formatter: yFormatter ?? ((v) => v.toLocaleString('en-US')),
           style: { fontSize: '11px' },
         },
       };

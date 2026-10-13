@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { listMembers, type MemberResponse } from '../../services/api';
-import PageHeader from '../../components/shared/PageHeader';
 import FilterBar from '../../components/shared/FilterBar';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
@@ -12,6 +11,9 @@ import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Card from '../../components/ui/Card';
 import { formatDate, daysUntil } from '../../utils/date';
+import { Plus } from 'lucide-react';
+import { DashboardPage, PrimaryAction } from '../../components/dashboard';
+import { QuickActionModals, type ActionKey } from '../../components/dashboard/QuickActionCenter';
 
 // §34د-1 — ONE truth per member: the subscription status from the server
 // (`subscription_status`, LEFT JOIN on the latest member_subscriptions row).
@@ -64,6 +66,9 @@ export default function MembersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // §34د-5 — adding a member starts right here, with the SAME centered modal
+  // the dashboard uses (real offers + PIN shown once), not a page detour.
+  const [action, setAction] = useState<ActionKey | null>(null);
   const [showBillingAlert, setShowBillingAlert] = useState(() => {
     return localStorage.getItem('gymcore_billing_alert_dismissed') !== '1';
   });
@@ -144,23 +149,17 @@ export default function MembersPage() {
   const activeTabKey = sectionTabs.find((t) => t.route && (location.pathname === t.route || location.pathname.startsWith(t.route + '/')))?.id ?? 'members';
 
   return (
-    <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6 bg-gray-50 min-h-screen -m-6 p-6">
-      <PageHeader
-        title={rtl ? 'إدارة المشتركين' : 'Members'}
-        subtitle={rtl ? 'إدارة مشتركي الصالة الرياضية' : 'Manage gym members'}
-        icon="groups"
-        actions={
-          <>
-            <Button variant="primary" onClick={() => navigate('/admin/members/add')}>
-              <span className="material-symbols-outlined text-lg">add</span>
-              {rtl ? 'إضافة مشترك' : '+ ADD MEMBER'}
-            </Button>
-            <Button variant="outline" onClick={() => showToast(rtl ? 'ميزة الدعوة قادمة قريباً' : 'Invite feature coming soon', 'success')}>
-              {rtl ? 'دعوة' : 'INVITE'}
-            </Button>
-          </>
-        }
-      />
+    <DashboardPage
+      className="bg-gray-50 min-h-screen -m-6 p-6"
+      title={rtl ? 'إدارة المشتركين' : 'Members'}
+      subtitle={rtl ? 'إدارة مشتركي الصالة الرياضية' : 'Manage gym members'}
+      actions={
+        <PrimaryAction onClick={() => setAction('member')}>
+          <Plus size={16} />
+          {rtl ? 'إضافة مشترك' : 'Add member'}
+        </PrimaryAction>
+      }
+    >
 
       {/* Section Tabs Navigation */}
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm px-4 pt-2 overflow-x-auto">
@@ -189,6 +188,9 @@ export default function MembersPage() {
               { value: 'active', labelAr: 'نشط', labelEn: 'Active' },
               { value: 'expired', labelAr: 'منتهي', labelEn: 'Expired' },
               { value: 'suspended', labelAr: 'موقوف', labelEn: 'Suspended' },
+              { value: 'none', labelAr: 'بلا اشتراك', labelEn: 'No subscription' },
+              { value: 'expiring7', labelAr: 'ينتهي خلال 7 أيام', labelEn: 'Ending within 7 days' },
+              { value: 'blacklisted', labelAr: 'موقوف (أسود)', labelEn: 'Blacklisted' },
             ],
           },
         ]}
@@ -286,7 +288,7 @@ export default function MembersPage() {
               <Button
                 variant="primary"
                 className="mt-auto px-4 py-2 text-xs"
-                onClick={() => navigate('/admin/members/add')}
+                onClick={() => setAction('member')}
               >
                 {rtl ? '+ إضافة مشترك' : '+ ADD A MEMBER'}
               </Button>
@@ -407,20 +409,20 @@ export default function MembersPage() {
                       </td>
                       <td className="p-3 text-gray-500" dir="ltr">{m.phone_number || '-'}</td>
                       <td className="p-3 text-gray-500">
-                        {m.birth_date ? `${calcAge(m.birth_date)} · ${formatDate(m.birth_date, rtl)}` : '-'}
+                        {m.birth_date ? `${calcAge(m.birth_date)} · ${formatDate(m.birth_date)}` : '-'}
                       </td>
                       <td className="p-3 text-gray-500">{m.plan_name || '-'}</td>
-                      <td className="p-3 text-gray-500">{formatDate(m.join_date || m.created_at, rtl)}</td>
+                      <td className="p-3 text-gray-500">{formatDate(m.join_date || m.created_at)}</td>
                       <td className={`p-3 ${endSoon ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
                         {m.subscription_end_date ? (
-                          <span title={formatDate(m.subscription_end_date, rtl)}>
-                            {formatDate(m.subscription_end_date, rtl)}
+                          <span title={formatDate(m.subscription_end_date)}>
+                            {formatDate(m.subscription_end_date)}
                             {endDays !== null && endDays >= 0 && ` (${rtl ? `${endDays} يوم` : `${endDays}d`})`}
                             {endDays !== null && endDays < 0 && (rtl ? ` (متأخر ${-endDays} يوم)` : ` (overdue ${-endDays}d)`)}
                           </span>
                         ) : '-'}
                       </td>
-                      <td className="p-3 text-gray-500">{formatDate(m.last_checkin, rtl)}</td>
+                      <td className="p-3 text-gray-500">{formatDate(m.last_checkin)}</td>
                       <td className="p-3 text-gray-500 tabular-nums">{m.visit_count != null ? Number(m.visit_count) : '-'}</td>
                       <td className="p-3">
                         <StatusBadge status={meta.label} variant={meta.variant} />
@@ -488,7 +490,10 @@ export default function MembersPage() {
           </div>
         </div>
       )}
-    </div>
+
+      {/* §33أ/§34د-5 — the same centered member modal the dashboard uses */}
+      <QuickActionModals action={action} onClose={() => setAction(null)} />
+    </DashboardPage>
   );
 }
 

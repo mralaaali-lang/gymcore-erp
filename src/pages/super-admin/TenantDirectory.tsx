@@ -313,7 +313,7 @@ export default function TenantDirectory() {
                       <td className="p-4 whitespace-nowrap">
                         {gym.subscription_expires_at ? (
                           <span className={`text-sm ${new Date(gym.subscription_expires_at) < new Date() ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-                            {formatDate(gym.subscription_expires_at, isRtl)}
+                            {formatDate(gym.subscription_expires_at)}
                           </span>
                         ) : <span className="text-gray-500/40 text-sm">-</span>}
                       </td>
@@ -386,7 +386,7 @@ export default function TenantDirectory() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-gray-500">{T('Expiry', 'تاريخ الانتهاء')}</span>
-                      <span className="text-gray-900">{formatDate(gym.subscription_expires_at, isRtl)}</span>
+                      <span className="text-gray-900">{formatDate(gym.subscription_expires_at)}</span>
                     </div>
                   </div>
                 </div>

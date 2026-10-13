@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatDate } from '../../utils/date';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
@@ -132,7 +133,7 @@ export default function BillingOverview() {
   const fmtDate = (v?: string) => {
     if (!v) return '-';
     try {
-      return new Date(v).toLocaleDateString(rtl ? 'ar-EG' : 'en-GB');
+      return formatDate(v);
     } catch {
       return '-';
     }

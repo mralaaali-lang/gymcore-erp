@@ -12,6 +12,7 @@
 // read from pt_sessions.notes written by the real complete-session flow.
 // ====================================================================
 import { useMemo, useState } from 'react';
+import { formatDate } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { searchMembers, listPtSessions, getCustomer360 } from '../../services/api';
@@ -36,8 +37,8 @@ interface SessionRow {
   notes: string | null;
 }
 
-const fmtDate = (iso: string | null, isRtl: boolean) =>
-  iso ? new Date(iso).toLocaleDateString(isRtl ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const fmtDate = (iso: string | null, _isRtl?: boolean) =>
+  iso ? formatDate(iso) : '—';
 
 export default function ClientProgress() {
   const { language } = useApp();

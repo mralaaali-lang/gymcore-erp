@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { formatDateTime, formatTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { getSystemStatus, type SystemMetricItem, type SystemEvent } from '../../services/api';
@@ -78,13 +79,7 @@ export default function SystemMonitor() {
   }, [sysData?.events, activeTab]);
 
   const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleString(isRtl ? 'ar-EG' : 'en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    formatDateTime(dateStr);
 
   const formatBytes = (mb: number) => {
     if (mb > 1024) return `${(mb / 1024).toFixed(2)} GB`;
@@ -230,7 +225,7 @@ export default function SystemMonitor() {
                 {sysData.daily_checkins.map((d: { date: string; count: number }, i: number) => {
                   const maxCount = Math.max(...sysData.daily_checkins.map((x: { count: number }) => x.count), 1);
                   const height = Math.max((d.count / maxCount) * 100, 5);
-                  const dayName = new Date(d.date).toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { weekday: 'short' });
+                  const dayName = formatDate(d.date);
                   return (
                     <div key={i} className="flex-1 flex flex-col items-center gap-1">
                       <span className="text-xs font-bold text-gray-900">{d.count}</span>
@@ -547,7 +542,7 @@ export default function SystemMonitor() {
 
       {/* Footer — last updated timestamp */}
       <div className="mt-6 text-center text-xs text-gray-500/50">
-        {t('آخر تحديث', 'Last updated')}: {new Date().toLocaleTimeString(isRtl ? 'ar-EG' : 'en-US')}
+        {t('آخر تحديث', 'Last updated')}: {formatTime(new Date())}
         {isStale && (
           <span className="ml-2 text-amber-600 flex items-center gap-1 inline-flex">
             <AlertTriangle size={12} />

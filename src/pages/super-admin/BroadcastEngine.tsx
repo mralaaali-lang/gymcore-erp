@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDateTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useMutation } from '@tanstack/react-query';
@@ -98,7 +99,7 @@ export default function BroadcastEngine() {
                   <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
                     <span>{b.sent_by_email || '—'}</span>
                     <span>&middot;</span>
-                    <span>{new Date(b.created_at).toLocaleString()}</span>
+                    <span>{formatDateTime(b.created_at)}</span>
                     {b.target_roles && b.target_roles.length > 0 && (
                       <><span>&middot;</span><StatusBadge status={b.target_roles.join(', ')} variant="neutral" /></>
                     )}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDateTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,7 +19,7 @@ type TabKey = 'overview' | 'email' | 'sms' | 'push' | 'webhook' | 'inapp' | 'his
 // ── Helpers ────────────────────────────────────────────
 function formatDate(dateStr: string): string {
   try {
-    return new Date(dateStr).toLocaleString();
+    return formatDateTime(dateStr);
   } catch { return dateStr; }
 }
 

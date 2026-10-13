@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { formatTime } from '../../utils/date';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
@@ -55,11 +56,10 @@ export default function AttendanceRecords() {
 
   const rRecords = records || [];
   const latestCheckIn = rRecords.length
-    ? new Date(
+    ? formatTime(
         Math.max(...rRecords.map(r => new Date(r.check_in_time).getTime()))
-      ).toLocaleTimeString(rtl ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+      )
     : '--:--';
-
   const handleCheckIn = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = phone.trim();
@@ -131,7 +131,7 @@ export default function AttendanceRecords() {
               </thead>
               <tbody>
                 {rRecords.map((r, i) => {
-                  const checkInTime = new Date(r.check_in_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                  const checkInTime = formatTime(r.check_in_time);
                   const entryType: string = r.entry_method;
                   return (
                     <tr key={r.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">

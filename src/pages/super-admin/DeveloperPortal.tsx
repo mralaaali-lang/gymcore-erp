@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDate } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -93,11 +94,6 @@ export default function DeveloperPortal() {
     showToast(t('تم النسخ', 'Copied!'), 'success');
   };
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  };
-
   const togglePermission = (perm: string) => {
     setForm((prev) => ({
       ...prev,
@@ -129,10 +125,10 @@ export default function DeveloperPortal() {
       {usage && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: t('إجمالي الطلبات', 'Total Requests'), value: usage.total_requests.toLocaleString(), icon: <Activity size={20} />, color: 'bg-blue-500' },
-            { label: t('طلبات ناجحة', 'Successful'), value: usage.success_count.toLocaleString(), icon: <CheckCircle2 size={20} />, color: 'bg-green-500' },
+            { label: t('إجمالي الطلبات', 'Total Requests'), value: usage.total_requests.toLocaleString('en-US'), icon: <Activity size={20} />, color: 'bg-blue-500' },
+            { label: t('طلبات ناجحة', 'Successful'), value: usage.success_count.toLocaleString('en-US'), icon: <CheckCircle2 size={20} />, color: 'bg-green-500' },
             { label: t('متوسط وقت الاستجابة', 'Avg Response'), value: `${usage.avg_response_time_ms}ms`, icon: <Clock size={20} />, color: 'bg-amber-500' },
-            { label: t('طلبات آخر ساعة', 'Last Hour'), value: usage.requests_last_hour.toLocaleString(), icon: <Activity size={20} />, color: 'bg-purple-500' },
+            { label: t('طلبات آخر ساعة', 'Last Hour'), value: usage.requests_last_hour.toLocaleString('en-US'), icon: <Activity size={20} />, color: 'bg-purple-500' },
           ].map((card) => (
             <Card key={card.label}>
               <div className="flex items-center gap-3 mb-2">

@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
 import { useApp } from '../../context/GymBrandContext';
+import { formatDate } from '../../utils/date';
 import { formatMoney } from '../../utils/currency';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -145,7 +146,7 @@ export default function ExpensesPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-500">{e.staff_name || '-'}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs" dir="ltr">
-                      {new Date(e.created_at).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US')}
+                      {formatDate(e.created_at)}
                     </td>
                   </tr>
                 ))}

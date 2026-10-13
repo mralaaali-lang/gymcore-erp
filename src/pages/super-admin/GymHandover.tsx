@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { formatDate } from '../../utils/date';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
@@ -285,10 +286,7 @@ export default function GymHandover() {
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Calendar size={14} />
-                  {new Date(gym.created_at).toLocaleDateString(
-                    isRtl ? 'ar-EG' : 'en-US',
-                    { year: 'numeric', month: 'long', day: 'numeric' }
-                  )}
+                  {formatDate(gym.created_at)}
                 </span>
               </div>
             </div>

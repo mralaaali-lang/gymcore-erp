@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDate } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -118,7 +119,7 @@ export default function PlatformMarketing() {
             {[
               { label: isRtl ? 'الحملات' : 'Campaigns', value: campaigns.length.toString(), icon: MegaphoneSimple, color: 'text-primary bg-primary/5' },
               { label: isRtl ? 'الإحالات' : 'Referrals', value: referrals.length.toString(), icon: Users, color: 'text-green-700 bg-green-50' },
-              { label: isRtl ? 'نقاط الولاء' : 'Loyalty Points', value: (loyalty?.total_points || 0).toLocaleString(), icon: Star, color: 'text-amber-700 bg-amber-50' },
+              { label: isRtl ? 'نقاط الولاء' : 'Loyalty Points', value: (loyalty?.total_points || 0).toLocaleString('en-US'), icon: Star, color: 'text-amber-700 bg-amber-50' },
               { label: isRtl ? 'الأعضاء النشطون' : 'Active Members', value: (loyalty?.active_members || 0).toString(), icon: Users, color: 'text-blue-700 bg-blue-50' },
             ].map((card) => (
               <div key={card.label} className={`rounded-xl border p-4 ${card.color}`}>
@@ -167,7 +168,7 @@ export default function PlatformMarketing() {
                   <div key={c.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                     <div>
                       <p className="text-sm font-medium text-gray-900">{isRtl ? c.name_ar || c.name : c.name}</p>
-                      <p className="text-xs text-gray-500">{c.type} â€¢ {new Date(c.created_at).toLocaleDateString()}</p>
+                      <p className="text-xs text-gray-500">{c.type} â€¢ {formatDate(c.created_at)}</p>
                     </div>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadge(c.status)}`}>
                       {c.status}
@@ -212,8 +213,8 @@ export default function PlatformMarketing() {
                       </div>
                       {c.description && <p className="text-sm text-gray-500 mb-2">{c.description}</p>}
                       <div className="flex items-center gap-4 text-xs text-gray-500">
-                        <span className="flex items-center gap-1"><Clock size={12} /> {new Date(c.created_at).toLocaleDateString()}</span>
-                        {c.budget > 0 && <span>{isRtl ? 'الميزانية:' : 'Budget:'} {c.budget.toLocaleString()}</span>}
+                        <span className="flex items-center gap-1"><Clock size={12} /> {formatDate(c.created_at)}</span>
+                        {c.budget > 0 && <span>{isRtl ? 'الميزانية:' : 'Budget:'} {c.budget.toLocaleString('en-US')}</span>}
                         {c.gym_name && <span className="flex items-center gap-1"><Users size={12} /> {c.gym_name}</span>}
                       </div>
                     </div>
@@ -280,7 +281,7 @@ export default function PlatformMarketing() {
                             {r.reward_status}
                           </span>
                         </td>
-                        <td className="p-4 text-sm text-gray-500">{new Date(r.created_at).toLocaleDateString()}</td>
+                        <td className="p-4 text-sm text-gray-500">{formatDate(r.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -296,9 +297,9 @@ export default function PlatformMarketing() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              { label: isRtl ? 'إجمالي النقاط' : 'Total Points', value: (loyalty?.total_points || 0).toLocaleString(), icon: Star, color: 'text-amber-700 bg-amber-50' },
+              { label: isRtl ? 'إجمالي النقاط' : 'Total Points', value: (loyalty?.total_points || 0).toLocaleString('en-US'), icon: Star, color: 'text-amber-700 bg-amber-50' },
               { label: isRtl ? 'الأعضاء النشطون' : 'Active Members', value: (loyalty?.active_members || 0).toString(), icon: Users, color: 'text-blue-700 bg-blue-50' },
-              { label: isRtl ? 'النقاط المستردة' : 'Redeemed Points', value: (loyalty?.total_redeemed || 0).toLocaleString(), icon: CheckCircle, color: 'text-green-700 bg-green-50' },
+              { label: isRtl ? 'النقاط المستردة' : 'Redeemed Points', value: (loyalty?.total_redeemed || 0).toLocaleString('en-US'), icon: CheckCircle, color: 'text-green-700 bg-green-50' },
             ].map((card) => (
               <div key={card.label} className={`rounded-xl border p-5 ${card.color}`}>
                 <card.icon size={24} />

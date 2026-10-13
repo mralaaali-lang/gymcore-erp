@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, Fragment } from 'react';
+import { formatDate, formatDateTime } from '../../utils/date';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -43,14 +44,14 @@ const EVENT_DOT_COLORS = ['bg-emerald-500', 'bg-cyan-500', 'bg-violet-500', 'bg-
 
 // ── Helpers ──
 
-function fmtTime(iso: string, lang: string): string {
+function fmtTime(iso: string, _lang?: string): string {
   try {
-    return new Date(iso).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return formatDateTime(iso);
   } catch { return iso; }
 }
 
 function fmtEGP(n: number): string {
-  return `${(Number(n) || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
+  return `${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
 }
 
 // Gym subscription lifecycle relative to the 14-day grace policy (auto-suspend after grace).
@@ -182,7 +183,7 @@ export default function SuperAdminDashboard() {
   }, [monthOffset]);
   const calYear = viewedDate.getFullYear();
   const calMonth = viewedDate.getMonth();
-  const monthLabel = viewedDate.toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { month: 'long', year: 'numeric' });
+  const monthLabel = formatDate(viewedDate);
   const expiringDays = useMemo(() => {
     const set = new Set<number>();
     for (const g of allUpcoming) {
@@ -541,7 +542,7 @@ export default function SuperAdminDashboard() {
             ) : allUpcoming.slice(0, 6).map((g, i) => (
               <div key={g.id} className="flex items-center gap-4 p-3 rounded-2xl border border-gray-100 hover:border-emerald-200 hover:bg-emerald-50/40 transition-all">
                 <div className="text-xs font-bold text-gray-500 w-12 text-center" dir="ltr">
-                  {g.subscription_expires_at ? new Date(g.subscription_expires_at).toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' }) : '—'}
+                  {g.subscription_expires_at ? formatDate(g.subscription_expires_at) : '—'}
                 </div>
                 <div className={`w-1.5 h-10 rounded-full ${EVENT_DOT_COLORS[i % EVENT_DOT_COLORS.length]}`} />
                 <div className="flex-1 min-w-0">

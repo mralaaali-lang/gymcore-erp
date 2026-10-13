@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatDate } from '../../utils/date';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
@@ -298,13 +299,11 @@ export default function PlatformAdmins() {
                     </td>
                     <td className="p-4 text-gray-500 text-sm">
                       {admin.last_login_at
-                        ? new Date(admin.last_login_at).toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', {
-                            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                          })
+                        ? formatDate(admin.last_login_at)
                         : '-'}
                     </td>
                     <td className="p-4 text-gray-500 text-sm">
-                      {new Date(admin.created_at).toLocaleDateString(isRtl ? 'ar-EG' : 'en-US')}
+                      {formatDate(admin.created_at)}
                     </td>
                     <td className="p-4 relative">
                       <button

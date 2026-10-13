@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDate } from '../../../utils/date';
 import { useApp } from '../../../context/GymBrandContext';
 import { useToast } from '../../../context/ToastContext';
 import { useApiQuery } from '../../../hooks/useApiQuery';
@@ -197,7 +198,7 @@ export default function DebtsPanel() {
                       <td className="px-4 py-3 text-gray-900" dir="ltr">{money(d.original_amount)}</td>
                       <td className={`px-4 py-3 font-medium ${overdue ? 'text-red-500' : 'text-gray-900'}`} dir="ltr">{money(d.remaining_amount)}</td>
                       <td className="px-4 py-3 text-gray-500 text-xs" dir="ltr">
-                        {new Date(d.due_date).toLocaleDateString(rtl ? 'ar-EG' : 'en-US')}
+                        {formatDate(d.due_date)}
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge

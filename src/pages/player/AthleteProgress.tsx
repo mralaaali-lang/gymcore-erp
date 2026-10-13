@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { formatDate, formatTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { getMyVisits, getMyPoints, getMySubscription } from '../../services/api';
 import PageHeader from '../../components/shared/PageHeader';
@@ -134,10 +135,10 @@ export default function AthleteProgress() {
               return (
                 <div key={v.id} className="bg-white rounded-2xl p-3 border border-gray-100 flex justify-between items-center">
                   <span className="text-sm text-gray-600">
-                    {Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString(isRtl ? 'ar-EG' : 'en-GB')}
+                    {Number.isNaN(d.getTime()) ? '—' : formatDate(d)}
                   </span>
                   <span className="text-sm font-medium text-gray-900">
-                    {Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(isRtl ? 'ar-EG' : 'en-GB', { hour: '2-digit', minute: '2-digit' })}
+                    {Number.isNaN(d.getTime()) ? '' : formatTime(d)}
                   </span>
                 </div>
               );

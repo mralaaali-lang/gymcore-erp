@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { formatDate } from '../../utils/date';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/GymBrandContext';
@@ -87,7 +88,7 @@ function groupNavItems(items: NavItem[]): NavGroup[] {
 }
 
 export default function Sidebar({ items }: SidebarProps) {
-  const { isSidebarOpen, role, logout, gymProfile, language } = useApp();
+  const { isSidebarOpen, role, logout, gymProfile } = useApp();
   const { t } = useTranslation();
 
   // §33أ-تنظيف: the gym's own identity (name · today's date · plan) lives
@@ -96,7 +97,7 @@ export default function Sidebar({ items }: SidebarProps) {
   const brandName = gymProfile?.name || 'GymCore';
   const brandSub = gymProfile?.name
     ? [
-        new Date().toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }),
+        formatDate(new Date()),
         gymProfile.plan_tier ? t(`plan.${gymProfile.plan_tier}`, gymProfile.plan_tier) : null,
       ].filter(Boolean).join(' · ')
     : t('sidebar.brandTagline');

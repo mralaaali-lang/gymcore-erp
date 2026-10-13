@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDateTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { listAuditLogs } from '../../services/api';
@@ -66,7 +67,7 @@ export default function AuditLogs() {
     const actionKey = inferActionType(log.actionType);
     return {
       id: log.id,
-      timestamp: new Date(log.timestamp).toLocaleString(isRtl ? 'ar-EG' : 'en-US'),
+      timestamp: formatDateTime(log.timestamp),
       action: (
         <StatusBadge
           status={isRtl ? (actionLabels[actionKey] || log.actionType) : log.actionType}

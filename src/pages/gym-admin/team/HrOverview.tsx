@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDate } from '../../../utils/date';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../../context/GymBrandContext';
 import { formatMoney } from '../../../utils/currency';
@@ -162,7 +163,7 @@ export default function HrOverview() {
                       <td className="p-4 font-medium text-gray-800">{p.staff_name || p.full_name || '—'}</td>
                       <td className="p-4">{money(p.base_salary_paid)}</td>
                       <td className="p-4">{money(p.commissions_paid)}</td>
-                      <td className="p-4 text-gray-600">{p.payment_date ? new Date(p.payment_date).toLocaleDateString('ar-EG') : '—'}</td>
+                      <td className="p-4 text-gray-600">{p.payment_date ? formatDate(p.payment_date) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>

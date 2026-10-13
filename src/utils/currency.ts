@@ -22,5 +22,5 @@ export function currencySymbol(code?: string | null): string {
 
 /** "1,250 ر.س" — symbol after the number (Arabic-market convention). */
 export function formatMoney(amount: number, code?: string | null): string {
-  return `${Number(amount || 0).toLocaleString()} ${currencySymbol(code)}`;
+  return `${Number(amount || 0).toLocaleString('en-US')} ${currencySymbol(code)}`;
 }

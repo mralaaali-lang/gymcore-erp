@@ -1,4 +1,5 @@
 import { useApp } from '../../context/GymBrandContext';
+import { formatDateTime } from '../../utils/date';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { listBroadcasts } from '../../services/api';
 import PageHeader from '../../components/shared/PageHeader';
@@ -29,7 +30,7 @@ export default function SmsGateway() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   }).length;
   // /platform/broadcasts returns newest-first (ORDER BY created_at DESC).
-  const lastSent = broadcasts.length > 0 ? new Date(broadcasts[0].created_at).toLocaleString() : '—';
+  const lastSent = broadcasts.length > 0 ? formatDateTime(broadcasts[0].created_at) : '—';
   const senders = new Set(broadcasts.map((b) => b.sent_by_email).filter(Boolean)).size;
 
   const stats = [
@@ -52,7 +53,7 @@ export default function SmsGateway() {
     title: b.title,
     content: b.content,
     audience: Array.isArray(b.target_roles) && b.target_roles.length > 0 ? b.target_roles.join('، ') : (isRtl ? 'الكل' : 'All'),
-    date: new Date(b.created_at).toLocaleString(),
+    date: formatDateTime(b.created_at),
   }));
 
   return (

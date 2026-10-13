@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDate } from '../../utils/date';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
@@ -144,7 +145,7 @@ export default function BillingEngine() {
   // `amount + vat` becomes string concatenation ("1500.00210.00000000000003").
   const formatCurrency = (amount: number | string) => {
     const n = Number(amount) || 0;
-    return `${n.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${CURRENCY_SYMBOL}`;
+    return `${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${CURRENCY_SYMBOL}`;
   };
 
   const calcWithVAT = (amount: number | string) => {
@@ -276,7 +277,7 @@ export default function BillingEngine() {
                     <td className="p-4 text-gray-500 text-sm">
                       <div className="flex items-center gap-1">
                         <Calendar size={12} />
-                        {new Date(inv.period_start).toLocaleDateString()} — {new Date(inv.period_end).toLocaleDateString()}
+                        {formatDate(inv.period_start)} — {formatDate(inv.period_end)}
                       </div>
                     </td>
                     <td className="p-4">
@@ -350,7 +351,7 @@ export default function BillingEngine() {
                       {c.max_discount_amount && c.discount_type === 'percentage' ? ` (max ${formatCurrency(c.max_discount_amount)})` : ''}
                     </td>
                     <td className="p-4 text-gray-500 text-sm">{c.current_uses} / {c.max_uses}</td>
-                    <td className="p-4 text-gray-500 text-sm">{c.valid_until ? new Date(c.valid_until).toLocaleDateString() : '—'}</td>
+                    <td className="p-4 text-gray-500 text-sm">{c.valid_until ? formatDate(c.valid_until) : '—'}</td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold ${c.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                         {c.is_active ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}

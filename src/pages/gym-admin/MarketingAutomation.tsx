@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatDate } from '../../utils/date';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -96,7 +97,7 @@ export default function MarketingAutomation() {
         <div key={r.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
           <div>
             <p className="text-sm font-medium text-gray-900">{referralName(r)}</p>
-            <p className="text-xs text-gray-500">{r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}</p>
+            <p className="text-xs text-gray-500">{r.created_at ? formatDate(r.created_at) : ''}</p>
           </div>
           <StatusBadge status={r.status} variant={referralStatusVariant(r.status)} />
         </div>

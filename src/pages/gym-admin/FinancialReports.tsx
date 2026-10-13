@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { formatDate } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
 import { getFinanceSummary, listPayments, createPayment, listMembers } from '../../services/api';
@@ -170,7 +171,7 @@ export default function FinancialReports() {
                     {payments.map((p: any, i: number) => (
                       <tr key={p.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 text-gray-500">{i + 1}</td>
-                        <td className="px-4 py-3 text-gray-500">{p.created_at ? new Date(p.created_at).toLocaleDateString('ar-EG') : '-'}</td>
+                        <td className="px-4 py-3 text-gray-500">{p.created_at ? formatDate(p.created_at) : '-'}</td>
                         <td className="px-4 py-3 font-medium text-gray-900">{p.member_name || p.member?.full_name || '-'}</td>
                         <td className="px-4 py-3 font-medium text-gray-900">{money(p.amount)}</td>
                         <td className="px-4 py-3">

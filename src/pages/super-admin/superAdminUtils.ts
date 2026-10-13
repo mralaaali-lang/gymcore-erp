@@ -1,4 +1,5 @@
 // ── Super Admin Shared Utilities ──
+import { formatDate as isoFormatDate, formatDateTime as isoFormatDateTime } from '../../utils/date';
 import {
   Buildings, CreditCard, ChartBar, Bell, Shield, Monitor, Gear,
   Code, Headset, Users, Megaphone, Rocket,
@@ -83,28 +84,15 @@ export function statusLabel(status: string, isRtl: boolean): string {
   return STATUS_LABELS[status]?.[isRtl ? 'ar' : 'en'] || status;
 }
 
-// ── Date Formatting ──
-export function formatDate(dateStr: string | null | undefined, isRtl: boolean): string {
-  if (!dateStr) return '-';
-  try {
-    return new Date(dateStr).toLocaleDateString(isRtl ? 'ar-EG' : 'en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-    });
-  } catch {
-    return dateStr;
-  }
+// ── Date Formatting (§34هـ: thin wrappers over the shared ISO helpers;
+// the isRtl parameter is kept for call-site compatibility but ignored —
+// dates are numeric YYYY-MM-DD in both languages) ──
+export function formatDate(dateStr: string | null | undefined, _isRtl?: boolean): string {
+  return isoFormatDate(dateStr);
 }
 
-export function formatDateTime(dateStr: string | null | undefined, isRtl: boolean): string {
-  if (!dateStr) return '-';
-  try {
-    return new Date(dateStr).toLocaleString(isRtl ? 'ar-EG' : 'en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
-  } catch {
-    return dateStr;
-  }
+export function formatDateTime(dateStr: string | null | undefined, _isRtl?: boolean): string {
+  return isoFormatDateTime(dateStr);
 }
 
 export function daysRemaining(dateStr: string | null | undefined): number | null {

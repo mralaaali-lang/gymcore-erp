@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { formatDateTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
 import { listCashboxSessions, openCashbox, closeCashbox } from '../../services/api';
@@ -67,7 +68,7 @@ export default function CashboxPage() {
     v != null ? formatMoney(v, gymProfile?.currency) : '—';
 
   const formatDate = (d: string | null) =>
-    d ? new Date(d).toLocaleString('ar-EG') : '—';
+    d ? formatDateTime(d) : '—';
 
   if (isLoading) {
     return (

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDateTime } from '../../../utils/date';
 import { useApp } from '../../../context/GymBrandContext';
 import PageLoader from '../../../components/shared/PageLoader';
 import Button from '../../../components/ui/Button';
@@ -115,7 +116,7 @@ export default function BackupTab() {
                 <div className="space-y-1">
                   <p className="font-mono text-sm text-gray-900">{b.folder}</p>
                   <p className="text-xs text-gray-500">
-                    {new Date(b.timestamp).toLocaleString(isRtl ? 'ar-EG' : 'en-US')} &middot; {formatBytes(b.sizeBytes)} &middot; {b.totalRecords} {isRtl ? 'سجل' : 'records'}
+                    {formatDateTime(b.timestamp)} &middot; {formatBytes(b.sizeBytes)} &middot; {b.totalRecords} {isRtl ? 'سجل' : 'records'}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">

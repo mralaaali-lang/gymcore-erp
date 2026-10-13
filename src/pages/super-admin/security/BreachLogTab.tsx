@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDateTime } from '../../../utils/date';
 import { useApp } from '../../../context/GymBrandContext';
 import { useApiQuery } from '../../../hooks/useApiQuery';
 import { getSecurityOverview } from '../../../services/api';
@@ -167,9 +168,7 @@ export default function BreachLogTab() {
                     <td className="p-3 font-mono text-gray-500/70">{entry.ip}</td>
                     <td className="p-3 text-gray-500/70 max-w-[200px] truncate">{entry.details || '-'}</td>
                     <td className="p-3 text-gray-500/70">
-                      {new Date(entry.timestamp).toLocaleString(isRtl ? 'ar-EG' : 'en-US', {
-                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                      })}
+                      {formatDateTime(entry.timestamp)}
                     </td>
                     <td className="p-3 text-center">
                       {entry.resolved ? (

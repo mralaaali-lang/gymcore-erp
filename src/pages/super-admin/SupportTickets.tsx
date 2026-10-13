@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDateTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useMutation } from '@tanstack/react-query';
@@ -86,7 +87,7 @@ export default function SupportTickets() {
                     <StatusBadge status={t.priority} variant={priorityVariants[t.priority] || 'neutral'} />
                   </div>
                   <p className="text-sm text-gray-500">{t.description}</p>
-                  <p className="text-xs text-gray-500 mt-2">{t.gym_name} &middot; {new Date(t.created_at).toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 mt-2">{t.gym_name} &middot; {formatDateTime(t.created_at)}</p>
                 </div>
               </div>
               <select

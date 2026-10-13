@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDate } from '../../../utils/date';
 import { useApp } from '../../../context/GymBrandContext';
 import { formatMoney } from '../../../utils/currency';
 import { useToast } from '../../../context/ToastContext';
@@ -195,7 +196,7 @@ export default function PurchasesPanel() {
                       />
                     </td>
                     <td className="p-4 text-gray-500 text-xs" dir="ltr">
-                      {new Date(p.created_at).toLocaleDateString(rtl ? 'ar-EG' : 'en-US')}
+                      {formatDate(p.created_at)}
                     </td>
                     <td className="p-4 text-gray-500 text-xs max-w-[120px] truncate">{p.notes || '-'}</td>
                   </tr>

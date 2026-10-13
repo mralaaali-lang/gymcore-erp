@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { formatTime } from '../../utils/date';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -497,7 +498,7 @@ function TodayAttendance() {
             <li key={r.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
               <span className="font-medium text-gray-900 truncate">{r.full_name}</span>
               <span className="text-gray-500 shrink-0 text-xs">
-                {new Date(r.check_in_time).toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                {formatTime(r.check_in_time)}
                 {' · '}{methodLabel(r.entry_method)}
               </span>
             </li>

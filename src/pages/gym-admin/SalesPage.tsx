@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDate } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
 import { useToast } from '../../context/ToastContext';
@@ -234,7 +235,7 @@ export default function SalesPage() {
                         variant="neutral"
                       />
                     </td>
-                    <td className="p-4 text-gray-500 text-xs" dir="ltr">{new Date(s.created_at).toLocaleDateString()}</td>
+                    <td className="p-4 text-gray-500 text-xs" dir="ltr">{formatDate(s.created_at)}</td>
                   </tr>
                 ))}
                 {sales.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-gray-500/50">{rtl ? 'لا توجد مبيعات' : 'No sales found'}</td></tr>}
