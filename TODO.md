@@ -51,7 +51,7 @@
 
 | دفعة | النطاق | الحالة |
 |---|---|---|
-| **§32** | حذف mocks المسار المدرب (TrainerDashboard/ClientProgress/SmsGateway/BreachLog) + PT revenue حقيقي + `mine=true` + إصلاح route-order لـ customer360/search | 🔄 جارية |
+| **§32** | حذف mocks المسار المدرب (TrainerDashboard/ClientProgress/SmsGateway/BreachLog) + PT revenue حقيقي + `mine=true` + إصلاح route-order لـ customer360/search | ✅ (2026-10-13 — 6e10270) |
 | **§34أ** | KPIs مالية في لوحة القيادة: `GET /api/analytics/business-metrics` → MRR من price_paid النشطة، churn% (ملغيات/نشطي الشهر)، ARPU، صافي النمو | ⏳ |
 | **§34ب** | معدل زيارات العضو (8–12) + إشغال الكلاسات (70–85%) من class_bookings/schedule_capacity + إصلاح BranchAnalytics (retention/forecast/peak-hours عقود مكسورة) | ⏳ |
 | **§34ت** | قمع التسويق الحقيقي من gym_leads (بدل Math.random) + funnel بالمصدر + تحويل الليد% + مسار tenant لـ referrals | ⏳ |
@@ -116,6 +116,7 @@
 - 2026-10-12: **رفع تلقائي GitHub→Railway (§29)** — ربط خدمتي gymcore-staging بالمستودع (GitHub App + trigger فرع main)؛ إصلاح جذر البناء: backend rootDirectory فارغ + `/server/Dockerfile.prod`، frontend `.`؛ لم يعد «ارفع» اليدوي لازماً لـ staging.
 - 2026-10-13: **استكمال العملة (§30)** — TrainerDashboard/PersonalTraining/useGymDashboard/MemberProfileView/MemberRegistrationForm على formatMoney؛ وإصلاح أدراج: customer360 كان 500 لكل الأعضاء لأن migration 044 حذفت `loyalty_points` — الجدول لم يُهجَّر في أي controller (ديون موثقة).
 - 2026-10-13: **تهجير الولاء إلى 044 (§31)** — إعادة كتابة `loyalty.ts` + تهجير `mobile.ts`/`stitchService.ts`/`platformMarketing.ts` إلى `loyalty_accounts/loyalty_tiers/loyalty_transactions` مع حفظ عقد الاستجابة؛ ضبط وإصلاح bug «inconsistent types $1» (placeholder مشترك بين UUID والفرع العددي)؛ إضافة platinum لـ TIER_LABELS؛ تحقق حي: earn 120→bronze ثم 400→520→silver وترقية الشريحة تعمل، history/rewards/customer360 من الجداول الجديدة، ثم مسح كامل لصفوف الاختبار.
+- 2026-10-13: **قرار صفر mocks + تدقيق كامل (§32)** — agent جرّد كل لوحة المدير: السيرفر نظيف عدا إيراد PT «×50» ملفق؛ إعادة بناء لوحة المدرب وتقدم العملاء على `?mine=true`+customer360 الحقيقيين (حُذفت بطاقات وزن/دهون لا مصدر لها)؛ إزالة أرقام SMS الملفقة وتبويب قوالب ميت؛ إصلاح route-order كان يجعل `customer360/search` 500 منذ نشأته؛ تحقق حي بدورة كاملة (100→200 ثم مسح الأثر). خارطة الدفعات §34أ..ج في أعلى TODO.
 - 2026-10-12: **إعادة تصميم داشبورد مدير الصالة (§24)** — «مهام اليوم أولاً» بنمط المنافسين: شريط اليوم + 4 كروت «يحتاج إجراءك» (3 endpoints سيرفر جديدة)، معلومات الصالة/العملة من /auth/me بدل platform 403، إخفاء onboarding بعد أول نشاط، رسوم بسلسلتين ومحاور صحيحة، صفر 403 حياً. **التالي:** تعميم formatMoney على بقية الصفحات، دمج debts/announcements ثم backup/migration، وتحقق تفاعلي بدخول كل دور
 - 2026-10-10: إعادة هيكلة كاملة لوحات السوبر أدمن (9 صفحات) — التفاصيل `LOCAL_TESTING_REPORT.md` §5-§6
 - 2026-10-11: حفظ المرحلة الثانية في git + تنظيف الملفات القديمة والمكررة من الجذر
