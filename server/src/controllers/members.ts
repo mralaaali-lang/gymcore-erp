@@ -2,6 +2,58 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { query, getClient } from '../config/database';
 import logger from '../config/logger';
+import { closeStaleSessions } from './attendance';
+
+// ====================================================================
+// §34ح — MEMBERS STATS CARDS (the five numbers above the members tab)
+// One query, one truth: each figure uses exactly the same subscription
+// derivation the list badge uses (latest member_subscriptions row), so a
+// card and a row can never disagree.
+// ====================================================================
+export const getMemberStats = async (req: Request, res: Response): Promise<void> => {
+  const gym_id = req.staff?.gym_id;
+
+  try {
+    // Settle forgotten check-outs first — "present now" is read-time truth.
+    await closeStaleSessions(gym_id);
+
+    const tzResult = await query(
+      `SELECT COALESCE(timezone, 'Africa/Cairo') AS tz FROM gyms WHERE id = $1`,
+      [gym_id]
+    );
+    const tz = tzResult.rows[0]?.tz || 'Africa/Cairo';
+
+    const result = await query(
+      `SELECT
+         COUNT(*)::int AS total_members,
+         COUNT(*) FILTER (WHERE latest.status = 'active' AND m.is_blacklisted = false)::int AS active_members,
+         COUNT(*) FILTER (WHERE latest.id IS NOT NULL AND latest.status <> 'cancelled')::int AS ever_subscribed,
+         COUNT(*) FILTER (
+           WHERE m.created_at >= ((date_trunc('month', ((CURRENT_TIMESTAMP AT TIME ZONE $2)::date)::timestamp)) AT TIME ZONE $2)
+         )::int AS new_this_month,
+         COUNT(*) FILTER (WHERE open_session.id IS NOT NULL)::int AS present_now
+       FROM members m
+       LEFT JOIN LATERAL (
+         SELECT ms.id, ms.status FROM member_subscriptions ms
+         WHERE ms.member_id = m.id AND ms.gym_id = m.gym_id
+         ORDER BY ms.created_at DESC LIMIT 1
+       ) latest ON true
+       LEFT JOIN LATERAL (
+         SELECT al.id FROM attendance_logs al
+         WHERE al.member_id = m.id AND al.gym_id = m.gym_id
+           AND al.deleted_at IS NULL AND al.check_out_time IS NULL
+         LIMIT 1
+       ) open_session ON true
+       WHERE m.gym_id = $1 AND m.deleted_at IS NULL`,
+      [gym_id, tz]
+    );
+
+    res.status(200).json({ data: result.rows[0] });
+  } catch (error) {
+    logger.error('Failed to load member stats', { requestId: (req as any).requestId, error: (error as Error).message });
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+};
 
 export const listMembers = async (req: Request, res: Response): Promise<void> => {
   const gym_id = req.staff?.gym_id;

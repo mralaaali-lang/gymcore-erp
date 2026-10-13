@@ -46,6 +46,7 @@ const iconMap: Record<string, LucideIcon> = {
   crm: Target,
   team: UserCog,
   schedule: CalendarDays,
+  analytics: BarChart3, // §34ح — sidebar entry for /admin/analytics
 };
 
 const ROLE_BASE: Record<UserRole, string> = {

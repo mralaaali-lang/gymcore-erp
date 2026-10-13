@@ -33,6 +33,7 @@ import {
   verifyAndRegisterAttendance,
   getTodayAttendance,
   manualCheckIn,
+  checkOutAttendance, // §34ح
   verifyPublicQrPass,
 } from '../controllers/attendance';
 import {
@@ -43,6 +44,7 @@ import {
 } from '../controllers/bookings';
 import {
   listMembers,
+  getMemberStats, // §34ح
   getMemberById,
   createMember,
   updateMember,
@@ -140,6 +142,7 @@ import {
   listSuppliers, createSupplier,
   listDebts, createDebt, payDebt,
   listCashboxSessions, openCashbox, closeCashbox, getFinanceSummary,
+  // TEMP-REMOVED-FOR-COMMIT: getCashbook, listSessionLedger (restore after §34ح commit)
 } from '../controllers/finance';
 import {
   completeStitchOrderHandler, listStitchOrdersHandler, getStitchOrderHandler,
@@ -210,6 +213,8 @@ router.use('/api', authenticateAndIsolateTenant);
 // MEMBERS
 // ====================================================================
 router.get('/api/members', requireRole('manager', 'receptionist', 'coach'), listMembers);
+// §34ح — stats cards; registered BEFORE /:id so 'stats' is never treated as a member id.
+router.get('/api/members/stats', requireRole('manager', 'receptionist'), getMemberStats);
 router.get('/api/members/:id', requireRole('manager', 'receptionist', 'coach'), getMemberById);
 router.post('/api/members', requireRole('manager', 'receptionist'), planGuard({ checkMembers: true }), validate(createMemberSchema), createMember);
 router.put('/api/members/:id', requireRole('manager', 'receptionist'), validate(updateMemberSchema), updateMember);
@@ -236,6 +241,8 @@ router.put('/api/membership-offers/:id', requireRole('manager'), validate(update
 router.post('/api/attendance/qr', qrRateLimit, requireRole('manager', 'receptionist'), validate(qrAttendanceSchema), verifyAndRegisterAttendance);
 router.post('/api/attendance/manual', requireRole('manager', 'receptionist'), validate(manualCheckinSchema), manualCheckIn);
 router.get('/api/attendance/today', requireRole('manager', 'receptionist', 'coach'), getTodayAttendance);
+// §34ح — manual check-out of an open session (front desk button).
+router.post('/api/attendance/checkout', requireRole('manager', 'receptionist'), checkOutAttendance);
 
 // ====================================================================
 // PHOTO UPLOAD — Staff-accessible member photo upload
@@ -382,6 +389,7 @@ router.post('/api/finance/debts/:id/pay', requireRole('manager'), validate(payDe
 router.get('/api/finance/cashbox', requireRole('manager'), listCashboxSessions);
 router.post('/api/finance/cashbox/open', requireRole('manager'), validate(openCashboxSchema), openCashbox);
 router.post('/api/finance/cashbox/close', requireRole('manager'), validate(closeCashboxSchema), closeCashbox);
+// TEMP-REMOVED-FOR-COMMIT: §34ث cashbook/ledger routes (restore after §34ح commit)
 router.get('/api/finance/summary', requireRole('manager'), getFinanceSummary);
 
 // ====================================================================

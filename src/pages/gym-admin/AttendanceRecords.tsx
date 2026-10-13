@@ -3,7 +3,7 @@ import { formatTime } from '../../utils/date';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
-import { getTodayAttendance, manualCheckInByPhone } from '../../services/api';
+import { getTodayAttendance, manualCheckInByPhone, checkOutAttendance } from '../../services/api';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useMutation } from '@tanstack/react-query';
 import PageHeader from '../../components/shared/PageHeader';
@@ -16,9 +16,12 @@ import Spinner from '../../components/ui/Spinner';
 
 // Row shape returned by GET /api/attendance/today → { data: [...] }.
 // The backend column is full_name (NOT member_name).
+// §34ح — check_out_time is NULL while the member is still inside; the server
+// also lazy-stamps sessions older than an hour before ever returning them.
 interface AttendanceRow {
   id: string;
   check_in_time: string;
+  check_out_time: string | null;
   entry_method: string;
   full_name: string;
   phone_number?: string;
@@ -55,11 +58,27 @@ export default function AttendanceRecords() {
   });
 
   const rRecords = records || [];
+  // §34ح — presence right now: open sessions after the server's lazy
+  // one-hour auto-checkout.
+  const presentNow = rRecords.filter(r => !r.check_out_time).length;
   const latestCheckIn = rRecords.length
     ? formatTime(
         Math.max(...rRecords.map(r => new Date(r.check_in_time).getTime()))
       )
     : '--:--';
+
+  // §34ح — manual check-out per open session.
+  const checkOutMutation = useMutation({
+    mutationFn: (id: string) => checkOutAttendance(id),
+    onSuccess: () => {
+      showToast(rtl ? 'تم تسجيل الخروج' : 'Check-out recorded', 'success');
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    },
+    onError: () => {
+      showToast(rtl ? 'فشل تسجيل الخروج' : 'Check-out failed', 'error');
+    },
+  });
+
   const handleCheckIn = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = phone.trim();
@@ -79,9 +98,11 @@ export default function AttendanceRecords() {
       />
 
       <StatsGrid
-        columns={2}
+        columns={3}
         stats={[
           { key: 'checked', label: rtl ? 'تم الحضور اليوم' : 'Checked in today', value: rRecords.length, icon: 'how_to_reg', color: 'primary' },
+          // §34ح — live presence (open sessions).
+          { key: 'present', label: rtl ? 'متواجدون الآن' : 'Present now', value: presentNow, icon: 'location_city', color: 'info' },
           { key: 'latest', label: rtl ? 'آخر تسجيل' : 'Latest check-in', value: latestCheckIn, icon: 'schedule', color: 'info' },
         ]}
       />
@@ -127,6 +148,8 @@ export default function AttendanceRecords() {
                   <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'وقت الدخول' : 'Check-In'}</th>
                   <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'النوع' : 'Type'}</th>
                   <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'سجّله' : 'Recorded by'}</th>
+                  {/* §34ح — check-out state + manual exit button */}
+                  <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الخروج' : 'Check-out'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -144,6 +167,19 @@ export default function AttendanceRecords() {
                         <StatusBadge status={typeLabels[entryType] || entryType} variant={entryType === 'pt' ? 'success' : 'neutral'} />
                       </td>
                       <td className="px-4 py-3 text-gray-500">{r.verified_by_name || '--'}</td>
+                      <td className="px-4 py-3">
+                        {r.check_out_time ? (
+                          <span className="text-gray-500 font-medium" dir="ltr">{formatTime(r.check_out_time)}</span>
+                        ) : (
+                          <button
+                            onClick={() => checkOutMutation.mutate(r.id)}
+                            disabled={checkOutMutation.isPending}
+                            className="px-3 py-1.5 rounded-xl bg-sky-50 text-sky-700 text-xs font-semibold hover:bg-sky-100 transition disabled:opacity-50 min-h-[36px]"
+                          >
+                            {rtl ? 'تسجيل خروج' : 'Check out'}
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}

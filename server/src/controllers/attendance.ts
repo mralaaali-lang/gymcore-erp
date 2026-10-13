@@ -9,6 +9,27 @@ import logger from '../config/logger';
 
 const QR_WINDOW_SECONDS = 30;
 
+// §34ح — house limit for a gym visit. A session still open after this window
+// is treated as forgotten check-out and stamped automatically at read time.
+export const SESSION_HOURS = 1;
+
+/**
+ * §34ح — lazy check-out: stamp any session older than the house limit with
+ * check_out_time = check_in_time + 1h, right before anyone reads presence
+ * numbers. No cron, no background writer — the "متواجدين الآن" figure and
+ * the today-list can never show a ghost that left an hour ago.
+ */
+export async function closeStaleSessions(gym_id: string | undefined): Promise<void> {
+  if (!gym_id) return;
+  await query(
+    `UPDATE attendance_logs
+     SET check_out_time = check_in_time + INTERVAL '${SESSION_HOURS} hours'
+     WHERE gym_id = $1 AND check_out_time IS NULL
+       AND check_in_time < NOW() - INTERVAL '${SESSION_HOURS} hours'`,
+    [gym_id]
+  );
+}
+
 interface DecodedQrPayload {
   member_id: string;
   gym_id: string;
@@ -195,8 +216,12 @@ export const getTodayAttendance = async (req: Request, res: Response): Promise<v
   const role = req.staff?.role;
 
   try {
+    // §34ح — settle forgotten exits first so the list's checkout state is
+    // truthful at the moment it is read.
+    await closeStaleSessions(gym_id);
+
     const result = await query(
-      `SELECT al.id, al.check_in_time, al.entry_method, m.full_name, decrypt_sensitive(m.phone_encrypted) as phone_number,
+      `SELECT al.id, al.check_in_time, al.check_out_time, al.entry_method, m.full_name, decrypt_sensitive(m.phone_encrypted) as phone_number,
               su.full_name as verified_by_name
        FROM attendance_logs al
        JOIN members m ON al.member_id = m.id
@@ -251,8 +276,58 @@ export const manualCheckIn = async (req: Request, res: Response): Promise<void> 
 };
 
 // ====================================================================
+// §34ح — MANUAL CHECK-OUT (front desk closes a session explicitly)
+// ====================================================================
+export const checkOutAttendance = async (req: Request, res: Response): Promise<void> => {
+  const gym_id = req.staff?.gym_id;
+  const staff_user_id = req.staff?.staff_user_id;
+  const attendance_log_id = (req.body as { attendance_log_id?: string })?.attendance_log_id;
+
+  if (!attendance_log_id) {
+    res.status(400).json({ error: 'attendance_log_id is required.' });
+    return;
+  }
+
+  try {
+    const result = await query(
+      `UPDATE attendance_logs
+       SET check_out_time = NOW()
+       WHERE id = $1 AND gym_id = $2 AND check_out_time IS NULL AND deleted_at IS NULL
+       RETURNING id, check_in_time, check_out_time, member_id`,
+      [attendance_log_id, gym_id]
+    );
+
+    if (result.rows.length === 0) {
+      // Distinguish "no such row" from "already closed" so the message is honest.
+      const exists = await query(
+        `SELECT id, check_out_time FROM attendance_logs WHERE id = $1 AND gym_id = $2`,
+        [attendance_log_id, gym_id]
+      );
+      if (exists.rows.length === 0) {
+        res.status(404).json({ error: 'Attendance session not found.' });
+        return;
+      }
+      res.status(400).json({ error: 'This session is already checked out.' });
+      return;
+    }
+
+    const row = result.rows[0];
+    await query(
+      `INSERT INTO activity_logs (gym_id, staff_user_id, action_description, ip_address)
+       VALUES ($1, $2, $3, $4)`,
+      [gym_id, staff_user_id || null, `Check-out recorded for attendance ${row.id}`, null]
+    );
+
+    res.status(200).json({ data: row });
+  } catch (error) {
+    logger.error('Check-out failed', { requestId: (req as any).requestId, error: (error as Error).message });
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+};
+
+// ====================================================================
 // PUBLIC QR PASS VERIFICATION — No staff JWT required
-// Used by QR scanner hardware at the entry gate
+// Used by QR hardware at the entry gate
 // ====================================================================
 export const verifyPublicQrPass = async (req: Request, res: Response): Promise<void> => {
   const { qr_token } = req.body;

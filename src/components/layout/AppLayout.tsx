@@ -69,6 +69,9 @@ function buildNavItems(base: string, role: UserRole): NavItem[] {
       { label: i18n.t('sidebar.store'), icon: 'products', path: `${base}/products`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionOps') },
       { label: i18n.t('sidebar.marketing'), icon: 'marketing', path: `${base}/marketing`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionOps') },
       { label: i18n.t('sidebar.crm'), icon: 'crm', path: `${base}/crm`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionOps') },
+      // §34ح — growth page joined the sidebar after the members-page tab
+      // strip (its only former entrance) was replaced by stat cards.
+      { label: i18n.t('sidebar.growth'), icon: 'analytics', path: `${base}/analytics`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionOps') },
       { label: i18n.t('sidebar.website'), icon: 'website', path: `${base}/website`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionOps'), premium: true },
       // ── الفريق والإعدادات ──
       { label: i18n.t('sidebar.team'), icon: 'team', path: `${base}/users`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionTeam') },

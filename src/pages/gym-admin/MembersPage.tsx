@@ -1,10 +1,9 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
-import { listMembers, type MemberResponse } from '../../services/api';
+import { listMembers, getMemberStats, type MemberResponse, type MemberStats } from '../../services/api';
 import FilterBar from '../../components/shared/FilterBar';
-import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
 import ExportButton from '../../components/shared/ExportButton';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -54,7 +53,6 @@ export default function MembersPage() {
   const { language } = useApp();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const location = useLocation();
   const rtl = language === 'ar';
 
   const [search, setSearch] = useState('');
@@ -64,6 +62,8 @@ export default function MembersPage() {
   const [members, setMembers] = useState<MemberResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  // §34ح — the five stat cards; every number comes from /api/members/stats.
+  const [stats, setStats] = useState<MemberStats | null>(null);
   // §34د-5 — adding a member starts right here, with the SAME centered modal
   // the dashboard uses (real offers + PIN shown once), not a page detour.
   const [action, setAction] = useState<ActionKey | null>(null);
@@ -80,15 +80,21 @@ export default function MembersPage() {
   const fetchMembers = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listMembers({
-        search: debouncedSearch || undefined,
-        status: filter !== 'all' ? filter : undefined,
-        page,
-        limit: perPage,
-      });
+      const [data, statsRes] = await Promise.all([
+        listMembers({
+          search: debouncedSearch || undefined,
+          status: filter !== 'all' ? filter : undefined,
+          page,
+          limit: perPage,
+        }),
+        // §34ح — cards refresh alongside the list (and the manual refresh
+        // button), so "متواجدون الآن" never lags behind reality.
+        getMemberStats().catch(() => null),
+      ]);
       const list = data.members || [];
       setMembers(list);
       setTotal(data.total || 0);
+      if (statsRes) setStats(statsRes);
     } catch {
       showToast(rtl ? 'فشل تحميل القائمة' : 'Failed to load members', 'error');
     } finally {
@@ -112,22 +118,20 @@ export default function MembersPage() {
   const isEmpty = !loading && total === 0 && !search && filter === 'all';
   const isEmptySearch = !loading && members.length === 0 && (search || filter !== 'all');
 
-  // §34د-3 — tabs that exist: the duplicate "check-in" (same route as
-  // attendance) and the route-less "rosters"/"documents" (toast-only) are gone.
-  const sectionTabs = [
-    { id: 'members', labelEn: 'Members', labelAr: 'المشتركين', route: '/admin/members' },
-    { id: 'attendance', labelEn: 'Attendance', labelAr: 'الحضور', route: '/admin/attendance' },
-    { id: 'memberships', labelEn: 'Memberships', labelAr: 'الباقات', route: '/admin/plans' },
-    { id: 'content', labelEn: 'Content', labelAr: 'المحتوى', route: '/admin/marketing?tab=Announcements' },
-    { id: 'growth', labelEn: 'Growth', labelAr: 'النمو', route: '/admin/analytics' },
-    { id: 'settings', labelEn: 'Settings', labelAr: 'الإعدادات', route: '/admin/settings' },
-  ];
+  // §34ح — the old six-tab strip (المشتركين/الحضور/الباقات/المحتوى/النمو/
+  // الإعدادات) is gone by design: every one of those pages has its own
+  // sidebar entry now (النمو was added to the sidebar in the same batch),
+  // and this slot shows the five live member numbers instead.
 
-  const navigateTab = (tab: typeof sectionTabs[0]) => {
-    navigate(tab.route);
-  };
-
-  const activeTabKey = sectionTabs.find((t) => location.pathname === t.route || location.pathname.startsWith(t.route.split('?')[0] + '/'))?.id ?? 'members';
+  const statCards = stats
+    ? [
+        { value: stats.total_members, labelAr: 'إجمالي المشتركين', labelEn: 'Total members', color: 'text-slate-900' },
+        { value: stats.active_members, labelAr: 'أعضاء نشطون', labelEn: 'Active', color: 'text-emerald-600' },
+        { value: stats.ever_subscribed, labelAr: 'لديهم اشتراك', labelEn: 'Ever subscribed', color: 'text-violet-600' },
+        { value: stats.new_this_month, labelAr: 'جديد الشهر', labelEn: 'New this month', color: 'text-amber-600' },
+        { value: stats.present_now, labelAr: 'متواجدون الآن', labelEn: 'Present now', color: 'text-sky-600' },
+      ]
+    : null;
 
   return (
     <DashboardPage
@@ -142,17 +146,18 @@ export default function MembersPage() {
       }
     >
 
-      {/* Section Tabs Navigation */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm px-4 pt-2 overflow-x-auto">
-        <UnifiedTabs
-          variant="underline"
-          tabs={sectionTabs.map((t) => ({ key: t.id, labelAr: t.labelAr, labelEn: t.labelEn }))}
-          activeKey={activeTabKey}
-          onChange={(key) => {
-            const tab = sectionTabs.find((t) => t.id === key);
-            if (tab) navigateTab(tab);
-          }}
-        />
+      {/* §34ح — five live stat cards (big colored number, small caption) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {(statCards || [0, 1, 2, 3, 4].map(() => null)).map((c, i) => (
+          <div key={i} className="bg-white rounded-3xl border border-gray-100 shadow-sm px-4 py-5 text-center">
+            <div className={`text-3xl font-extrabold leading-none ${c ? c.color : 'text-gray-300'}`}>
+              {c ? c.value : '—'}
+            </div>
+            <div className="mt-2 text-xs text-gray-500 font-medium">
+              {c ? (rtl ? c.labelAr : c.labelEn) : rtl ? 'جارٍ التحميل…' : 'Loading…'}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Action Bar */}

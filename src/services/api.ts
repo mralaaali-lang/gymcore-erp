@@ -678,6 +678,21 @@ export async function listMembers(params?: { search?: string; status?: string; p
   };
 }
 
+// §34ح — the five stat cards above the members list. Every number comes from
+// /api/members/stats; nothing here is derived client-side.
+export interface MemberStats {
+  total_members: number;
+  active_members: number;
+  ever_subscribed: number;
+  new_this_month: number;
+  present_now: number;
+}
+
+export async function getMemberStats(): Promise<MemberStats> {
+  const res = await api.get('/api/members/stats');
+  return res.data.data as MemberStats;
+}
+
 export async function getMember(id: string) {
   const res = await api.get(`/api/members/${id}`);
   return res.data.data || res.data;
@@ -719,6 +734,12 @@ export async function manualCheckInByPhone(memberPhone: string) {
 export async function getTodayAttendance() {
   const res = await api.get('/api/attendance/today');
   return { records: (res.data.data || []) as Record<string, unknown>[] };
+}
+
+// §34ح — front desk closes an open session explicitly.
+export async function checkOutAttendance(attendanceLogId: string) {
+  const res = await api.post('/api/attendance/checkout', { attendance_log_id: attendanceLogId });
+  return res.data;
 }
 
 // ====================================================================
