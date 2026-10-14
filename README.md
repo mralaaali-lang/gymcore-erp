@@ -29,12 +29,9 @@ GymCore ERP هو نظام متكامل لإدارة الصالات الرياض�
 - واجهة عربية وإنجليزية مع دعم اتجاه RTL.
 
 ## 🏗️ البنية التقنية | Architecture
-- الواجهة: React وTypeScript وVite.
-- الخادم: Node.js وExpress وTypeScript.
-- قاعدة البيانات: PostgreSQL مع سياسات عزل للجهات.
-- Redis متاح للمهام والتخزين المؤقت في إعداد Docker.
+المصدر الوحيد للحقيقة المعمارية: **[`ARCHITECTURE.md`](ARCHITECTURE.md)** — مخطط Mermaid مبني على الكود الفعلي (العملاء → طبقة العزل والباقات → Express → PostgreSQL بمنطقه الداخلي من RLS وتشفير وترايجرز ودوال الباقات → النشر على Railway) مع جداول بالمسارات وفجوات معروفة. يُعرض رسوميًا أيضًا في `ARCH_MAP.html`. **القاعدة:** أي milestone يغيّر البنية يحدّث `ARCHITECTURE.md` في نفس الـcommit، ولا صور خارجية مولَّدة تلقائيًا لأنها تثبت لقطة قديمة.
 
-المجلدات الأساسية: src للواجهة، server/src للـ API، server/migrations لترحيلات قاعدة البيانات، وdocs للتوثيق.
+المجلدات الأساسية: src للواجهة، server/src للـ API، server/migrations لترحيلات قاعدة البيانات، mobile/ لمشروع React Native المنفصل، وdocs للتوثيق.
 
 ## 🚀 البدء السريع | Quick Start
 

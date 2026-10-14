@@ -480,29 +480,76 @@
         <div class="max-w-6xl mx-auto">
             <h2 class="section-title gradient-text" data-aos="fade-up">البنية المعمارية</h2>
             
+            <div class="card p-8 rounded-lg mb-8" data-aos="fade-up">
+                <h3 class="text-xl font-bold mb-2 flex items-center gap-2">
+                    <span class="material-symbols-rounded">account_tree</span>
+                    المخطط المعماري — مولَّد من الكود الفعلي (2026-10-14، حتى migration 067)
+                </h3>
+                <p class="text-sm text-slate-400 mb-6">مصدر الحقيقة الوحيد: <code>ARCHITECTURE.md</code> في جذر المستودع — أي milestone يغيّر البنية يحدّث الملفين معًا. لا صور خارجية قديمة.</p>
+                <div dir="ltr" class="mermaid text-left">
+flowchart TB
+  subgraph CL["العملاء"]
+    SPA["Admin SPA — React 18 + Vite + Tailwind + TanStack Query + i18next<br/>nginx يخدم dist: محلي :9000 · Railway frontend"]
+    MOB["mobile/ — React Native منفصل (Bearer)"]
+    CRON["cron: subscriptionCleanup · Enforcement · databaseBackup"]
+    WH["Webhooks دفع (webhookAuth + Idempotency)"]
+  end
+  subgraph IS["طبقة العزل والباقات"]
+    RL["rateLimit → csrf → metrics"]
+    TN["tenant.ts: subdomain → gym_id"]
+    AU["auth.ts: JWT كوكي/Bearer · platformAuth · Zod"]
+    PG["planGuard.ts + gracePeriod + tenantIsolation"]
+  end
+  subgraph AP["Express API :4000"]
+    RT["routes ×4: index · admin · platform · billing"]
+    CT["controllers ×45"]
+    SV["services ×17: billing · invoice · whatsapp · push · queue · aiCoach · ..."]
+  end
+  subgraph DB["PostgreSQL 15 — منطق داخل الـDB"]
+    RLSp["RLS مفروض: set_config app.gym_id (004/029/030/051)"]
+    ENC["تشفير أعمدة: trg_members_encrypt + phone_hash (018)"]
+    TRG["triggers: sync_gym_plan_columns 064 · gym_card_counters 063 · addons 066"]
+    FNS["دوال: gym_effective_features / limit / live_addons"]
+  end
+  subgraph DE["النشر"]
+    RAIL["push main → GitHub → Railway auto-deploy + migrations عند الإقلاع"]
+    DOCK["docker-compose محلي (postgres + backend + frontend)"]
+    EXT["Sentry · FCM · Email · WhatsApp · Google Drive · /uploads"]
+  end
+  SPA --> RL --> TN --> AU --> PG --> RT
+  MOB --> AU
+  CRON --> DB
+  WH --> RT
+  RT --> CT --> SV --> DB
+  PG -. يقرأ .-> FNS
+  SV --> EXT
+  RAIL --> AP
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <!-- Tech Stack -->
                 <div class="card p-8 rounded-lg" data-aos="fade-right">
                     <h3 class="text-xl font-bold mb-6 flex items-center gap-2">
                         <span class="material-symbols-rounded">layers</span>
-                        المكدس التقني
+                        المكدس التقني (بالمسارات)
                     </h3>
                     <div class="space-y-4">
                         <div class="p-4 bg-slate-900/50 rounded">
-                            <div class="text-sm font-semibold text-blue-400 mb-2">Frontend</div>
-                            <div class="text-sm text-slate-400">React 18.2 + TypeScript + Tailwind CSS + React Router v7</div>
+                            <div class="text-sm font-semibold text-blue-400 mb-2">Frontend — <code>src/</code></div>
+                            <div class="text-sm text-slate-400">React 18.2 + TypeScript + Vite 5 + Tailwind + React Router 7 + TanStack Query 5 + i18next (AR/EN)</div>
                         </div>
                         <div class="p-4 bg-slate-900/50 rounded">
-                            <div class="text-sm font-semibold text-blue-400 mb-2">Backend</div>
-                            <div class="text-sm text-slate-400">Node.js + Express + TypeScript + Zod</div>
+                            <div class="text-sm font-semibold text-blue-400 mb-2">Backend — <code>server/src/</code></div>
+                            <div class="text-sm text-slate-400">Node.js + Express + TypeScript + Zod · 45 controller · 17 service · cron · multer uploads</div>
                         </div>
                         <div class="p-4 bg-slate-900/50 rounded">
-                            <div class="text-sm font-semibold text-blue-400 mb-2">Database</div>
-                            <div class="text-sm text-slate-400">PostgreSQL 15 + Supabase + RLS Policies</div>
+                            <div class="text-sm font-semibold text-blue-400 mb-2">Database — PostgreSQL 15</div>
+                            <div class="text-sm text-slate-400">RLS مفروض لكل مستأجر + تشفير أعمدة + triggers/dوال للخطة والكروت (migrations 001–067) — لا Supabase؛ PG محلي Docker وعلى Railway</div>
                         </div>
                         <div class="p-4 bg-slate-900/50 rounded">
                             <div class="text-sm font-semibold text-blue-400 mb-2">DevOps</div>
-                            <div class="text-sm text-slate-400">Docker + docker-compose + nginx + pm2</div>
+                            <div class="text-sm text-slate-400">GitHub → Railway Deployment Trigger على main (خدمتان، ميجريشنات عند الإقلاع) + docker-compose/nginx محليًا</div>
                         </div>
                     </div>
                 </div>
@@ -511,23 +558,27 @@
                 <div class="card p-8 rounded-lg" data-aos="fade-left">
                     <h3 class="text-xl font-bold mb-6 flex items-center gap-2">
                         <span class="material-symbols-rounded">people</span>
-                        البنية الهرمية
+                        الأدوار والصلب المعماري: الباقات
                     </h3>
                     <div class="space-y-3">
                         <div class="role-badge" style="background: rgba(14, 165, 233, 0.1); border-color: rgba(14, 165, 233, 0.3);">
-                            👑 Super Admin — إدارة المنصة الكاملة
+                            👑 Super Admin — إدارة المنصة والإضافات (platformAuth)
                         </div>
                         <div class="role-badge" style="background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3);">
-                            🏢 Gym Admin — إدارة صالة واحدة
+                            🏢 Manager — إدارة صالة واحدة (كل شيء يبدأ من لوحة القيادة)
                         </div>
                         <div class="role-badge" style="background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.3);">
-                            🏋️ Trainer — إدارة برامج التدريب
+                            🏋️ Coach — الحصص والبرامج (حرس COACH_NOT_IN_GYM)
                         </div>
                         <div class="role-badge" style="background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.3);">
-                            📋 Reception — تسجيل دخول الأعضاء
+                            📋 Reception — الحضور وتسجيل الأعضاء (كود/QR + تأكيد)
                         </div>
                         <div class="role-badge" style="background: rgba(244, 114, 182, 0.1); border-color: rgba(244, 114, 182, 0.3);">
-                            👤 Player — عضو بالصالة
+                            👤 Member/Player — حجز ومتابعة عبر Bearer token
+                        </div>
+                        <div class="p-4 bg-slate-900/50 rounded mt-4">
+                            <div class="text-sm font-semibold text-emerald-400 mb-2">سلّم الباقات (migration 065/066)</div>
+                            <div class="text-sm text-slate-400">Starter 550/5,500 · Growth 900/9,000 · Pro 1,400/14,000 · Enterprise 2,500/25,000 EGP (سنوي = 10× شهري) + وحدات إضافية تُسلَّم لكل صالة بسعر مخفَّض — والإلغاء لا يسحب ميزة تابعة للخطة.</div>
                         </div>
                     </div>
                 </div>
@@ -931,6 +982,10 @@
                 }
             });
         }
+    </script>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose', fontFamily: "'Cairo', sans-serif" });
     </script>
 </body>
 </html>
