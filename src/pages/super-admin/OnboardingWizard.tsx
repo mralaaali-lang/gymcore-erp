@@ -162,6 +162,7 @@ export default function OnboardingWizard() {
     mutationFn: (finalData?: Record<string, unknown>) => completeOnboarding(finalData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['onboarding-progress'] });
+      queryClient.invalidateQueries({ queryKey: ['platform'] });
       showToast(t('تم إعداد المنصة بنجاح!', 'Platform setup completed successfully!'), 'success');
     },
     onError: () => showToast(t('فشل إكمال الإعداد', 'Failed to complete setup'), 'error'),
@@ -397,6 +398,18 @@ export default function OnboardingWizard() {
               </p>
             </div>
 
+            {/* §40 — حقيقة المنصة: عدد الصالات الحالي من الخادم */}
+            {(progress?.gym_count ?? 0) > 0 && (
+              <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 max-w-md mx-auto">
+                <p className="text-sm text-amber-800 font-medium">
+                  {t(
+                    `منصتك تحتوي بالفعل على ${progress?.gym_count ?? 0} صالة — هذه الخطوة ستضيف صالة جديدة عند الإكمال، ويمكنك تخطيها إن لم ترغب في ذلك.`,
+                    `Your platform already has ${progress?.gym_count ?? 0} gym(s) — this step adds a new one when setup completes; skip it if you don't want one.`
+                  )}
+                </p>
+              </div>
+            )}
+
             <div className="space-y-4 max-w-md mx-auto">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-gray-500">{t('اسم الصالة (عربي)', 'Gym Name (Arabic)')}</label>
@@ -497,6 +510,11 @@ export default function OnboardingWizard() {
                 {t(
                   'يمكنك إضافة مشرف إضافي للمنصة. يمكنك تخطي هذه الخطوة وإضافة مشرفين لاحقاً.',
                   'Add an additional platform admin. You can skip this and add admins later.'
+                )}
+                {progress && (
+                  <span className="block mt-1 text-xs text-gray-400">
+                    {t(`عدد المشرفين الحالي على المنصة: ${progress.admin_count}`, `Current platform admins: ${progress.admin_count}`)}
+                  </span>
                 )}
               </p>
             </div>
@@ -630,12 +648,32 @@ export default function OnboardingWizard() {
                 <CheckCircle2 size={52} className="text-white" />
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-                {t('أهلاً بك! تم إعداد المنصة', 'Welcome! Platform is Ready')}
+                {t('الخطوة الأخيرة: إكمال الإعداد', 'Final Step: Complete Setup')}
               </h1>
               <p className="text-gray-500 max-w-lg leading-relaxed">
                 {t(
-                  'لقد أكملت الإعدادات الأساسية. يمكنك الآن استكشاف لوحة التحكم والبدء في إدارة صالاتك الرياضية.',
-                  'You have completed the basic setup. Start exploring the dashboard and managing your gyms.'
+                  'اضغط «اكتمال الإعداد» لحفظ إعدادات المنصة وإنشاء الصالة المحددة — يبدأ العدّاد أدناه بالارتفاع فور الحفظ.',
+                  'Press “Complete Setup” to save the platform settings and create the gym you specified — the counters below start ticking up once saved.'
+                )}
+              </p>
+            </div>
+
+            {/* §40 — حالة المنصة الحقيقية لحظة المراجعة (أرقام من الخادم) */}
+            <div className="grid grid-cols-2 gap-3 mb-6 max-w-lg mx-auto">
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-gray-900">{progress?.gym_count ?? 0}</p>
+                <p className="text-xs text-gray-500">{t('صالة على المنصة', 'gyms on platform')}</p>
+              </div>
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-center">
+                <p className="text-2xl font-bold text-gray-900">{progress?.admin_count ?? 0}</p>
+                <p className="text-xs text-gray-500">{t('مشرف على المنصة', 'platform admins')}</p>
+              </div>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-8 max-w-lg mx-auto">
+              <p className="text-sm text-blue-800 font-medium">
+                {t(
+                  'ملاحظة العقود: بعد الإكمال أبرم عقدًا لكل صالة من «دليل الصالات» — العقد هو مصدر الباقة والفواتير والميزات الفعّالة.',
+                  'Contracts note: after completion, sign a contract for each gym from the Tenant Directory — the contract is the source of plan, invoices and effective features.'
                 )}
               </p>
             </div>

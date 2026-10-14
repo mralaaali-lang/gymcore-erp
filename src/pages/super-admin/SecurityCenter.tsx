@@ -1,4 +1,5 @@
 ﻿import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { formatDateTime } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
@@ -10,6 +11,7 @@ import {
   revokePlatformAdminSession,
   getSecuritySettings,
   updateSecuritySettings,
+  listPlatformAudit,
   type SecurityOverview,
   type PlatformAdminSession,
   type SecuritySettings,
@@ -35,6 +37,13 @@ export default function SecurityCenter() {
   const overviewQuery = useApiQuery(['security', 'overview'], getSecurityOverview, { staleTime: 30_000 });
   const sessionsQuery = useApiQuery(['security', 'sessions'], listPlatformAdminSessions, { staleTime: 15_000 });
   const settingsQuery = useApiQuery(['security', 'settings'], getSecuritySettings, { staleTime: 30_000 });
+  // §40 — سجل تدقيق المنصة الحقيقي (platform_audit_logs)
+  const auditQuery = useApiQuery(
+    ['platform', 'audit', 'recent'],
+    () => listPlatformAudit({ limit: 8 }),
+    { staleTime: 20_000 },
+  );
+  const auditEntries = auditQuery.data?.data ?? [];
 
   const overview: SecurityOverview | null = overviewQuery.data?.data ?? null;
   const sessions: PlatformAdminSession[] = sessionsQuery.data?.data ?? [];
@@ -154,6 +163,50 @@ export default function SecurityCenter() {
           </div>
         </div>
       )}
+
+      {/* §40 — آخر أحداث تدقيق المنصة الحقيقية */}
+      <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">{t('Recent platform audit', 'آخر أحداث تدقيق المنصة')}</h3>
+          <Link to="/super-admin/audit" className="text-sm font-semibold text-primary hover:underline">
+            {t('All logs', 'كل السجلات')}
+          </Link>
+        </div>
+        {auditQuery.isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-9 bg-gray-50 rounded-xl animate-pulse" />)}
+          </div>
+        ) : auditEntries.length === 0 ? (
+          <p className="text-sm text-gray-500 py-4 text-center">{t('No platform audit entries yet', 'لا توجد أحداث تدقيق على المنصة بعد')}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-gray-600">
+                  <th className="text-right px-4 py-2.5 font-semibold">{t('Time', 'الوقت')}</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">{t('Action', 'الإجراء')}</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">{t('Actor', 'المنفّذ')}</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">{t('Table', 'الجدول')}</th>
+                  <th className="text-right px-4 py-2.5 font-semibold">IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditEntries.map((e) => (
+                  <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{formatDateTime(e.created_at)}</td>
+                    <td className="px-4 py-2.5">
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-mono font-semibold" dir="ltr">{e.action_type}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-900" dir="ltr">{e.actor_email || t('System', 'النظام')}</td>
+                    <td className="px-4 py-2.5 text-gray-600 text-xs font-mono" dir="ltr">{e.table_name}</td>
+                    <td className="px-4 py-2.5 text-gray-600 text-xs font-mono">{e.ip_address || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 
