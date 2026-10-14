@@ -1128,7 +1128,6 @@ export interface UpcomingClassData {
   name: string;
   start_time: string;
   end_time: string;
-  day: string;
   capacity: number;
   trainer_name: string;
   booked: number;
@@ -1137,6 +1136,51 @@ export interface UpcomingClassData {
 export async function getUpcomingClasses() {
   const res = await api.get('/api/classes/upcoming');
   return res.data as { data: UpcomingClassData[] };
+}
+
+// ====================================================================
+// §37ب — CLASS SCHEDULE (gym-manager CRUD over fitness_classes)
+// One class = one dated occurrence (start/end timestamptz). The weekly
+// grid fetches its visible range — no client-side re-labelling.
+// ====================================================================
+export interface GymClassData {
+  id: string;
+  title: string;
+  coach_id: string;
+  coach_name: string | null;
+  capacity: number;
+  start_time: string;
+  end_time: string;
+  is_cancelled: boolean;
+  booked: number;
+}
+
+export interface GymClassInput {
+  title: string;
+  coach_id: string;
+  capacity: number;
+  start_time: string;
+  end_time: string;
+}
+
+export async function listGymClasses(from: string, to: string) {
+  const res = await api.get('/api/classes', { params: { from, to } });
+  return res.data as { data: GymClassData[] };
+}
+
+export async function createGymClass(input: GymClassInput) {
+  const res = await api.post('/api/classes', input);
+  return res.data as { data: GymClassData };
+}
+
+export async function updateGymClass(id: string, input: Partial<GymClassInput> & { is_cancelled?: boolean }) {
+  const res = await api.put(`/api/classes/${id}`, input);
+  return res.data as { data: GymClassData };
+}
+
+export async function deleteGymClass(id: string) {
+  const res = await api.delete(`/api/classes/${id}`);
+  return res.data as { success: boolean };
 }
 
 // ====================================================================

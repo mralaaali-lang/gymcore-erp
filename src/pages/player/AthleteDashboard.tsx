@@ -98,7 +98,7 @@ export default function AthleteDashboard() {
                   <p className="text-sm font-medium text-gray-900">{c.name}</p>
                   <p className="text-xs text-gray-500">{c.trainer_name}</p>
                 </div>
-                <span className="text-xs text-emerald-600">{c.day} {c.start_time}</span>
+                <span className="text-xs text-emerald-600">{formatDate(c.start_time)} · {new Date(c.start_time).toTimeString().slice(0, 5)}</span>
               </div>
             </Card>
           ))}

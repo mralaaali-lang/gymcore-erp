@@ -107,12 +107,23 @@ export async function getMySubscription(req: Request, res: Response): Promise<vo
 }
 
 export async function getUpcomingClasses(req: Request, res: Response): Promise<void> {
-  const gymId = (req as any).member?.gym_id;
+  // §37ب — هذا الدالة كانت تقرأ أعمدة غير موجودة (fc.name/day/trainer_id/
+  // is_active) وهوية من req.member التي لا يملؤها أي middleware — أي أنها
+  // كانت تنهار 500 لكل عضو. الصيغة الآن على السكيما الحقيقية (migration 001:
+  // title/coach_id/is_cancelled) وهوية req.staff كما في بقية مسارات الأعضاء.
+  const gymId = req.staff?.gym_id;
   try {
     const result = await query(
-      `SELECT fc.id, fc.name, fc.start_time, fc.end_time, fc.day, fc.capacity, su.full_name AS trainer_name,
-              COALESCE((SELECT COUNT(*) FROM class_bookings cb WHERE cb.class_id = fc.id), 0) AS booked
-       FROM fitness_classes fc LEFT JOIN staff_users su ON fc.trainer_id = su.id WHERE fc.gym_id = $1 AND fc.is_active = true ORDER BY fc.day, fc.start_time`,
+      `SELECT fc.id, fc.title AS name, fc.start_time, fc.end_time, fc.capacity,
+              su.full_name AS trainer_name,
+              COALESCE((SELECT COUNT(*) FROM class_bookings cb
+                        WHERE cb.class_id = fc.id AND cb.status = 'confirmed'), 0)::int AS booked
+       FROM fitness_classes fc
+       LEFT JOIN staff_users su ON su.id = fc.coach_id
+       WHERE fc.gym_id = $1 AND fc.is_cancelled = false
+         AND fc.start_time >= CURRENT_TIMESTAMP
+       ORDER BY fc.start_time
+       LIMIT 50`,
       [gymId]
     );
     res.json({ data: result.rows });

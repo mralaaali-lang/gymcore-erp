@@ -1,4 +1,5 @@
 import { useApiQuery } from '../../hooks/useApiQuery';
+import { formatDate } from '../../utils/date';
 import { getMyVisits, getMySubscription, getUpcomingClasses, getMyPoints } from '../../services/api';
 import { useApp } from '../../context/GymBrandContext';
 import { getPlatformGym } from '../../services/api';
@@ -48,7 +49,7 @@ function usePlayerDashboard() {
     isLoading,
     metrics: [
       { label: 'حضوري هذا الشهر', value: isLoading ? '—' : String(monthlyVisits), icon: 'calendar_view_day', trend: { value: String(monthlyVisits > 10 ? '+' : ''), positive: true }, color: 'primary' as const },
-      { label: 'الحصة القادمة', value: nextClass ? `${nextClass.day} ${nextClass.start_time || ''}` : '—', icon: 'event', color: 'secondary' as const },
+      { label: 'الحصة القادمة', value: nextClass ? `${formatDate(nextClass.start_time)} ${new Date(nextClass.start_time).toTimeString().slice(0, 5)}` : '—', icon: 'event', color: 'secondary' as const },
       { label: 'الخطة النشطة', value: sub?.plan_name || '—', icon: 'workspace_premium', color: 'primary' as const },
       { label: 'الأيام المتبقية', value: isLoading ? '—' : String(remainingDays), icon: 'hourglass_top', trend: { value: `-${30 - remainingDays}`, positive: false }, color: 'warning' as const },
       { label: 'نقاط الولاء', value: isLoading ? '—' : String(points?.points_balance ?? points?.balance ?? 0), icon: 'exercise', trend: { value: '+12', positive: true }, color: 'secondary' as const },

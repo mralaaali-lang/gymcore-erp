@@ -71,7 +71,7 @@ import {
   loginSchema,
   qrAttendanceSchema,
   manualCheckinSchema,
-  classBookingSchema,
+  classBookingSchema, createFitnessClassSchema, updateFitnessClassSchema,
   freezeSubscriptionSchema,
   pendingActionSchema,
   processPendingSchema,
@@ -153,6 +153,10 @@ import {
 import {
   listProducts, getProduct, createProduct, updateProduct, deleteProduct,
 } from '../controllers/products';
+// §37ب — جدول الحصص الحقيقي للإدارة (fitness_classes CRUD)
+import {
+  listClasses, createClass, updateClass, deleteClass,
+} from '../controllers/classes';
 import {
   listStaff, getStaff, createStaff, updateStaff, deleteStaff,
   listTrainers,
@@ -282,6 +286,12 @@ router.get('/api/pending-actions', requireRole('manager'), listPendingActions);
 router.post('/api/classes/book', requireRole('member'), planGuard({ requireFeatures: ['class_booking'] }), validate(classBookingSchema), bookFitnessClass);
 router.put('/api/classes/cancel/:booking_id', requireRole('member'), cancelClassBooking);
 router.get('/api/classes/my-bookings', requireRole('member'), getMyBookings);
+
+// §37ب — إدارة الجدول: القراءة للمدير/الاستقبال/المدرب، والكتابة للمدير فقط.
+router.get('/api/classes', requireRole('manager', 'receptionist', 'coach'), listClasses);
+router.post('/api/classes', requireRole('manager'), validate(createFitnessClassSchema), createClass);
+router.put('/api/classes/:id', requireRole('manager'), validate(updateFitnessClassSchema), updateClass);
+router.delete('/api/classes/:id', requireRole('manager'), deleteClass);
 
 // ====================================================================
 // SUBSCRIPTION FREEZE — Mobile App Endpoint (Member Token)

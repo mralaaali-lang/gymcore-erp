@@ -56,6 +56,24 @@ export const classBookingSchema = z.object({
   class_id: z.string().uuid('Invalid class ID format'),
 });
 
+// §37b — gym-manager class schedule CRUD payloads (fitness_classes).
+export const createFitnessClassSchema = z.object({
+  title: z.string().min(2).max(255),
+  coach_id: z.string().uuid('Invalid coach ID'),
+  capacity: z.number().int().min(1).max(1000),
+  start_time: z.string().min(10),
+  end_time: z.string().min(10),
+});
+
+export const updateFitnessClassSchema = z.object({
+  title: z.string().min(2).max(255).optional(),
+  coach_id: z.string().uuid('Invalid coach ID').optional(),
+  capacity: z.number().int().min(1).max(1000).optional(),
+  start_time: z.string().min(10).optional(),
+  end_time: z.string().min(10).optional(),
+  is_cancelled: z.boolean().optional(),
+});
+
 export const freezeSubscriptionSchema = z.object({
   subscription_id: z.string().uuid(),
   freeze_days: z.number().int().min(1).max(30),
