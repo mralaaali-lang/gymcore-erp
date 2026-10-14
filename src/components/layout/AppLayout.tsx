@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { useApp } from '../../context/GymBrandContext';
 import Sidebar from './Sidebar';
 import TopNav from './TopNav';
-import BottomNav from './BottomNav';
 import TrialBanner from './TrialBanner';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { getNavBadges } from '../../services/api';
@@ -40,12 +39,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Trial/upgrade banner is a gym-level concept — never on platform ops screens */}
         {role !== 'super-admin' && <TrialBanner />}
         <TopNav navItems={navItems} />
-        <main className="flex-1 p-margin-mobile md:p-margin-desktop bg-surface-container-low pb-24 md:pb-margin-desktop">
+        {/* §42 — mobile nav is the drawer (Sidebar) + top-bar menu button only.
+            The legacy BottomNav strip (first 4 nav items as fixed icons) was
+            removed along with BottomNav.tsx/navIcons.ts. */}
+        <main className="flex-1 p-margin-mobile md:p-margin-desktop bg-surface-container-low">
           <div className="max-w-container-max mx-auto space-y-stack-lg">
             {children}
           </div>
         </main>
-        <BottomNav items={navItems.filter((i) => !i.premium && !i.path.includes('?') && i.path !== '/team-login').slice(0, 4)} />
       </div>
     </div>
   );
