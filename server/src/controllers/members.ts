@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { query, getClient } from '../config/database';
 import logger from '../config/logger';
 import { closeStaleSessions } from './attendance';
@@ -64,6 +65,21 @@ export const listMembers = async (req: Request, res: Response): Promise<void> =>
   const search = req.query.search as string;
   const status = req.query.status as string;
 
+  // ترتيب من الهيدر — قائمة بيضاء صارمة. أسماء الأعمدة المحسوبة
+  // (visit_count/last_checkin) تُقبل كأسماء مخرجات في ORDER BY،
+  // وNULLS LAST حتى لا يقفز فاقدو البيانات للأعلى.
+  const SORTS: Record<string, string> = {
+    member_name: 'm.full_name',
+    created_at: 'm.created_at',
+    end_date: 's.end_date',
+    remaining: 's.end_date',
+    visits: 'visit_count',
+    last_visit: 'last_checkin',
+  };
+  const rawSort = (req.query.sort as string) || 'created_at';
+  const sortKey = Object.keys(SORTS).includes(rawSort) ? rawSort : 'created_at';
+  const dir = (req.query.order as string) === 'asc' ? 'ASC' : 'DESC';
+
   try {
     let whereClause = 'WHERE m.gym_id = $1';
     const params: unknown[] = [gym_id];
@@ -103,7 +119,7 @@ export const listMembers = async (req: Request, res: Response): Promise<void> =>
 
     const dataResult = await query(
       `SELECT m.id, m.gym_id, m.full_name, decrypt_sensitive(m.phone_encrypted) as phone_number,
-              m.email, m.photo_url, m.is_blacklisted, m.blacklist_reason,
+              m.email, m.photo_url, m.is_blacklisted, m.blacklist_reason, m.gender,
               m.created_at, m.birth_date, decrypt_sensitive(m.notes_encrypted) AS medical_notes,
               s.status as subscription_status, s.end_date as subscription_end_date,
               s.start_date as subscription_start_date,
@@ -129,7 +145,7 @@ export const listMembers = async (req: Request, res: Response): Promise<void> =>
          WHERE member_id = m.id AND gym_id = m.gym_id
          ORDER BY created_at DESC LIMIT 1)
        ${whereClause}
-       ORDER BY m.created_at DESC
+       ORDER BY ${SORTS[sortKey]} ${dir} NULLS LAST, m.created_at DESC
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset]
     );
@@ -165,7 +181,7 @@ export const getMemberById = async (req: Request, res: Response): Promise<void> 
   try {
     const result = await query(
       `SELECT m.id, m.gym_id, m.full_name, decrypt_sensitive(m.phone_encrypted) as phone_number,
-              m.email, m.photo_url, m.is_blacklisted, m.blacklist_reason,
+              m.email, m.photo_url, m.is_blacklisted, m.blacklist_reason, m.gender,
               m.created_at, m.birth_date, m.card_code, decrypt_sensitive(m.notes_encrypted) AS medical_notes,
               json_agg(DISTINCT jsonb_build_object(
                 'id', s.id, 'status', s.status, 'start_date', s.start_date,
@@ -198,7 +214,7 @@ export const getMemberById = async (req: Request, res: Response): Promise<void> 
 };
 
 export const createMember = async (req: Request, res: Response): Promise<void> => {
-  const { full_name, phone_number, email, birth_date, plan_id, medical_notes, photo_url } = req.body;
+  const { full_name, phone_number, email, birth_date, plan_id, medical_notes, photo_url, gender } = req.body;
   const gym_id = req.staff?.gym_id;
   const staff_user_id = req.staff?.staff_user_id;
 
@@ -214,9 +230,9 @@ export const createMember = async (req: Request, res: Response): Promise<void> =
     const pinHash = await bcrypt.hash(generatedPin, 12);
 
     const memberResult = await client.query(
-      `INSERT INTO members (gym_id, full_name, phone_number, email, birth_date, medical_notes, photo_url, pin_code_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [gym_id, full_name, phone_number, email || null, birth_date || null, medical_notes || null, photo_url || null, pinHash]
+      `INSERT INTO members (gym_id, full_name, phone_number, email, birth_date, medical_notes, photo_url, pin_code_hash, gender)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [gym_id, full_name, phone_number, email || null, birth_date || null, medical_notes || null, photo_url || null, pinHash, gender || null]
     );
 
     const offerResult = plan_id
@@ -365,7 +381,7 @@ export const updateMember = async (req: Request, res: Response): Promise<void> =
   const { id } = req.params;
   const gym_id = req.staff?.gym_id;
   const staff_user_id = req.staff?.staff_user_id;
-  const { full_name, phone_number, email, birth_date, medical_notes, photo_url } = req.body;
+  const { full_name, phone_number, email, birth_date, medical_notes, photo_url, gender } = req.body;
 
   try {
     // Build dynamic SET clause
@@ -379,6 +395,7 @@ export const updateMember = async (req: Request, res: Response): Promise<void> =
     if (birth_date !== undefined) { updates.push(`birth_date = $${idx++}`); params.push(birth_date || null); }
     if (medical_notes !== undefined) { updates.push(`medical_notes = $${idx++}`); params.push(medical_notes || null); }
     if (photo_url !== undefined) { updates.push(`photo_url = $${idx++}`); params.push(photo_url || null); }
+    if (gender !== undefined) { updates.push(`gender = $${idx++}`); params.push(gender || null); }
 
     if (updates.length === 0) {
       res.status(400).json({ error: 'No fields to update.' });
@@ -407,6 +424,40 @@ export const updateMember = async (req: Request, res: Response): Promise<void> =
     res.status(200).json({ success: true, data: result.rows[0] });
   } catch (error) {
     logger.error('Failed to update member', { requestId: (req as any).requestId, memberId: id, error: (error as Error).message });
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+};
+
+// POST /api/members/:id/pin-reset — توليد رمز دخول جديد (4 أرقام).
+// الـPIN القديم غير قابل للاسترجاع (مخزن هاش فقط)، لذا خانة «رمز الدخول»
+// في البروفايل كانت تعرض ---- دائمًا. الجديد يُعرض مرة واحدة في الاستجابة
+// ويجب على الموظف إبلاغه للعضو فورًا — لا يُخزَّن نصًا في أي مكان.
+export const resetMemberPin = async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const gym_id = req.staff?.gym_id;
+  const staff_user_id = req.staff?.staff_user_id;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '')) {
+    res.status(400).json({ error: 'Invalid member id.' });
+    return;
+  }
+  try {
+    const exists = await query(
+      `SELECT id, full_name FROM members WHERE id = $1 AND gym_id = $2 AND deleted_at IS NULL`,
+      [id, gym_id]);
+    if (exists.rows.length === 0) {
+      res.status(404).json({ error: 'Member not found.' });
+      return;
+    }
+    const pin = String(1000 + crypto.randomInt(9000));
+    const pinHash = await bcrypt.hash(pin, 12);
+    await query(`UPDATE members SET pin_code_hash = $1 WHERE id = $2 AND gym_id = $3`, [pinHash, id, gym_id]);
+    await query(
+      `INSERT INTO activity_logs (gym_id, staff_user_id, action_description, ip_address)
+        VALUES ($1,$2,$3,$4)`,
+      [gym_id, staff_user_id, `Reset entry PIN for member ${exists.rows[0].full_name}`, req.ip]);
+    res.status(200).json({ data: { pin } });
+  } catch (error) {
+    logger.error('Failed to reset member PIN', { requestId: (req as any).requestId, memberId: id, error: (error as Error).message });
     res.status(500).json({ error: 'Internal server error.' });
   }
 };

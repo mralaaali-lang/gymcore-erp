@@ -31,6 +31,16 @@ export const createStaffSchema = z.object({
   role: z.enum(['manager', 'receptionist', 'coach']),
 });
 
+// صورة العضو: رابط مطلق، أو مسار نسبي من مرفوعات السيرفر نفسه
+// (/uploads/...) — وهو ما يرجعه POST /api/upload/photo. النسبي مقيد
+// بمجلد الأعضاء لمنع حقن مسارات خارجية.
+const memberPhotoUrl = z
+  .string()
+  .url()
+  .or(z.literal(''))
+  .or(z.string().regex(/^\/uploads\/members\/[A-Za-z0-9._-]+$/))
+  .optional();
+
 export const createMemberSchema = z.object({
   full_name: sanitizedString({ min: 2, max: 255 }),
   phone_number: z.string().min(7).max(50).regex(/^\+?[\d\s\-()]+$/, 'Invalid phone number format'),
@@ -38,7 +48,8 @@ export const createMemberSchema = z.object({
   birth_date: sanitizedString().optional(),
   plan_id: z.string().uuid('Invalid plan ID').optional(),
   medical_notes: sanitizedString({ max: 2000 }).optional(),
-  photo_url: z.string().url().optional().or(z.literal('')),
+  photo_url: memberPhotoUrl,
+  gender: z.enum(['male', 'female']).optional(),
 });
 
 export const qrAttendanceSchema = z.object({
@@ -116,7 +127,8 @@ export const updateMemberSchema = z.object({
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   birth_date: sanitizedString().optional(),
   medical_notes: sanitizedString({ max: 2000 }).optional(),
-  photo_url: z.string().url().optional().or(z.literal('')),
+  photo_url: memberPhotoUrl,
+  gender: z.enum(['male', 'female']).optional().nullable(),
 });
 
 export const paginationSchema = z.object({
@@ -613,4 +625,13 @@ export const createSubscriptionSchema = z.object({
   weekly_days: z.array(z.enum(WEEK_DAY_CODES)).max(7).optional(),
   amount_paid: z.number().min(0),
   payment_method: z.enum(['cash', 'card', 'vodafone_cash', 'instapay', 'bank']).default('cash'),
+});
+
+// تعديل الاشتراك: بيانات التعيين فقط (رياضة/مدرب/أيام) — بلا أي أثر مالي.
+// الباقة والتواريخ والمبالغ لا تُعدَّل (الديون والمدفوعات مرتبطة بها)، والإلغاء
+// والتجميد لهما مساران منفصلان. اشتراك ملغي نهائي لا يُعدَّل.
+export const updateSubscriptionSchema = z.object({
+  coach_id: z.string().uuid().optional().nullable(),
+  sport: z.enum(SUBSCRIPTION_SPORTS).optional().nullable(),
+  weekly_days: z.array(z.enum(WEEK_DAY_CODES)).max(7).optional().nullable(),
 });

@@ -8,7 +8,7 @@ import logger from '../config/logger';
 // وإنشاء اشتراك يولّد دفعة + دينًا عند الدفع الجزئي/الآجل.
 // ====================================================================
 
-const PAGE_LIMITS = [50, 100, 300];
+const PAGE_LIMITS = [10, 50, 100, 300];
 
 interface FilterBits {
   clauses: string[];
@@ -69,6 +69,19 @@ export const listSubscriptions = async (req: Request, res: Response): Promise<vo
     const rawLimit = parseInt(req.query.limit as string, 10) || 50;
     const limit = PAGE_LIMITS.includes(rawLimit) ? rawLimit : 50;
 
+    // ترتيب من الهيدر — قائمة بيضاء صارمة (لا إدخال خام في ORDER BY).
+    // المتبقي محسوب (end_date - today) فيُرتَّب كتعبير لا كعمود.
+    const SORTS: Record<string, string> = {
+      member_name: 'm.full_name',
+      start_date: 's.start_date',
+      end_date: 's.end_date',
+      remaining: '(s.end_date - CURRENT_DATE)',
+      amount: 'o.price',
+    };
+    const rawSort = (req.query.sort as string) || 'start_date';
+    const sortKey = Object.keys(SORTS).includes(rawSort) ? rawSort : 'start_date';
+    const dir = (req.query.order as string) === 'asc' ? 'ASC' : 'DESC';
+
     const countResult = await query(
       `SELECT COUNT(*)::int AS total
        FROM member_subscriptions s
@@ -80,7 +93,7 @@ export const listSubscriptions = async (req: Request, res: Response): Promise<vo
     const data = await query(
       `SELECT s.id, s.status, s.start_date, s.end_date, s.sport, s.weekly_days, s.price_paid,
               s.coach_id, s.member_id, s.offer_id,
-              m.full_name AS member_name,
+              m.full_name AS member_name, m.card_code AS member_code,
               decrypt_sensitive(m.phone_encrypted) AS member_phone,
               o.title AS offer_title, o.duration_days, o.price AS offer_price,
               c.full_name AS coach_name,
@@ -92,7 +105,7 @@ export const listSubscriptions = async (req: Request, res: Response): Promise<vo
        JOIN membership_offers o ON o.id = s.offer_id
        LEFT JOIN staff_users c ON c.id = s.coach_id
        WHERE ${where}
-       ORDER BY s.start_date DESC
+       ORDER BY ${SORTS[sortKey]} ${dir}, s.start_date DESC
        LIMIT ${limit} OFFSET ${(page - 1) * limit}`, params);
 
     // Stats computed over the SAME tenant's rows (no filters) — the four
@@ -247,5 +260,70 @@ export const createSubscription = async (req: Request, res: Response): Promise<v
     res.status(500).json({ error: 'Internal error' });
   } finally {
     client.release();
+  }
+};
+
+// PUT /api/subscriptions/:id — تعديل بيانات التعيين فقط
+// (الرياضة/المدرب/أيام الحضور). بلا أثر مالي: الباقة والتواريخ والمبالغ
+// خارج النطاق عمدًا (الديون والمدفوعات والطابور مرتبطة بها)، والملغي نهائي.
+export const updateSubscription = async (req: Request, res: Response): Promise<void> => {
+  const gym_id = req.staff?.gym_id;
+  const staff_user_id = req.staff?.staff_user_id;
+  const id = req.params.id as string;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '')) {
+    res.status(400).json({ error: 'Invalid subscription id.' });
+    return;
+  }
+  const { coach_id, sport, weekly_days } = req.body as {
+    coach_id?: string | null; sport?: string | null; weekly_days?: string[] | null;
+  };
+  if (coach_id === undefined && sport === undefined && weekly_days === undefined) {
+    res.status(400).json({ error: 'Nothing to update.' });
+    return;
+  }
+  try {
+    const cur = await query(
+      `SELECT id, status, member_id FROM member_subscriptions
+        WHERE id = $1 AND gym_id = $2 AND deleted_at IS NULL`,
+      [id, gym_id]);
+    if (cur.rows.length === 0) {
+      res.status(404).json({ error: 'Subscription not found in this gym.' });
+      return;
+    }
+    if (cur.rows[0].status === 'cancelled') {
+      res.status(400).json({ error: 'Cannot edit a cancelled subscription.' });
+      return;
+    }
+    if (coach_id) {
+      const coachRes = await query(
+        `SELECT id FROM staff_users WHERE id = $1 AND gym_id = $2 AND role = 'coach' AND is_active = true`,
+        [coach_id, gym_id]);
+      if (coachRes.rows.length === 0) {
+        res.status(400).json({ error: 'Coach not found in this gym' });
+        return;
+      }
+    }
+    const sets: string[] = [];
+    const vals: unknown[] = [id, gym_id];
+    // Dynamic SET: explicit null clears the field, absent key keeps it.
+    if (coach_id !== undefined) { vals.push(coach_id); sets.push(`coach_id = $${vals.length}`); }
+    if (sport !== undefined) { vals.push(sport); sets.push(`sport = $${vals.length}`); }
+    if (weekly_days !== undefined) {
+      vals.push(weekly_days && weekly_days.length ? weekly_days : null);
+      sets.push(`weekly_days = $${vals.length}`);
+    }
+    const upd = await query(
+      `UPDATE member_subscriptions SET ${sets.join(', ')}
+        WHERE id = $1 AND gym_id = $2
+        RETURNING id, coach_id, sport, weekly_days`,
+      vals);
+    await query(
+      `INSERT INTO activity_logs (gym_id, staff_user_id, action_description, ip_address)
+        VALUES ($1,$2,$3,$4)`,
+      [gym_id, staff_user_id, `Updated subscription ${id} assignment (coach/sport/days)`, req.ip]);
+    res.status(200).json({ data: upd.rows[0] });
+  } catch (e: any) {
+    logger.error('updateSubscription failed', { error: e.message });
+    res.status(500).json({ error: 'Internal error' });
   }
 };

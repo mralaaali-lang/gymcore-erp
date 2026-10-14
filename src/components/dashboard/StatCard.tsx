@@ -30,7 +30,7 @@ export default function StatCard({
 }: StatCardProps) {
   const a = ACCENTS[accent];
   const Tag = onClick ? 'button' : 'div';
-  // pill أخضر مميز للزيادة (‎+2 جديد‎) — باقي الـ sub يفضل نص رمادي صغير
+  // الزيادة (‎+2 جديد‎) pill أخضر تحت خالص — باقي الـ sub نص رمادي صغير
   const subIsHighlight = !!sub && /^\+/.test(sub.trim());
   return (
     <Tag
@@ -38,33 +38,37 @@ export default function StatCard({
       onClick={onClick}
       className={`${CARD_HOVER_CLASS} text-start w-full ${onClick ? 'cursor-pointer' : ''}`}
     >
-      <div className="flex items-start justify-between gap-2">
+      {/* الأيقونة يمين في المنتصف (أول عنصر = يمين في RTL) والنص جنبها */}
+      <div className="flex items-center gap-3">
         <div
           className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
           style={{ backgroundColor: a.soft }}
         >
           <Icon size={22} strokeWidth={1.75} style={{ color: a.solid }} />
         </div>
-        {trend ? (
-          <span
-            className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
-              trendPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
-            }`}
-          >
-            {trendPositive ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-            {trend}
-          </span>
-        ) : subIsHighlight ? (
-          <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full shrink-0 bg-emerald-50 text-emerald-600">
-            {sub}
-          </span>
-        ) : null}
+        <div className="min-w-0">
+          <p className="text-lg md:text-xl font-extrabold text-gray-900 tracking-tight tabular-nums leading-tight">
+            {value}
+          </p>
+          <p className="text-sm font-medium text-gray-500 mt-0.5">{label}</p>
+          {trend ? (
+            <span
+              className={`mt-1.5 inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${
+                trendPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+              }`}
+            >
+              {trendPositive ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+              {trend}
+            </span>
+          ) : subIsHighlight ? (
+            <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600">
+              {sub}
+            </span>
+          ) : sub ? (
+            <span className="mt-1.5 block text-xs text-gray-400">{sub}</span>
+          ) : null}
+        </div>
       </div>
-      <p className="text-2xl md:text-3xl font-extrabold text-gray-900 mt-3 tracking-tight tabular-nums">
-        {value}
-      </p>
-      <p className="text-sm font-medium text-gray-500 mt-1">{label}</p>
-      {sub && !subIsHighlight && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
       {sparkData && <Sparkline data={sparkData} color={a.solid} />}
     </Tag>
   );

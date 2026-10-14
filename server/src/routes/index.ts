@@ -50,6 +50,7 @@ import {
   createMember,
   updateMember,
   blacklistMember,
+  resetMemberPin,
   cancelSubscription,
 } from '../controllers/members';
 import {
@@ -65,8 +66,8 @@ import {
   revokeAllOtherSessions,
 } from '../controllers/auth';
 import { listOffers, listAllOffers, createOffer, updateOffer } from '../controllers/offers';
-import { createOfferSchema, updateOfferSchema, createSubscriptionSchema } from '../validators/schemas';
-import { listSubscriptions, createSubscription } from '../controllers/subscriptions';
+import { createOfferSchema, updateOfferSchema, createSubscriptionSchema, updateSubscriptionSchema } from '../validators/schemas';
+import { listSubscriptions, createSubscription, updateSubscription } from '../controllers/subscriptions';
 import {
   loginSchema,
   qrAttendanceSchema,
@@ -226,6 +227,8 @@ router.get('/api/members/:id', requireRole('manager', 'receptionist', 'coach'), 
 router.post('/api/members', requireRole('manager', 'receptionist'), planGuard({ checkMembers: true }), validate(createMemberSchema), createMember);
 router.put('/api/members/:id', requireRole('manager', 'receptionist'), validate(updateMemberSchema), updateMember);
 router.put('/api/members/:id/blacklist', requireRole('manager'), validate(blacklistMemberSchema), blacklistMember);
+// رمز الدخول غير قابل للاسترجاع (هاش فقط) — التوليد من جديد هو الطريق الصادق الوحيد.
+router.post('/api/members/:id/pin-reset', requireRole('manager'), resetMemberPin);
 // §34ج — استيراد CSV الحقيقي (tabs/Settings→MigrationTab) — كل صف يُكتب فعلًا
 // أو يُرفض برسالة صادقة، بلا أي توست وهمي.
 router.post('/api/import/:type', requireRole('manager'), importData);
@@ -234,6 +237,8 @@ router.post('/api/subscriptions/:subscriptionId/cancel', requireRole('manager'),
 // اشتراك يولّد دفعة ودينًا عند الجزئي/الآجل (كل الحسابات سيرفرية).
 router.get('/api/subscriptions', requireRole('manager'), listSubscriptions);
 router.post('/api/subscriptions', requireRole('manager'), validate(createSubscriptionSchema), createSubscription);
+// تعديل بيانات التعيين فقط (رياضة/مدرب/أيام) — بلا أثر مالي، والملغي خارج النطاق.
+router.put('/api/subscriptions/:id', requireRole('manager'), validate(updateSubscriptionSchema), updateSubscription);
 
 // ====================================================================
 // MEMBERSHIP OFFERS

@@ -45,6 +45,17 @@ function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** Live clock in 12-hour format (front-desk wall clock convention). */
+function clock12(d: Date, rtl: boolean): { time: string; suffix: string } {
+  const h24 = d.getHours();
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    time: `${pad(h12)}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`,
+    suffix: rtl ? (h24 < 12 ? 'ص' : 'م') : (h24 < 12 ? 'AM' : 'PM'),
+  };
+}
+
 export default function AttendanceRecords() {
   const { language, role } = useApp();
   const { showToast } = useToast();
@@ -65,7 +76,6 @@ export default function AttendanceRecords() {
     const t = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(t);
   }, []);
-
   // Today's rows — drive the "متواجدون الآن" table + stats + lookup already
   // refreshed by the card's own queries; react-query dedupes by key.
   const { data: todayRes, isLoading: todayLoading } = useApiQuery(
@@ -172,7 +182,10 @@ export default function AttendanceRecords() {
       <Panel icon={Clock} accent="sky" title={rtl ? 'اليوم المعروض' : 'Displayed day'}>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-2xl md:text-3xl font-extrabold text-gray-900 tabular-nums" dir="ltr">
-            {`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`}
+            {clock12(now, rtl).time}
+          </span>
+          <span className="text-sm font-bold text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1">
+            {clock12(now, rtl).suffix}
           </span>
           <span className="text-sm text-gray-500 font-medium">{selectedDate}</span>
           <div className="flex items-center gap-2 ms-auto flex-wrap">

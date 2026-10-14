@@ -199,7 +199,6 @@ export default function GymAdminDashboard() {
 
   const totalMembers = membersRes?.total ?? 0;
   const fin = financeRes?.data;
-  const monthlyRevenue = Number(fin?.monthly_revenue ?? 0);
   const todayRevenue = Number(fin?.today_revenue ?? 0);
 
   // §36-ب — the dashboard follows the same effective-feature gating as the
@@ -244,7 +243,7 @@ export default function GymAdminDashboard() {
             icon={Users}
             label={t('dashboard.members', 'المشتركين')}
             value={String(totalMembers)}
-            sub={biz ? `+${biz.new_this_month} ${t('dashboard.newThisMonth', 'جديد هذا الشهر')}` : undefined}
+            sub={biz ? `+${biz.new_this_month} ${t('dashboard.newThisMonth', 'جديد')}` : undefined}
             accent="emerald"
             onClick={() => navigate('/admin/members')}
           />
@@ -252,7 +251,7 @@ export default function GymAdminDashboard() {
             icon={CreditCard}
             label={t('dashboard.subscriptions', 'الاشتراكات')}
             value={biz ? String(biz.active_members) : '—'}
-            sub={`${expiring?.total ?? 0} ${t('dashboard.expiring7d', 'تنتهي خلال 7 أيام')}`}
+            sub={`${expiring?.total ?? 0} ${t('dashboard.expiring7d', 'تنتهي')}`}
             accent="violet"
             onClick={() => navigate('/admin/subscriptions')}
           />
@@ -260,7 +259,6 @@ export default function GymAdminDashboard() {
             icon={Wallet}
             label={t('dashboard.revenueTodayCard', 'إيراد اليوم')}
             value={formatMoney(todayRevenue, currency)}
-            sub={`${formatMoney(monthlyRevenue, currency)} ${t('dashboard.monthlyShort', 'شهرياً')}`}
             accent="amber"
             onClick={() => navigate(reportsTarget)}
           />

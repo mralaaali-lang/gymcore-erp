@@ -114,6 +114,7 @@ function AddMemberForm({ onDone, defaultPlanNote }: { onDone: () => void; defaul
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [birthDate, setBirthDate] = useState('');
+  const [gender, setGender] = useState('');
   const [planId, setPlanId] = useState('');
   const [created, setCreated] = useState<{ name: string; pin: string } | null>(null);
 
@@ -126,6 +127,7 @@ function AddMemberForm({ onDone, defaultPlanNote }: { onDone: () => void; defaul
       phone_number: phone.trim(),
       email: email.trim() || undefined,
       birth_date: birthDate || undefined,
+      gender: gender || undefined,
       plan_id: planId || undefined,
     }),
     onSuccess: (res: { data?: { full_name?: string }; generated_pin?: string }) => {
@@ -169,6 +171,13 @@ function AddMemberForm({ onDone, defaultPlanNote }: { onDone: () => void; defaul
       </Field>
       <Field label={rtl ? 'تاريخ الميلاد (اختياري)' : 'Birth date (optional)'}>
         <input className={inputCls} type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+      </Field>
+      <Field label={rtl ? 'الجنس (اختياري)' : 'Gender (optional)'}>
+        <select className={inputCls} value={gender} onChange={(e) => setGender(e.target.value)}>
+          <option value="">{rtl ? 'بدون تحديد' : 'Not set'}</option>
+          <option value="male">{rtl ? 'ذكر' : 'Male'}</option>
+          <option value="female">{rtl ? 'أنثى' : 'Female'}</option>
+        </select>
       </Field>
       <Field label={rtl ? 'الاشتراك / العرض' : 'Membership offer'}>
         {offersQuery.isLoading ? (
@@ -318,6 +327,13 @@ function CheckInForm() {
 
   const startCamera = async () => {
     setCameraError(null);
+    // نفس كشف CheckInCard: بلا mediaDevices يعني رابط http غير آمن غالبًا.
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(rtl
+        ? 'الكاميرا لا تعمل على رابط غير آمن (http) — افتح الموقع من رابط https، أو استخدم الإدخال اليدوي.'
+        : 'Camera needs a secure (https) URL — open the site over https, or use manual entry.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream;
@@ -349,11 +365,18 @@ function CheckInForm() {
         loopRef.current = window.setTimeout(tick, 300);
       };
       loopRef.current = window.setTimeout(tick, 300);
-    } catch {
+    } catch (e) {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       setCameraOn(false);
-      setCameraError(rtl ? 'تعذر فتح الكاميرا — تحقق من إذن الكاميرا، أو استخدم الإدخال اليدوي.' : 'Camera unavailable — check permission, or use manual entry.');
+      const name = (e as { name?: string })?.name;
+      setCameraError(rtl
+        ? name === 'NotAllowedError' || name === 'SecurityError'
+          ? 'تم رفض إذن الكاميرا — اسمح بالكاميرا من إعدادات المتصفح للموقع، أو استخدم الإدخال اليدوي.'
+          : name === 'NotFoundError' || name === 'OverconstrainedError'
+            ? 'لم يتم العثور على كاميرا في هذا الجهاز — استخدم الإدخال اليدوي.'
+            : 'تعذر فتح الكاميرا — تحقق من إذن الكاميرا، أو استخدم الإدخال اليدوي.'
+        : 'Camera unavailable — check permission, or use manual entry.');
     }
   };
 

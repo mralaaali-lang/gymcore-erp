@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
-import { getMember, getCustomer360, updateMember, type Customer360Data } from '../../services/api';
+import { getMember, getCustomer360, updateMember, resetMemberPin, uploadMemberPhoto, type Customer360Data } from '../../services/api';
 import PageLoader from '../../components/shared/PageLoader';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import Button from '../../components/ui/Button';
@@ -24,8 +24,16 @@ const TAB_ICONS: Record<ProfileTab, string> = {
   attendance: 'fact_check',
 };
 
+/** رقم صالح لـ wa.me: أرقام فقط، والمحلي المصري 01xxxxxxxxx يُكتب 201xxxxxxxxx. */
+function toWhatsApp(phone: string): string {
+  const d = phone.replace(/\D/g, '');
+  if (/^01\d{9}$/.test(d)) return '2' + d;
+  if (d.startsWith('00201')) return d.slice(2);
+  return d;
+}
+
 export default function MemberProfileView() {
-  const { language, gymProfile } = useApp();
+  const { language, gymProfile, role } = useApp();
   // §30: money() — gym currency symbol everywhere on this page
   const money = (v: number | string | null | undefined) =>
     v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
@@ -41,8 +49,41 @@ export default function MemberProfileView() {
   // fake "coming soon" toast). Centered modal per project convention.
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ full_name: '', phone_number: '', email: '', birth_date: '', medical_notes: '', photo_url: '' });
+  const [editForm, setEditForm] = useState({ full_name: '', phone_number: '', email: '', birth_date: '', medical_notes: '', photo_url: '', gender: '' });
   const [editSaving, setEditSaving] = useState(false);
+  // رمز الدخول الجديد يُعرض مرة واحدة فقط (لا يُسترجع بعدها).
+  const [freshPin, setFreshPin] = useState<string | null>(null);
+  const [pinBusy, setPinBusy] = useState(false);
+  // نافذة الاتصال: تعرض الرقم المسجل بخط كبير (مريحة للموبايل).
+  const [callOpen, setCallOpen] = useState(false);
+  // صورة العضو: تُعرض عند وجودها وتسقط للأحرف الأولى لو الرابط مكسور.
+  const [imgOk, setImgOk] = useState(true);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const photoRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => { setImgOk(true); setFreshPin(null); }, [id]);
+
+  // الضغط على الصورة/الأحرف يفتح اختيار صورة → رفع → حفظ في الملف.
+  const changePhoto = async (file: File | undefined) => {
+    if (!file || !id) return;
+    if (file.size > 2 * 1024 * 1024) {
+      showToast(rtl ? 'الصورة أكبر من 2 ميجا' : 'Image larger than 2MB', 'error');
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const up = await uploadMemberPhoto(file);
+      await updateMember(id, { photo_url: up.data.url });
+      setImgOk(true);
+      queryClient.invalidateQueries({ queryKey: ['member', id] });
+      showToast(rtl ? 'تم تحديث الصورة' : 'Photo updated', 'success');
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      showToast(msg || (rtl ? 'فشل رفع الصورة' : 'Photo upload failed'), 'error');
+    } finally {
+      setPhotoBusy(false);
+      if (photoRef.current) photoRef.current.value = '';
+    }
+  };
 
   useEffect(() => {
     if (sessionStorage.getItem('member_just_added') === 'true') {
@@ -88,8 +129,9 @@ export default function MemberProfileView() {
   const pinCode = m.pin_code || m.generated_pin || '----';
   const cardCode = m.card_code || '';
   const joinDate = m.join_date || m.created_at?.split('T')[0] || '-';
-  const phone = m.phone_number || '-';
-  const gender = m.gender || '-';
+  const phone = m.phone_number || '';
+  const hasPhone = phone.trim().length >= 7;
+  const gender = m.gender === 'male' ? (rtl ? 'ذكر' : 'Male') : m.gender === 'female' ? (rtl ? 'أنثى' : 'Female') : '-';
   // §34ج — pg returns date columns as full ISO timestamps; UI standard is YYYY-MM-DD.
   const birthDate = m.birth_date ? String(m.birth_date).split('T')[0] : '-';
   const balance = m.balance || '0.00';
@@ -107,6 +149,7 @@ export default function MemberProfileView() {
       birth_date: (m.birth_date as string)?.split('T')[0] || '',
       medical_notes: (m.medical_notes as string) || '',
       photo_url: (m.photo_url as string) || '',
+      gender: (m.gender as string) || '',
     });
     setEditOpen(true);
   };
@@ -125,6 +168,7 @@ export default function MemberProfileView() {
         birth_date: editForm.birth_date || undefined,
         medical_notes: editForm.medical_notes,
         photo_url: editForm.photo_url,
+        gender: editForm.gender || null,
       });
       queryClient.invalidateQueries({ queryKey: ['member', id] });
       queryClient.invalidateQueries({ queryKey: ['customer360', id] });
@@ -156,11 +200,38 @@ export default function MemberProfileView() {
         {/* Left Sidebar */}
         <aside className="lg:w-72 shrink-0">
           <Card className="sticky top-4 space-y-5">
-            {/* Avatar + Name */}
+            {/* Avatar — الضغط عليها يغيّر الصورة (رفع فوري وحفظ في الملف) */}
             <div className="text-center">
-              <div className="w-20 h-20 rounded-3xl bg-emerald-500 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-3 shadow-sm shadow-emerald-500/25">
-                {initials}
-              </div>
+              <input
+                ref={photoRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => changePhoto(e.target.files?.[0])}
+              />
+              <button
+                type="button"
+                onClick={() => photoRef.current?.click()}
+                disabled={photoBusy}
+                title={rtl ? 'اضغط لتغيير الصورة' : 'Click to change photo'}
+                className="relative block mx-auto mb-3 group disabled:opacity-60"
+              >
+                {m.photo_url && imgOk ? (
+                  <img
+                    src={String(m.photo_url)}
+                    alt={fullName}
+                    onError={() => setImgOk(false)}
+                    className="w-20 h-20 rounded-3xl object-cover shadow-sm"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-3xl bg-emerald-500 text-white flex items-center justify-center text-2xl font-bold shadow-sm shadow-emerald-500/25">
+                    {photoBusy ? '…' : initials}
+                  </div>
+                )}
+                <span className="absolute inset-0 rounded-3xl bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center">
+                  <span className="material-symbols-outlined text-white text-2xl opacity-0 group-hover:opacity-100 transition">photo_camera</span>
+                </span>
+              </button>
               <h2 className="text-lg font-bold text-gray-900 leading-tight">{fullName}</h2>
               <p className="text-sm text-gray-500 mt-1">
                 {rtl ? 'مشترك منذ' : 'Member since'} {joinDate}
@@ -177,7 +248,37 @@ export default function MemberProfileView() {
             {/* Check-in Code */}
             <div className="text-center py-3 bg-gray-50 rounded-2xl border border-gray-100">
               <p className="text-xs text-gray-500 mb-1">{rtl ? 'رمز الدخول' : 'CHECK-IN CODE'}</p>
-              <p className="text-4xl font-mono font-bold tracking-[0.3em] text-emerald-600">{pinCode}</p>
+              <p className="text-4xl font-mono font-bold tracking-[0.3em] text-emerald-600">
+                {freshPin ?? pinCode}
+              </p>
+              {freshPin ? (
+                <p className="text-[11px] text-amber-700 mt-1 px-2">
+                  {rtl ? 'جديد — أبلغه للعضو الآن، لن يظهر مجددًا' : 'New — relay it to the member now, it will not show again'}
+                </p>
+              ) : (
+                role === 'gym-admin' && (
+                  <button
+                    type="button"
+                    disabled={pinBusy}
+                    onClick={async () => {
+                      setPinBusy(true);
+                      try {
+                        const res = await resetMemberPin(id!);
+                        setFreshPin(res.data.pin);
+                        showToast(rtl ? 'تم توليد رمز جديد — أبلغه للعضو فورًا' : 'New PIN generated — relay it now', 'success');
+                      } catch (e: unknown) {
+                        const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+                        showToast(msg || (rtl ? 'فشل توليد الرمز' : 'PIN generation failed'), 'error');
+                      } finally {
+                        setPinBusy(false);
+                      }
+                    }}
+                    className="mt-1.5 text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 min-h-[32px]"
+                  >
+                    {pinBusy ? (rtl ? 'جارٍ…' : '…') : (rtl ? 'توليد رمز جديد' : 'Generate new PIN')}
+                  </button>
+                )
+              )}
             </div>
 
             {/* §35ج — كود العضوية الحقيقي: رقم تسلسلي لكل صالة + طباعة بطاقة بـQR */}
@@ -206,19 +307,25 @@ export default function MemberProfileView() {
               <p className="text-center text-xs text-gray-400">{rtl ? 'لم يُصدر كود بطاقة لهذا العضو بعد' : 'No card code issued for this member yet'}</p>
             )}
 
-            {/* Quick Actions */}
+            {/* Quick Actions — اتصال (نافذة بالرقم كبير) وواتساب على نفس الرقم */}
             <div className="flex justify-center gap-3">
               <button
-                onClick={() => window.open(`tel:${phone}`, '_self')}
+                onClick={() => setCallOpen(true)}
                 className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition"
                 title={rtl ? 'اتصال' : 'Call'}
               >
                 <span className="material-symbols-outlined text-xl">call</span>
               </button>
               <button
-                onClick={() => window.open(`sms:${phone}`, '_self')}
+                onClick={() => {
+                  if (!hasPhone) {
+                    showToast(rtl ? 'لا يوجد رقم مسجل لهذا العضو' : 'No phone number saved for this member', 'error');
+                    return;
+                  }
+                  window.open(`https://wa.me/${toWhatsApp(phone)}`, '_blank');
+                }}
                 className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition"
-                title={rtl ? 'رسالة' : 'Message'}
+                title={rtl ? 'واتساب' : 'WhatsApp'}
               >
                 <span className="material-symbols-outlined text-xl">chat</span>
               </button>
@@ -245,7 +352,7 @@ export default function MemberProfileView() {
                 {[
                   { label: rtl ? 'تاريخ الميلاد' : 'Birthday', value: birthDate },
                   { label: rtl ? 'الجنس' : 'Gender', value: gender },
-                  { label: rtl ? 'رقم الهاتف' : 'Phone Number', value: phone },
+                  { label: rtl ? 'رقم الهاتف' : 'Phone Number', value: phone || '—' },
                   { label: rtl ? 'الرصيد' : 'Balance', value: balance },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2">
@@ -256,10 +363,6 @@ export default function MemberProfileView() {
               </div>
             </div>
 
-            {/* Manage Family */}
-            <Button variant="outline" fullWidth className="py-2.5 text-xs">
-              {rtl ? 'إدارة الحساب العائلي' : 'MANAGE FAMILY ACCOUNT'}
-            </Button>
           </Card>
         </aside>
 
@@ -322,6 +425,13 @@ export default function MemberProfileView() {
                   <h3 className="text-base font-bold text-gray-900">
                     {rtl ? 'الملاحظات الطبية' : 'Medical Notes'}
                   </h3>
+                  <button
+                    type="button"
+                    onClick={openEdit}
+                    className="ms-auto text-xs font-bold text-emerald-700 hover:underline min-h-[36px] px-2"
+                  >
+                    {m.medical_notes ? (rtl ? 'تعديل الملاحظة' : 'Edit note') : (rtl ? 'إضافة ملاحظة' : 'Add note')}
+                  </button>
                 </div>
                 {m.medical_notes ? (
                   <p className="text-sm text-gray-700 whitespace-pre-line">{String(m.medical_notes)}</p>
@@ -417,6 +527,39 @@ export default function MemberProfileView() {
         </div>
       </div>
 
+      {/* نافذة الاتصال: الرقم المسجل بخط كبير + زر اتصال (مريحة للموبايل) */}
+      {callOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setCallOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" aria-hidden />
+          <div dir={rtl ? 'rtl' : 'ltr'} className="relative w-full max-w-xs bg-white rounded-3xl shadow-2xl p-6 text-center space-y-4">
+            <p className="text-sm text-gray-500">{fullName}</p>
+            {hasPhone ? (
+              <>
+                <p dir="ltr" className="text-3xl font-mono font-extrabold tracking-wider text-gray-900">{phone}</p>
+                <a
+                  href={`tel:${phone.replace(/\s/g, '')}`}
+                  className="flex items-center justify-center gap-2 w-full rounded-2xl bg-emerald-600 py-3.5 text-base font-bold text-white hover:bg-emerald-700 min-h-[52px]"
+                >
+                  <span className="material-symbols-outlined text-xl">call</span>
+                  {rtl ? 'اتصال الآن' : 'Call now'}
+                </a>
+              </>
+            ) : (
+              <p className="text-sm text-gray-500 py-4">
+                {rtl ? 'لا يوجد رقم مسجل لهذا العضو' : 'No phone number saved for this member'}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => setCallOpen(false)}
+              className="w-full rounded-2xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
+            >
+              {rtl ? 'إغلاق' : 'Close'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* §34ج — real member edit (centered modal per project convention) */}
       {editOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setEditOpen(false)}>
@@ -445,8 +588,7 @@ export default function MemberProfileView() {
                 </div>
               ))}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'رابط الصورة' : 'Photo URL'}</label>
-                <input
+                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'رابط الصورة' : 'Photo URL'}</label>                <input
                   type="url"
                   value={editForm.photo_url}
                   onChange={(e) => setEditForm((p) => ({ ...p, photo_url: e.target.value }))}
@@ -454,6 +596,18 @@ export default function MemberProfileView() {
                   dir="ltr"
                   placeholder="https://…"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الجنس' : 'Gender'}</label>
+                <select
+                  value={editForm.gender}
+                  onChange={(e) => setEditForm((p) => ({ ...p, gender: e.target.value }))}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  <option value="">{rtl ? 'بدون تحديد' : 'Not set'}</option>
+                  <option value="male">{rtl ? 'ذكر' : 'Male'}</option>
+                  <option value="female">{rtl ? 'أنثى' : 'Female'}</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الملاحظات الطبية' : 'Medical notes'}</label>

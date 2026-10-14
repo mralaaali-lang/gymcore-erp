@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Clock, DollarSign, FileText, Plus, Receipt, UserCheck, X } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowsDownUp, Clock, DollarSign, FileText, Plus, UserCheck, X } from 'lucide-react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -16,8 +16,8 @@ import { DashboardPage, PrimaryAction, SecondaryAction, Panel, EmptyState } from
 import { QuickActionModals, type ActionKey } from '../../components/dashboard/QuickActionCenter';
 import StatusBadge from '../../components/ui/StatusBadge';
 import AddSubscription from './subscriptions/AddSubscription';
-import { printSubscriptionInvoice } from './subscriptions/invoice';
-import { SPORTS, durationLabelAr, sportLabel } from './subscriptions/shared';
+import EditSubscription from './subscriptions/EditSubscription';
+import { SPORTS, sportLabel } from './subscriptions/shared';
 
 /** Extract the server's own error text so the UI never hides a real rejection. */
 function apiError(e: unknown, fallback: string): string {
@@ -47,6 +47,16 @@ const DURATION_OPTIONS = [
   { value: '180', ar: '6 شهور' },
 ];
 
+// الأعمدة القابلة للترتيب + الاتجاه الافتراضي الذكي لكل عمود
+// (إلى/المتبقي: الأقرب أولاً — الأهم للتجديد؛ المبلغ: الأعلى أولاً).
+const SORTABLE: Record<string, { labelAr: string; labelEn: string; def: 'asc' | 'desc' }> = {
+  member_name: { labelAr: 'العضو', labelEn: 'Member', def: 'asc' },
+  start_date: { labelAr: 'من', labelEn: 'From', def: 'desc' },
+  end_date: { labelAr: 'إلى', labelEn: 'To', def: 'asc' },
+  remaining: { labelAr: 'المتبقي', labelEn: 'Remaining', def: 'asc' },
+  amount: { labelAr: 'المبلغ', labelEn: 'Amount', def: 'desc' },
+};
+
 /**
  * §34ي — صفحة الاشتراكات (مواصفة صاحب المشروع): هيدر + أزرار سريعة،
  * شريط PDF/اشتراك جديد، 4 كروت إحصاء محسوبة على السيرفر من
@@ -72,11 +82,15 @@ export default function SubscriptionsPage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(50);
+  const [limit, setLimit] = useState(10);
+  // الترتيب: العمود + الاتجاه — الافتراضي الأحدث أولاً (نفس ترتيب السيرفر القديم).
+  const [sort, setSort] = useState('start_date');
+  const [order, setOrder] = useState('desc');
 
   const [quick, setQuick] = useState<ActionKey | null>(null);
   const [showForm, setShowForm] = useState(params.get('new') === '1'); // §35ت — dashboard «اشتراك جديد» deep link
   const [cancelling, setCancelling] = useState<SubscriptionRow | null>(null);
+  const [editing, setEditing] = useState<SubscriptionRow | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
@@ -85,13 +99,13 @@ export default function SubscriptionsPage() {
   }, [searchInput]);
 
   const { data, isLoading, isError } = useApiQuery(
-    ['subscriptions', status, sport, duration, search, String(page), String(limit)],
+    ['subscriptions', status, sport, duration, search, String(page), String(limit), sort, order],
     () => listSubscriptions({
       status: status === 'all' ? undefined : status,
       sport: sport || undefined,
       duration: duration || undefined,
       search: search || undefined,
-      page, limit,
+      page, limit, sort, order,
     }),
     { staleTime: 15_000 }
   );
@@ -104,6 +118,39 @@ export default function SubscriptionsPage() {
     setStatus('all'); setSport(''); setDuration(''); setSearchInput(''); setSearch(''); setPage(1);
   };
   const filtersDirty = status !== 'all' || sport !== '' || duration !== '' || search !== '';
+
+  // الضغط على عمود مرتّب يعكس الاتجاه، والضغط على عمود جديد يبدأ باتجاهه الذكي.
+  const toggleSort = (key: string) => {
+    if (sort === key) {
+      setOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSort(key);
+      setOrder(SORTABLE[key].def);
+    }
+    setPage(1);
+  };
+
+  const sortTh = (key: string) => {
+    const cfg = SORTABLE[key];
+    const active = sort === key;
+    return (
+      <th key={key} className="py-3 px-2 font-semibold text-start" aria-sort={active ? (order === 'asc' ? 'ascending' : 'descending') : undefined}>
+        <button
+          type="button"
+          onClick={() => toggleSort(key)}
+          title={rtl ? 'اضغط للترتيب' : 'Click to sort'}
+          className={`inline-flex items-center gap-1 hover:text-gray-900 ${active ? 'text-emerald-700' : ''}`}
+        >
+          {rtl ? cfg.labelAr : cfg.labelEn}
+          {active ? (
+            order === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+          ) : (
+            <ArrowsDownUp size={14} className="text-gray-300" />
+          )}
+        </button>
+      </th>
+    );
+  };
 
   const cancel = useMutation({
     mutationFn: () => cancelSubscription(cancelling!.id, cancelReason.trim() || 'إلغاء من صفحة الاشتراكات'),
@@ -199,7 +246,7 @@ export default function SubscriptionsPage() {
           )}
         </div>
 
-        {/* 5) الجدول — 10 أعمدة، 50/100 صفوف */}
+        {/* 5) الجدول — 10 أعمدة، 10/50/100/300 صفوف (الافتراضي 10)، والضغط على الصف يفتح مودال التعديل */}
         <Panel>
           {isLoading ? (
             <p className="text-center py-12 text-gray-400">{rtl ? 'جاري التحميل...' : 'Loading…'}</p>
@@ -216,67 +263,52 @@ export default function SubscriptionsPage() {
               <table className="w-full min-w-[850px] text-sm">
                 <thead>
                   <tr className="text-start text-gray-500 border-b border-gray-100">
-                    <th className="py-3 px-2 font-semibold text-start">{rtl ? 'العضو' : 'Member'}</th>
+                    <th className="py-3 px-2 font-semibold text-start w-10">#</th>
+                    {sortTh('member_name')}
                     <th className="py-3 px-2 font-semibold text-start">{rtl ? 'الباقة' : 'Plan'}</th>
                     <th className="py-3 px-2 font-semibold text-start">{rtl ? 'الرياضة' : 'Sport'}</th>
                     <th className="py-3 px-2 font-semibold text-start">{rtl ? 'المدرب' : 'Coach'}</th>
-                    <th className="py-3 px-2 font-semibold text-start">{rtl ? 'من' : 'From'}</th>
-                    <th className="py-3 px-2 font-semibold text-start">{rtl ? 'إلى' : 'To'}</th>
-                    <th className="py-3 px-2 font-semibold text-start">{rtl ? 'المتبقي' : 'Remaining'}</th>
-                    <th className="py-3 px-2 font-semibold text-start">{rtl ? 'المبلغ' : 'Amount'}</th>
+                    {sortTh('start_date')}
+                    {sortTh('end_date')}
+                    {sortTh('remaining')}
+                    {sortTh('amount')}
                     <th className="py-3 px-2 font-semibold text-start">{rtl ? 'الدفع' : 'Payment'}</th>
-                    <th className="py-3 px-2 font-semibold text-start">{rtl ? 'إجراءات' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {rows.map((r) => {
+                  {rows.map((r, idx) => {
                     const rem = remainingCell(r);
                     return (
-                      <tr key={r.id} className="hover:bg-gray-50/60">
-                        <td className="py-3 px-2">
+                      <tr
+                        key={r.id}
+                        onClick={() => setEditing(r)}
+                        title={rtl ? 'اضغط للتعديل' : 'Click to edit'}
+                        className="hover:bg-gray-50/60 cursor-pointer"
+                      >
+                        <td className="py-3 px-2 text-start text-gray-400 tabular-nums text-xs">
+                          {(page - 1) * limit + idx + 1}
+                        </td>
+                        <td className="py-3 px-2 text-start">
                           <p className="font-bold text-gray-900">{r.member_name}</p>
-                          <p className="text-xs text-gray-500">{r.member_phone || r.id.slice(0, 8)}</p>
+                          <p className="text-xs text-gray-500">
+                            {rtl ? 'كود' : 'Code'} {r.member_code ?? '—'}
+                            {r.member_phone ? ` · ${r.member_phone}` : ''}
+                          </p>
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="py-3 px-2 text-start">
                           <p className="text-gray-800">{r.offer_title}</p>
-                          <p className="text-xs text-gray-400">{durationLabelAr(r.duration_days)}</p>
                         </td>
-                        <td className="py-3 px-2 text-gray-700">{sportLabel(r.sport)}</td>
-                        <td className="py-3 px-2 text-gray-700">{r.coach_name || (rtl ? 'بدون مدرب' : 'No coach')}</td>
-                        <td className="py-3 px-2 text-gray-700 whitespace-nowrap">{formatDate(r.start_date)}</td>
-                        <td className="py-3 px-2 text-gray-700 whitespace-nowrap">{formatDate(r.end_date)}</td>
-                        <td className="py-3 px-2"><StatusBadge status={rem.text} variant={rem.variant} /></td>
-                        <td className="py-3 px-2 text-gray-900 font-semibold whitespace-nowrap">{formatMoney(Number(r.offer_price), currency)}</td>
-                        <td className="py-3 px-2">
+                        <td className="py-3 px-2 text-start text-gray-700">{sportLabel(r.sport)}</td>
+                        <td className="py-3 px-2 text-start text-gray-700">{r.coach_name || (rtl ? 'بدون مدرب' : 'No coach')}</td>
+                        <td className="py-3 px-2 text-start text-gray-700 whitespace-nowrap">{formatDate(r.start_date)}</td>
+                        <td className="py-3 px-2 text-start text-gray-700 whitespace-nowrap">{formatDate(r.end_date)}</td>
+                        <td className="py-3 px-2 text-start"><StatusBadge status={rem.text} variant={rem.variant} /></td>
+                        <td className="py-3 px-2 text-start text-gray-900 font-semibold whitespace-nowrap">{formatMoney(Number(r.offer_price), currency)}</td>
+                        <td className="py-3 px-2 text-start">
                           <StatusBadge status={r.payment_state === 'paid' ? (rtl ? 'مدفوع' : 'Paid') : (rtl ? 'غير مدفوع' : 'Unpaid')} variant={r.payment_state === 'paid' ? 'success' : 'error'} />
                           {r.payment_state === 'unpaid' && (
                             <p className="text-[11px] text-rose-500 mt-1">{rtl ? 'عليه' : 'owed'} {formatMoney(Number(r.outstanding_amount), currency)}</p>
                           )}
-                        </td>
-                        <td className="py-3 px-2">
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              title={rtl ? 'طباعة الفاتورة' : 'Print invoice'}
-                              onClick={() => {
-                                const ok = printSubscriptionInvoice(gymName, currency, { ...r, sport_label: sportLabel(r.sport) });
-                                if (!ok) showToast(rtl ? 'المتصفح منع نافذة الطباعة' : 'Print popup blocked', 'error');
-                              }}
-                              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100"
-                            >
-                              <Receipt size={16} />
-                            </button>
-                            {r.status === 'active' && (
-                              <button
-                                type="button"
-                                title={rtl ? 'إلغاء الاشتراك' : 'Cancel subscription'}
-                                onClick={() => setCancelling(r)}
-                                className="p-2 rounded-lg text-gray-500 hover:bg-rose-50 hover:text-rose-600"
-                              >
-                                <X size={16} />
-                              </button>
-                            )}
-                          </div>
                         </td>
                       </tr>
                     );
@@ -296,17 +328,16 @@ export default function SubscriptionsPage() {
                   value={limit}
                   onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
                 >
+                  <option value={10}>10</option>
                   <option value={50}>50</option>
                   <option value={100}>100</option>
                   <option value={300}>300</option>
                 </select>
-                {rtl ? 'صف' : 'rows'} · {fmtNum(pagination.total)} {rtl ? 'إجمالي' : 'total'}
-                · {rtl ? `صفحة ${pagination.page} من ${pagination.total_pages}` : `page ${pagination.page} of ${pagination.total_pages}`}
               </label>
               {/* §35ج — numbered pages replace the deleted «السابق/التالي»: a click
                   jumps straight to the page, and 300-per-view shrinks the window. */}
               {pagination.total_pages > 1 && (
-                <div className="flex items-center gap-2" dir="ltr">
+                <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
                   {Array.from({ length: Math.min(pagination.total_pages, 5) }, (_, i) => {
                     const start = pagination.total_pages <= 5 ? 1
                       : Math.max(1, Math.min(pagination.page - 2, pagination.total_pages - 4));
@@ -334,6 +365,13 @@ export default function SubscriptionsPage() {
       {/* أزرار سريعة + شاشة الاشتراك الجديد */}
       <QuickActionModals action={quick} onClose={() => setQuick(null)} />
       {showForm && <AddSubscription onClose={() => setShowForm(false)} />}
+      {editing && (
+        <EditSubscription
+          sub={editing}
+          onClose={() => setEditing(null)}
+          onRequestCancel={() => { setEditing(null); setCancelling(editing); }}
+        />
+      )}
 
       {/* مودال إلغاء مصغّر — السيرفر يفرض سببًا */}
       {cancelling && (

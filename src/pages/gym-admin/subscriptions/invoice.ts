@@ -6,6 +6,7 @@ import { durationLabelAr, paymentMethodLabel } from './shared';
 export interface InvoiceSubscription {
   id: string;
   member_name: string;
+  member_code?: string | null;
   member_phone?: string | null;
   offer_title: string;
   duration_days: number;
@@ -30,6 +31,7 @@ export function printSubscriptionInvoice(gymName: string | undefined, currency: 
   const rows: [string, string][] = [
     ['رقم الاشتراك', s.id.slice(0, 8)],
     ['العضو', s.member_name],
+    ['كود العضو', s.member_code || '—'],
     ['التليفون', s.member_phone || '—'],
     ['الباقة', `${s.offer_title} (${durationLabelAr(s.duration_days)})`],
     ['الرياضة', s.sport_label || '—'],

@@ -673,7 +673,7 @@ export interface MemberResponse {
   balance?: string;
 }
 
-export async function listMembers(params?: { search?: string; status?: string; page?: number; limit?: number }) {
+export async function listMembers(params?: { search?: string; status?: string; page?: number; limit?: number; sort?: string; order?: string }) {
   const res = await api.get('/api/members', { params });
   return {
     members: (res.data.data || []) as MemberResponse[],
@@ -709,6 +709,7 @@ export async function createMember(data: {
   plan_id?: string;
   photo_url?: string;
   medical_notes?: string;
+  gender?: string;
 }) {
   const res = await api.post('/api/members', data);
   return res.data;
@@ -716,6 +717,12 @@ export async function createMember(data: {
 
 export async function blacklistMember(id: string, reason: string) {
   const res = await api.put(`/api/members/${id}/blacklist`, { reason });
+  return res.data;
+}
+
+// توليد رمز دخول جديد (يُعرض مرة واحدة — لا يُسترجع بعدها).
+export async function resetMemberPin(id: string): Promise<{ data: { pin: string } }> {
+  const res = await api.post(`/api/members/${id}/pin-reset`);
   return res.data;
 }
 
@@ -728,6 +735,7 @@ export async function updateMember(id: string, data: {
   birth_date?: string;
   photo_url?: string;
   medical_notes?: string;
+  gender?: string | null;
 }) {
   const res = await api.put(`/api/members/${id}`, data);
   return res.data;
@@ -967,6 +975,7 @@ export interface SubscriptionRow {
   coach_name: string | null;
   member_id: string;
   member_name: string;
+  member_code: string | null;
   member_phone: string | null;
   offer_id: string;
   offer_title: string;
@@ -986,7 +995,7 @@ export interface SubscriptionsStats {
 
 export async function listSubscriptions(params?: {
   status?: string; sport?: string; duration?: string; search?: string;
-  member_id?: string; page?: number; limit?: number;
+  member_id?: string; page?: number; limit?: number; sort?: string; order?: string;
 }): Promise<{ data: SubscriptionRow[]; pagination: { page: number; limit: number; total: number; total_pages: number }; stats: SubscriptionsStats }> {
   const res = await api.get('/api/subscriptions', { params });
   return res.data;
@@ -1011,6 +1020,17 @@ export async function createSubscription(input: NewSubscriptionInput): Promise<{
 
 export async function cancelSubscription(id: string, reason: string): Promise<{ data: unknown }> {
   const res = await api.post(`/api/subscriptions/${id}/cancel`, { reason });
+  return res.data;
+}
+
+export interface UpdateSubscriptionInput {
+  coach_id?: string | null;
+  sport?: string | null;
+  weekly_days?: string[] | null;
+}
+
+export async function updateSubscription(id: string, input: UpdateSubscriptionInput): Promise<{ data: { id: string; coach_id: string | null; sport: string | null; weekly_days: string[] | null } }> {
+  const res = await api.put(`/api/subscriptions/${id}`, input);
   return res.data;
 }
 

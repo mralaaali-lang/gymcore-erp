@@ -17,26 +17,23 @@ export interface MemberCardData {
 
 export function printMemberCard(c: MemberCardData): boolean {
   const svg = renderToStaticMarkup(
-    createElement(QRCodeSVG, { value: c.cardCode, size: 140, level: 'M' })
+    createElement(QRCodeSVG, { value: c.cardCode, size: 150, level: 'M' })
   );
   const inner = `
   <div style="display:flex;justify-content:center;padding:18px 0">
-    <div style="width:340px;border:2px solid #059669;border-radius:16px;padding:18px 20px;font-family:'Segoe UI',Tahoma,Arial,sans-serif">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <b style="font-size:15px;color:#065f46">${escapeHtml(c.gymName || '—')}</b>
-        <span style="font-size:10px;color:#6b7280">بطاقة عضوية</span>
+    <div style="width:360px;border-radius:18px;overflow:hidden;border:1px solid #d1d5db;font-family:'Segoe UI',Tahoma,Arial,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,0.08)">
+      <div style="background:linear-gradient(135deg,#065f46 0%,#059669 100%);padding:14px 20px;display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:16px;color:#ffffff">${escapeHtml(c.gymName || '—')}</b>
+        <span style="font-size:10px;color:#d1fae5;letter-spacing:2px">بطاقة عضوية</span>
       </div>
-      <div style="display:flex;align-items:center;gap:14px;margin-top:14px">
-        <div style="flex:0 0 auto">${svg}</div>
-        <div>
-          <div style="font-size:15px;font-weight:700">${escapeHtml(c.fullName)}</div>
-          <div dir="ltr" style="font-family:monospace;font-size:22px;letter-spacing:3px;color:#059669;margin-top:6px">${escapeHtml(c.cardCode)}</div>
-        </div>
+      <div style="height:3px;background:linear-gradient(90deg,#d4af37,#f5e08c,#d4af37)"></div>
+      <div style="padding:18px 20px 20px;text-align:center;background:#ffffff">
+        <div style="font-size:17px;font-weight:800;color:#111827">${escapeHtml(c.fullName)}</div>
+        <div dir="ltr" style="font-family:monospace;font-size:26px;letter-spacing:4px;color:#059669;margin-top:4px">${escapeHtml(c.cardCode)}</div>
+        <div style="display:inline-block;margin-top:12px;padding:12px;background:#ffffff;border:1.5px solid #e5e7eb;border-radius:12px">${svg}</div>
+        <div style="margin-top:12px;font-size:11px;color:#6b7280">صالحة حتى: <b style="color:#111827">${escapeHtml(c.validUntil || '—')}</b></div>
       </div>
-      <div style="margin-top:12px;display:flex;justify-content:space-between;font-size:11px;color:#6b7280">
-        <span>صالحة حتى: <b style="color:#111827">${escapeHtml(c.validUntil || '—')}</b></span>
-        <span>قدّم هذا الكود عند الحضور</span>
-      </div>
+      <div style="background:#f9fafb;padding:9px;text-align:center;font-size:10px;color:#6b7280;border-top:1px solid #f3f4f6">قدّم هذا الكود عند الحضور</div>
     </div>
   </div>
   <p class="muted" style="text-align:center">اطبع هذه الصفحة على ورق عادي ثم قصّ على الحد، أو احفظها PDF.</p>`;

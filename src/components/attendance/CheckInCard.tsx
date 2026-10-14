@@ -108,8 +108,24 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
 
   const fail = (text: string) => setLast({ ok: false, text });
 
+  /** رسائل السيرفر إنجليزية — نترجم المعروف منها للعربية بدل ما تظهر خام. */
+  const friendlyError = (raw: string, fallback: string): string => {
+    if (!rtl) return raw || fallback;
+    if (!raw) return fallback;
+    if (raw.includes('No member found with this phone')) return 'لم يُعثر على عضو بهذا الرقم — تأكد أن الرقم مسجل في بيانات العضو.';
+    if (raw.includes('blacklisted')) return 'هذا العضو محظور — لا يمكن تسجيل الحضور.';
+    if (raw.includes('no active subscription')) return 'هذا العضو ليس له اشتراك نشط — لا يمكن تسجيل الحضور.';
+    if (raw.includes('subscription is')) return 'اشتراك هذا العضو غير نشط — لا يمكن تسجيل الحضور.';
+    if (raw.includes('already checked in')) return 'تم تسجيل حضور هذا العضو اليوم بالفعل.';
+    if (raw.includes('Member not found')) return 'العضو غير موجود.';
+    return raw;
+  };
+
   const errorFrom = (e: unknown, fallback: string): string =>
-    (e as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
+    friendlyError(
+      (e as { response?: { data?: { error?: string } } })?.response?.data?.error || '',
+      fallback
+    );
 
   /** Register a specific member found via lookup. */
   const checkInMember = async (c: CheckInMemberHit) => {
@@ -119,7 +135,7 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
     try {
       const res = await manualCheckInById(c.id);
       if (res?.success) succeed(c.full_name);
-      else fail(res?.error || (rtl ? 'فشل تسجيل الحضور' : 'Check-in failed'));
+      else fail(friendlyError(res?.error || '', rtl ? 'فشل تسجيل الحضور' : 'Check-in failed'));
     } catch (e) {
       fail(errorFrom(e, rtl ? 'فشل تسجيل الحضور' : 'Check-in failed'));
     } finally {
@@ -139,7 +155,7 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
       try {
         const res = await qrCheckIn(raw);
         if (res?.success) succeed();
-        else fail(res?.error || (rtl ? 'رفض السيرفر التسجيل' : 'Server rejected check-in'));
+        else fail(friendlyError(res?.error || '', rtl ? 'رفض السيرفر التسجيل' : 'Server rejected check-in'));
       } catch (e) {
         fail(errorFrom(e, rtl ? 'فشل تسجيل الحضور' : 'Check-in failed'));
       } finally {
@@ -178,7 +194,7 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
       try {
         const res = await manualCheckInByPhone(raw);
         if (res?.success) succeed();
-        else fail(res?.error || (rtl ? 'لم يُعثر على عضو بهذا الرقم' : 'No member with this phone'));
+        else fail(friendlyError(res?.error || '', rtl ? 'لم يُعثر على عضو بهذا الرقم' : 'No member with this phone'));
       } catch (e) {
         fail(errorFrom(e, rtl ? 'لم يُعثر على عضو بهذا الرقم' : 'No member with this phone'));
       } finally {
@@ -225,7 +241,7 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
     try {
       const res = await qrCheckIn(token);
       if (res?.success) succeed();
-      else fail(res?.error || (rtl ? 'رفض السيرفر التسجيل' : 'Server rejected check-in'));
+      else fail(friendlyError(res?.error || '', rtl ? 'رفض السيرفر التسجيل' : 'Server rejected check-in'));
     } catch (e) {
       fail(errorFrom(e, rtl ? 'فشل تسجيل الحضور' : 'Check-in failed'));
     } finally {
@@ -236,6 +252,14 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
 
   const startCamera = async () => {
     setCameraError(null);
+    // المتصفح يمنع الكاميرا تمامًا على روابط http غير الآمنة (مثل IP الشبكة
+    // المحلية) — بلا أي نافذة إذن. نكشفها مبكرًا برسالة صادقة بدل "تحقق من الإذن".
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(rtl
+        ? 'الكاميرا لا تعمل على رابط غير آمن (http) — افتح الموقع من رابط https، أو استخدم الإدخال اليدوي.'
+        : 'Camera needs a secure (https) URL — open the site over https, or use manual entry.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream;
@@ -266,13 +290,22 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
         loopRef.current = window.setTimeout(tick, 300);
       };
       loopRef.current = window.setTimeout(tick, 300);
-    } catch {
+    } catch (e) {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       setCameraOn(false);
+      const name = (e as { name?: string })?.name;
       setCameraError(rtl
-        ? 'تعذر فتح الكاميرا — تحقق من إذن الكاميرا، أو استخدم الإدخال اليدوي.'
-        : 'Camera unavailable — check permission, or use manual entry.');
+        ? name === 'NotAllowedError' || name === 'SecurityError'
+          ? 'تم رفض إذن الكاميرا — اسمح بالكاميرا من إعدادات المتصفح للموقع، أو استخدم الإدخال اليدوي.'
+          : name === 'NotFoundError' || name === 'OverconstrainedError'
+            ? 'لم يتم العثور على كاميرا في هذا الجهاز — استخدم الإدخال اليدوي.'
+            : 'تعذر فتح الكاميرا — تحقق من إذن الكاميرا، أو استخدم الإدخال اليدوي.'
+        : name === 'NotAllowedError' || name === 'SecurityError'
+          ? 'Camera permission denied — allow camera for this site in browser settings, or use manual entry.'
+          : name === 'NotFoundError' || name === 'OverconstrainedError'
+            ? 'No camera found on this device — use manual entry.'
+            : 'Camera unavailable — check permission, or use manual entry.');
     }
   };
 
@@ -281,43 +314,14 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
       aria-label={rtl ? 'تسجيل الحضور' : 'Check in'}
       className={`bg-white rounded-3xl border border-gray-100 shadow-sm p-5 md:p-6 ${className}`}
     >
-      {/* مينيمال: سطر واحد — أيقونة + عنوان صغير يمين، والأرقام badges خفيفة شمال */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* الهيدر: أيقونة + عنوان فقط — الإحصائيات في شريط عصري تحت الإنبوت */}
+      <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0">
           <Activity size={20} className="text-emerald-600" />
         </div>
-        <div className="min-w-0">
-          <h2 className="text-base font-bold text-gray-900 leading-tight">
-            {rtl ? 'تسجيل الحضور' : 'Check In'}
-          </h2>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {rtl
-              ? 'امسح الباركود أو أدخل كود العضو أو رقم الهاتف أو الاسم'
-              : 'Scan a barcode/pass, or enter the member code, phone, or name'}
-          </p>
-        </div>
-
-        <div className="ms-auto flex items-center gap-2 flex-wrap">
-          {listTo ? (
-            <button
-              onClick={() => navigate(listTo)}
-              title={rtl ? 'عرض سجل الحضور' : 'View attendance log'}
-              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 tabular-nums hover:bg-emerald-100 transition cursor-pointer"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              {todayCount} {rtl ? 'حضور اليوم' : 'today'}
-            </button>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 tabular-nums">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              {todayCount} {rtl ? 'حضور اليوم' : 'today'}
-            </span>
-          )}
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 tabular-nums">
-            <span className={`h-1.5 w-1.5 rounded-full ${presentCount > 0 ? 'bg-violet-500 animate-pulse' : 'bg-violet-300'}`} />
-            {presentCount} {rtl ? 'متواجدون الآن' : 'inside'}
-          </span>
-        </div>
+        <h2 className="text-base font-bold text-gray-900 leading-tight">
+          {rtl ? 'تسجيل الحضور' : 'Check In'}
+        </h2>
       </div>
 
       {canCheckIn ? (
@@ -339,27 +343,29 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
                     else if (showList && e.key === 'ArrowUp') { e.preventDefault(); setHighlight((h) => Math.max(h - 1, 0)); }
                     else if (e.key === 'Enter') { e.preventDefault(); void submitQuery(); }
                   }}
-                  placeholder={rtl ? 'باركود / كود / هاتف / اسم…' : 'Barcode / code / phone / name…'}
-                  dir="auto"
+                  placeholder={rtl ? 'امسح الباركود أو أدخل كود العضو أو رقم الهاتف أو الاسم' : 'Scan a barcode/pass, or enter the member code, phone, or name'}
+                  dir={rtl ? 'rtl' : 'ltr'}
                   aria-label={rtl ? 'بحث العضو لتسجيل الحضور' : 'Member lookup for check-in'}
-                  className="w-full h-12 md:h-11 ps-10 pe-4 text-base md:text-sm rounded-xl border border-gray-200 bg-gray-50/50 text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 focus:bg-white outline-none transition"
+                  className="w-full h-12 md:h-11 ps-10 pe-12 text-start text-base md:text-sm rounded-xl border border-gray-200 bg-gray-50/50 text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 focus:bg-white outline-none transition"
                 />
+                {/* الكاميرا جوه البار على الطرف — نفس المكان والوظيفة */}
+                <button
+                  type="button"
+                  onClick={cameraOn ? stopCamera : startCamera}
+                  aria-label={cameraOn ? (rtl ? 'إيقاف الكاميرا' : 'Stop camera') : (rtl ? 'مسح بالكاميرا' : 'Scan with camera')}
+                  title={cameraOn ? (rtl ? 'إيقاف الكاميرا' : 'Stop camera') : (rtl ? 'مسح بالكاميرا' : 'Scan with camera')}
+                  className={`absolute end-1.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg flex items-center justify-center transition ${
+                    cameraOn ? 'bg-rose-50 text-rose-600' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Camera size={18} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={cameraOn ? stopCamera : startCamera}
-                aria-label={cameraOn ? (rtl ? 'إيقاف الكاميرا' : 'Stop camera') : (rtl ? 'مسح بالكاميرا' : 'Scan with camera')}
-                className={`shrink-0 w-12 h-12 md:h-11 md:w-11 rounded-xl border font-bold flex items-center justify-center transition ${
-                  cameraOn ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-                }`}
-              >
-                <Camera size={20} />
-              </button>
               <button
                 type="button"
                 onClick={() => void submitQuery()}
                 disabled={busy || !q}
-                className="shrink-0 h-12 md:h-11 px-5 rounded-xl bg-emerald-600 text-white text-base md:text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 min-w-[96px] transition"
+                className="shrink-0 h-12 md:h-11 px-3.5 md:px-5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 min-w-[80px] md:min-w-[96px] transition"
               >
                 {busy ? (rtl ? 'جارٍ التسجيل…' : 'Saving…') : (rtl ? 'حضور' : 'Check in')}
               </button>
@@ -404,16 +410,52 @@ export default function CheckInCard({ className = '', listTo }: { className?: st
         </p>
       )}
 
-      {/* Result line + continuous session counter */}
-      <div className="mt-3 min-h-[24px] flex items-center justify-between gap-3 flex-wrap">
+      {/* Result banner + continuous session counter */}
+      <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
         {last ? (
-          <p className={`text-sm font-semibold ${last.ok ? 'text-emerald-600' : 'text-rose-600'}`} role="status">{last.text}</p>
-        ) : <span />}
+          <p
+            role="status"
+            className={`w-full text-sm font-bold rounded-xl px-3.5 py-2.5 border ${
+              last.ok
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                : 'bg-rose-50 text-rose-700 border-rose-100'
+            }`}
+          >
+            {last.text}
+          </p>
+        ) : null}
         {canCheckIn && sessionCount > 0 && (
           <span className="text-xs font-bold text-gray-500 bg-gray-100 rounded-full px-3 py-1">
             {rtl ? `معالَج في هذه الجلسة: ${sessionCount}` : `Processed this session: ${sessionCount}`}
           </span>
         )}
+      </div>
+
+      {/* شريط الإحصاء آخر الكارت: حضور اليوم (زرار يفتح السجل) + متواجدون الآن */}
+      <div className="mt-3 grid grid-cols-2 rounded-2xl border border-gray-100 bg-gray-50/70 overflow-hidden">
+        {listTo ? (
+          <button
+            type="button"
+            onClick={() => navigate(listTo)}
+            title={rtl ? 'عرض سجل الحضور' : 'View attendance log'}
+            className="flex items-center justify-center gap-2 px-3 py-2.5 hover:bg-emerald-50/80 transition cursor-pointer"
+          >
+            <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+            <span className="text-lg font-extrabold tabular-nums text-emerald-700 leading-none">{todayCount}</span>
+            <span className="text-xs font-semibold text-gray-500">{rtl ? 'حضور اليوم' : 'today'}</span>
+          </button>
+        ) : (
+          <div className="flex items-center justify-center gap-2 px-3 py-2.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+            <span className="text-lg font-extrabold tabular-nums text-emerald-700 leading-none">{todayCount}</span>
+            <span className="text-xs font-semibold text-gray-500">{rtl ? 'حضور اليوم' : 'today'}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-center gap-2 px-3 py-2.5 border-s border-gray-200">
+          <span className={`h-2 w-2 rounded-full shrink-0 ${presentCount > 0 ? 'bg-violet-500 animate-pulse' : 'bg-violet-300'}`} />
+          <span className="text-lg font-extrabold tabular-nums text-violet-700 leading-none">{presentCount}</span>
+          <span className="text-xs font-semibold text-gray-500">{rtl ? 'متواجدون الآن' : 'inside'}</span>
+        </div>
       </div>
     </section>
   );

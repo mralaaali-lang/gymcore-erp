@@ -2,13 +2,14 @@
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 export type { PhosphorIcon as LucideIcon };
 
-// Same-name re-exports (56 icons)
+// Same-name re-exports (57 icons)
 export {
   Armchair,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  ArrowsDownUp,
   Bell,
   Brain,
   Briefcase,

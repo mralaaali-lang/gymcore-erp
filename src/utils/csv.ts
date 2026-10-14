@@ -1,6 +1,9 @@
 // §34ج — minimal RFC-4180 CSV helpers used by the real MigrationTab import.
 // parseCsv returns header-keyed row objects; downloadCsv produces the
 // per-entity template files (no server needed for a template).
+// downloadXlsx writes a real .xlsx workbook (SheetJS) for Excel exports.
+
+import * as XLSX from 'xlsx';
 
 export function parseCsv(text: string): Record<string, string>[] {
   // strip BOM, normalize newlines
@@ -42,4 +45,37 @@ export function downloadCsv(filename: string, content: string): void {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Build a 2D string matrix (header + rows) shared by CSV and XLSX exporters. */
+export function buildExportMatrix(
+  columns: { key: string; label: string }[],
+  data: Record<string, unknown>[],
+  formatCell?: (key: string, value: unknown) => string,
+): string[][] {
+  const head = columns.map((c) => c.label);
+  const body = data.map((row) =>
+    columns.map((col) => {
+      const v = row[col.key];
+      const formatted = formatCell?.(col.key, v) ?? (v === null || v === undefined ? '' : String(v));
+      return formatted;
+    })
+  );
+  return [head, ...body];
+}
+
+export function downloadMatrixCsv(filename: string, matrix: string[][]): void {
+  const csv = matrix.map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n');
+  downloadCsv(filename, csv);
+}
+
+/** Real Excel workbook from the same matrix (first row = headers). */
+export function downloadMatrixXlsx(filename: string, matrix: string[][]): void {
+  const ws = XLSX.utils.aoa_to_sheet(matrix);
+  ws['!cols'] = matrix[0].map((_, i) => ({
+    wch: Math.min(40, Math.max(12, ...matrix.map((r) => String(r[i] ?? '').length + 2))),
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, filename);
 }
