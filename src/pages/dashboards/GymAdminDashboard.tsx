@@ -202,6 +202,14 @@ export default function GymAdminDashboard() {
   const monthlyRevenue = Number(fin?.monthly_revenue ?? 0);
   const todayRevenue = Number(fin?.today_revenue ?? 0);
 
+  // §36-ب — the dashboard follows the same effective-feature gating as the
+  // sidebar (/auth/me features = plan modules ∪ live add-ons): store cards
+  // disappear without 'products', and reports entrances fall back to
+  // المدفوعات without 'daily_reports' so no card links into a hidden page.
+  const feats = gymProfile?.features;
+  const hasFeat = (k: string) => !Array.isArray(feats) || feats.includes(k);
+  const reportsTarget = hasFeat('daily_reports') ? '/admin/reports' : '/admin/billing';
+
   // Hide charts that would render as an empty frame (§24).
   const hasPeakData = (peakHours ?? []).some((h) => h.check_ins > 0);
   const hasRevenueData = !!revenueBreakdown
@@ -254,16 +262,18 @@ export default function GymAdminDashboard() {
             value={formatMoney(todayRevenue, currency)}
             sub={`${formatMoney(monthlyRevenue, currency)} ${t('dashboard.monthlyShort', 'شهرياً')}`}
             accent="amber"
-            onClick={() => navigate('/admin/reports')}
+            onClick={() => navigate(reportsTarget)}
           />
-          <StatCard
-            icon={ShoppingCart}
-            label={t('dashboard.sales', 'مبيعات المتجر')}
-            value={formatMoney(Number(fin?.today_sales_sum ?? 0), currency)}
-            sub={`${fin?.today_sales_count ?? 0} ${t('dashboard.ordersToday', 'طلب اليوم')}`}
-            accent="sky"
-            onClick={() => navigate('/admin/sales')}
-          />
+          {hasFeat('products') && (
+            <StatCard
+              icon={ShoppingCart}
+              label={t('dashboard.sales', 'مبيعات المتجر')}
+              value={formatMoney(Number(fin?.today_sales_sum ?? 0), currency)}
+              sub={`${fin?.today_sales_count ?? 0} ${t('dashboard.ordersToday', 'طلب اليوم')}`}
+              accent="sky"
+              onClick={() => navigate('/admin/sales')}
+            />
+          )}
         </div>
 
         {/* §35ت — the six daily actions, real endpoints/modals only (replaces QuickActionBar) */}
@@ -280,12 +290,14 @@ export default function GymAdminDashboard() {
             accent="violet"
             onClick={() => navigate('/admin/subscriptions?new=1')}
           />
-          <QuickCard
-            icon={ShoppingCart}
-            label={t('dashboard.sell', 'بيع')}
-            accent="sky"
-            onClick={() => navigate('/admin/sales')}
-          />
+          {hasFeat('products') && (
+            <QuickCard
+              icon={ShoppingCart}
+              label={t('dashboard.sell', 'بيع')}
+              accent="sky"
+              onClick={() => navigate('/admin/sales')}
+            />
+          )}
           <QuickCard
             icon={Banknote}
             label={t('dashboard.payment', 'دفعة')}
@@ -302,7 +314,7 @@ export default function GymAdminDashboard() {
             icon={BarChart3}
             label={t('dashboard.reports', 'التقارير')}
             accent="emerald"
-            onClick={() => navigate('/admin/reports')}
+            onClick={() => navigate(reportsTarget)}
           />
         </div>
 
@@ -318,7 +330,7 @@ export default function GymAdminDashboard() {
                 trend={`${biz.active_members} ${t('dashboard.activeSubsShort', 'اشتراك نشط')}`}
                 trendPositive
                 accent="emerald"
-                onClick={() => navigate('/admin/reports')}
+                onClick={() => navigate(reportsTarget)}
               />
               <StatCard
                 icon={Users}
@@ -334,7 +346,7 @@ export default function GymAdminDashboard() {
                 trend={biz.active_at_month_start > 0 ? `${biz.churned_this_month}/${biz.active_at_month_start}` : undefined}
                 trendPositive={(biz.churn_rate_pct ?? 0) <= 0}
                 accent="rose"
-                onClick={() => navigate('/admin/reports')}
+                onClick={() => navigate(reportsTarget)}
               />
               <StatCard
                 icon={TrendingUp}
