@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import * as Sentry from '@sentry/node';
 import { getAdminClient } from '../config/database';
 import logger from '../config/logger';
+import { logPlatformAudit } from '../utils/platformAudit';
 
 /** Safely extract error message from unknown error type */
 function getErrorMessage(error: unknown): string {
@@ -84,6 +85,7 @@ export const createBillingPlan = async (req: Request, res: Response): Promise<vo
       [name, name_ar, price_monthly || 0, price_yearly || 0, max_staff || 5, max_members || 100, max_gyms || 1, JSON.stringify(features || [])]
     );
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'CREATE', tableName: 'billing_plans', recordId: result.rows[0].id, newValues: result.rows[0], req });
     res.status(201).json({ data: result.rows[0] });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -117,6 +119,7 @@ export const updateBillingPlan = async (req: Request, res: Response): Promise<vo
       res.status(404).json({ error: 'Plan not found' });
       return;
     }
+    await logPlatformAudit({ action: 'UPDATE', tableName: 'billing_plans', recordId: req.params.id, newValues: result.rows[0], req });
     res.json({ data: result.rows[0] });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -136,10 +139,15 @@ export const deleteBillingPlan = async (req: Request, res: Response): Promise<vo
       res.status(404).json({ error: 'Plan not found' });
       return;
     }
+    await logPlatformAudit({ action: 'DELETE', tableName: 'billing_plans', recordId: id, oldValues: { id }, req });
     res.json({ data: { id: result.rows[0].id, deleted: true } });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     Sentry.captureException(error);
+    if (getErrorMessage(error).includes('foreign key')) {
+      res.status(409).json({ error: 'Plan is referenced by contracts or invoices — cancel them first.', code: 'PLAN_IN_USE' });
+      return;
+    }
     logger.error('deleteBillingPlan failed', { error: getErrorMessage(error) });
     res.status(500).json({ error: 'Internal server error.' });
   } finally { client.release(); }

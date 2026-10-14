@@ -5,6 +5,7 @@ import {
   generateTOTPSetup, enableTOTP, disableTOTP, verifyTOTPToken,
 } from '../services/totp.service';
 import logger from '../config/logger';
+import { logPlatformAudit } from '../utils/platformAudit';
 
 /** Safely extract error message from unknown error type */
 function getErrorMessage(error: unknown): string {
@@ -48,6 +49,7 @@ export const revokePlatformAdminSession = async (req: Request, res: Response): P
       return;
     }
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'REVOKE', tableName: 'platform_admin_sessions', recordId: id, newValues: { revoked_at: new Date().toISOString() }, req });
     res.json({ data: { message: 'Session revoked successfully.' } });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -115,6 +117,7 @@ export const updateSecuritySettings = async (req: Request, res: Response): Promi
       params
     );
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'SETTINGS_UPDATE', tableName: 'platform_security_settings', newValues: result.rows[0], req });
     res.json({ data: result.rows[0] });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -157,6 +160,7 @@ export const updateFeatureFlags = async (req: Request, res: Response): Promise<v
       [JSON.stringify(feature_flags), req.platformAdmin?.platform_admin_id]
     );
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'FEATURE_FLAG_UPDATE', tableName: 'platform_security_settings', newValues: { feature_flags }, req });
     res.json({ data: result.rows[0]?.feature_flags ?? [] });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -251,6 +255,7 @@ export const verify2FA = async (req: Request, res: Response): Promise<void> => {
 
   try {
     await enableTOTP(admin.platform_admin_id, secret);
+    await logPlatformAudit({ action: '2FA_ENABLE', tableName: 'platform_admins', recordId: admin.platform_admin_id, newValues: { enabled: true }, req });
     res.json({ data: { success: true, message: '2FA enabled successfully.' } });
   } catch (error) {
     logger.error('verify2FA failed', { error: getErrorMessage(error) });
@@ -267,6 +272,7 @@ export const disable2FA = async (req: Request, res: Response): Promise<void> => 
 
   try {
     await disableTOTP(admin.platform_admin_id);
+    await logPlatformAudit({ action: '2FA_DISABLE', tableName: 'platform_admins', recordId: admin.platform_admin_id, newValues: { enabled: false }, req });
     res.json({ data: { success: true, message: '2FA disabled successfully.' } });
   } catch (error) {
     logger.error('disable2FA failed', { error: getErrorMessage(error) });

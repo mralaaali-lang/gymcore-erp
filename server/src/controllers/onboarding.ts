@@ -6,6 +6,27 @@ import { getAdminClient } from '../config/database';
 import logger from '../config/logger';
 
 /**
+ * §34ج-أ — onboarding_data كان يخزّن كلمات مرور الخطوات كنص صريح داخل
+ * عمود jsonb. كلمة المرور تُستهلك أثناء إنشاء الحساب بشكل مشروع، لكن
+ * لا يحق لها البقاء في سجل الخطوات: تُقتطع هنا قبل كل حفظ (بما فيها
+ * التفرعات داخل step_N_data)، والعمود القديم نَقَّته migration 068.
+ */
+const SENSITIVE_KEY_PATTERN = /pass(word)?|secret|token|otp|hash|\bpin\b/i;
+
+function scrubSecrets<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((v) => scrubSecrets(v)) as unknown as T;
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (SENSITIVE_KEY_PATTERN.test(k)) continue;
+      out[k] = scrubSecrets(v);
+    }
+    return out as unknown as T;
+  }
+  return value;
+}
+
+/**
  * GET /platform/onboarding
  * Returns onboarding progress for the current super admin + overall platform status
  */
@@ -65,7 +86,8 @@ export async function saveOnboardingStep(req: Request, res: Response) {
       [adminId]
     );
     const existingData = currentData.rows[0]?.onboarding_data || {};
-    const mergedData = { ...existingData, ...data, [`step_${step}_data`]: data };
+    const safeData = scrubSecrets(data ?? {});
+    const mergedData = { ...existingData, ...safeData, [`step_${step}_data`]: safeData };
 
     await query(
       `UPDATE platform_admins SET onboarding_step = $1, onboarding_data = $2 WHERE id = $3`,
@@ -167,12 +189,12 @@ export async function completeOnboarding(req: Request, res: Response) {
       [adminId]
     )).rows[0]?.onboarding_data || {};
 
-    const mergedData = {
+    const mergedData = scrubSecrets({
       ...existingData,
       ...(final_data || {}),
       completed_at: new Date().toISOString(),
       created_gym_id: gymId,
-    };
+    });
 
     await query(
       `UPDATE platform_admins SET onboarding_complete = true, onboarding_step = 5, onboarding_data = $1 WHERE id = $2`,

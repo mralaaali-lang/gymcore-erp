@@ -635,3 +635,69 @@ export const updateSubscriptionSchema = z.object({
   sport: z.enum(SUBSCRIPTION_SPORTS).optional().nullable(),
   weekly_days: z.array(z.enum(WEEK_DAY_CODES)).max(7).optional().nullable(),
 });
+
+// ====================================================================
+// §40 — عقود المنصة (platform_contracts + بنودها + فواتيرها)
+// مصدر الحقيقة التعاقدية بدل إسناد gym_addons اليدوي.
+// ====================================================================
+export const CONTRACT_CYCLES = ['monthly', 'yearly'] as const;
+
+// تاريخ ISO حقيقي، لا مجرد شكل: «2026-13-40» يطابق النمط لكنه ليس تاريخًا،
+// والقاعدة ترفضه عند الإدراج — نرفضه هنا برسالة واضحة قبل الوصول إليها.
+const contractDateField = () =>
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
+    .refine((s) => {
+      const d = new Date(`${s}T00:00:00Z`);
+      return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+    }, 'Date must be a real calendar date (YYYY-MM-DD)');
+
+export const createContractSchema = z.object({
+  gym_id: z.string().uuid(),
+  plan_id: z.string().uuid(),
+  cycle: z.enum(CONTRACT_CYCLES).default('monthly'),
+  price: z.number().min(0).optional(),
+  currency: z.string().min(2).max(10).optional(),
+  auto_renew: z.boolean().optional(),
+  start_date: contractDateField().optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+export const updateContractSchema = z.object({
+  price: z.number().min(0).optional(),
+  renewal_date: contractDateField().optional(),
+  auto_renew: z.boolean().optional(),
+  notes: z.string().max(2000).optional(),
+  cycle: z.enum(CONTRACT_CYCLES).optional(),
+}).refine((v) => Object.keys(v).length > 0, { message: 'No fields provided to update.' });
+
+export const renewContractSchema = z.object({
+  periods: z.number().int().min(1).max(24).default(1),
+  issue_invoice: z.boolean().optional(),
+});
+
+export const cancelContractSchema = z.object({
+  reason: z.string().max(500).optional(),
+});
+
+export const addContractItemSchema = z.object({
+  addon_id: z.string().uuid(),
+  quantity: z.number().int().min(1).max(100).default(1),
+  unit_price: z.number().min(0).optional(),
+  cycle: z.enum(CONTRACT_CYCLES).optional(),
+  expires_at: contractDateField().optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+export const updateContractItemSchema = z.object({
+  quantity: z.number().int().min(1).max(100).optional(),
+  unit_price: z.number().min(0).optional(),
+  expires_at: contractDateField().nullable().optional(),
+  notes: z.string().max(2000).optional(),
+}).refine((v) => Object.keys(v).length > 0, { message: 'No fields provided to update.' });
+
+export const markInvoicePaidSchema = z.object({
+  payment_method: z.string().min(1).max(50).optional(),
+  payment_reference: z.string().max(255).optional(),
+});

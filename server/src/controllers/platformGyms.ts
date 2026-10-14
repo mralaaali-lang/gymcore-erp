@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import * as Sentry from '@sentry/node';
 import { getAdminClient, query } from '../config/database';
 import logger from '../config/logger';
+import { logPlatformAudit } from '../utils/platformAudit';
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
@@ -169,6 +170,7 @@ export const createGym = async (req: Request, res: Response): Promise<void> => {
       subscription_expires_at: resolvedSubscriptionExpiresAt,
     });
 
+    await logPlatformAudit({ action: 'CREATE', tableName: 'gyms', recordId: gym.id, newValues: { gym, owner }, req });
     res.status(201).json({ data: { gym, owner } });
   } catch (error: unknown) {
     await client.query('ROLLBACK').catch(() => {});
@@ -197,10 +199,33 @@ async function seedNewGymAsync(gymId: string, gymName: string) {
 
 // ====================================================================
 // List all gyms (platform-wide directory)
+// §40: فلاتر حقيقية (بحث/خطة/حالة) + ترقيم + أعمدة العقد الفعلي
+// (plan/سعر/تجديد/ميزات سارية) بدل plan_tier القديم وحده.
 // ====================================================================
-export const listGyms = async (_req: Request, res: Response): Promise<void> => {
+export const listGyms = async (req: Request, res: Response): Promise<void> => {
   const client = await getAdminClient();
   try {
+    const { search, plan_id: planId, status, sort } = req.query as Record<string, string | undefined>;
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit), 10) || 500, 1), 1000);
+    const offset = Math.max(parseInt(String(req.query.offset), 10) || 0, 0);
+
+    const clauses: string[] = ['g.deleted_at IS NULL'];
+    const params: unknown[] = [];
+    const push = (v: unknown): number => { params.push(v); return params.length; };
+    if (search) {
+      const i = push(`%${search}%`);
+      clauses.push(`(g.name ILIKE $${i} OR g.subdomain ILIKE $${i} OR g.phone ILIKE $${i} OR g.email ILIKE $${i})`);
+    }
+    if (planId) clauses.push(`g.plan_id = $${push(planId)}`);
+    if (status === 'active') clauses.push(`g.is_active = true`);
+    else if (status === 'suspended') clauses.push(`g.is_active = false`);
+    else if (status === 'trial') clauses.push(`EXISTS (SELECT 1 FROM gym_trials t WHERE t.gym_id = g.id AND t.trial_end > now())`);
+    else if (status === 'expired') clauses.push(`g.subscription_expires_at IS NOT NULL AND g.subscription_expires_at < now()`);
+
+    const order = ['name', 'created_at', 'members', 'renewal_date'].includes(String(sort))
+      ? { name: 'g.name ASC', created_at: 'g.created_at DESC', members: 'active_members_count DESC', renewal_date: 'c.renewal_date ASC NULLS LAST' }[String(sort)]
+      : 'g.created_at DESC';
+
     // Aggregates active member count per gym and exposes subscription expiry
     // so the super-admin directory has billing-relevant data without leaking
     // individual member/staff details.
@@ -209,7 +234,18 @@ export const listGyms = async (_req: Request, res: Response): Promise<void> => {
               g.created_at, g.subscription_expires_at, g.currency,
               g.phone, g.dba_name, g.timezone, g.email, g.address_city,
               g.address_street, g.address_country,
+              g.tenant_status, g.subscription_status,
               g.plan_id, p.name AS plan_name,
+              c.id AS contract_id, c.status AS contract_status, c.cycle AS contract_cycle,
+              c.price AS contract_price, c.currency AS contract_currency,
+              c.renewal_date AS contract_renewal_date, c.auto_renew,
+              gym_effective_features(g.id) AS effective_features,
+              gym_effective_limit(g.id, 'max_members') AS effective_max_members,
+              gym_effective_limit(g.id, 'max_staff') AS effective_max_staff,
+              (SELECT count(*)::int FROM platform_contract_addons pca
+                JOIN platform_contracts c2 ON c2.id = pca.contract_id
+               WHERE c2.gym_id = g.id AND pca.status = 'active' AND c2.status = 'active') AS live_addon_items,
+              (t.trial_end IS NOT NULL AND t.trial_end > now()) AS on_trial, t.trial_end,
               (SELECT MAX(al.check_in_time) FROM attendance_logs al WHERE al.gym_id = g.id) AS last_activity_at,
               COALESCE(uc.current_members_count, 0) AS active_members_count,
               COALESCE(uc.current_staff_count, 0) AS active_staff_count,
@@ -219,11 +255,20 @@ export const listGyms = async (_req: Request, res: Response): Promise<void> => {
               COALESCE(p.max_branches, 0) AS plan_max_branches
          FROM gyms g
          LEFT JOIN gym_usage_counters uc ON uc.gym_id = g.id
-         LEFT JOIN billing_plans p ON p.id = g.plan_id
-      ORDER BY g.created_at DESC`
+         LEFT JOIN billing_plans p ON p.id = gym_plan_id_effective(g.id)
+         LEFT JOIN platform_contracts c ON c.gym_id = g.id AND c.status = 'active'
+         LEFT JOIN gym_trials t ON t.gym_id = g.id
+         WHERE ${clauses.join(' AND ')}
+      ORDER BY ${order}
+      LIMIT ${limit} OFFSET ${offset}`,
+      params
+    );
+    const count = await client.query(
+      `SELECT count(*)::int AS total FROM gyms g WHERE ${clauses.join(' AND ')}`,
+      params
     );
     await client.query('COMMIT');
-    res.json({ data: result.rows });
+    res.json({ data: result.rows, total: count.rows[0].total, limit, offset });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     Sentry.captureException(error);
@@ -346,6 +391,10 @@ export const setGymActive = async (req: Request, res: Response): Promise<void> =
     );
 
     await client.query('COMMIT');
+    await logPlatformAudit({
+      action: is_active ? 'ACTIVATE' : 'DEACTIVATE', tableName: 'gyms', recordId: id,
+      newValues: result.rows[0], req,
+    });
     res.json({ data: result.rows[0] });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -432,6 +481,7 @@ export const updateGymSubscription = async (req: Request, res: Response): Promis
     );
 
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'UPDATE', tableName: 'gyms', recordId: id, newValues: { changes, ...gym }, req });
     res.json({ data: gym });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -513,6 +563,7 @@ export const updateGymFull = async (req: Request, res: Response): Promise<void> 
     );
 
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'UPDATE', tableName: 'gyms', recordId: id, newValues: result.rows[0], req });
     res.json({ data: result.rows[0] });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -551,6 +602,7 @@ export const deleteGym = async (req: Request, res: Response): Promise<void> => {
 
     await client.query('DELETE FROM gyms WHERE id = $1', [id]);
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'DELETE', tableName: 'gyms', recordId: id, oldValues: existing.rows[0], req });
 
     res.json({ data: { id, name: gymName, deleted: true } });
   } catch (error) {
@@ -604,6 +656,7 @@ export const impersonateGym = async (req: Request, res: Response): Promise<void>
       [id, req.platformAdmin?.platform_admin_id, `Super Admin impersonated gym: ${owner.full_name} (${owner.email})`, req.ip]
     );
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'IMPERSONATE', tableName: 'gyms', recordId: id, newValues: { staff_user_id: owner.id, email: owner.email, role: owner.role }, req });
 
     res.cookie('access_token', token, {
       httpOnly: true,
@@ -727,6 +780,7 @@ export const updateGymSettings = async (req: Request, res: Response) => {
     for (const [key, value] of Object.entries(settings)) {
       await query(`INSERT INTO gym_settings (gym_id, setting_key, setting_value) VALUES ($1,$2,$3) ON CONFLICT (gym_id, setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value, updated_at=NOW()`, [gym_id, key, value]);
     }
+    await logPlatformAudit({ action: 'SETTINGS_UPDATE', tableName: 'gyms', recordId: gym_id, newValues: settings, req });
     res.json({ success: true });
   } catch (e: any) { logger.error('updateGymSettings failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };

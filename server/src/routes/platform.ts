@@ -68,6 +68,12 @@ import {
   getChurnPrediction, getPlanRecommendations, getRevenueForecast, getAISuggestions, getAIDashboard,
 } from '../controllers/platformAI';
 import { listApiKeys, createApiKey, deleteApiKey, toggleApiKey, getApiUsage } from '../controllers/developerPortal';
+import {
+  listContracts, getContract, createContract, updateContract, cancelContract, renewContract,
+  issueContractInvoice, markInvoicePaid,
+  addContractItem, cancelContractItem, updateContractItem,
+} from '../controllers/platformContracts';
+import { getPlatformOverview, listEnforcementQueue, listPlatformAuditLogs } from '../controllers/platformInsights';
 import { planGuard } from '../middleware/planGuard';
 // Schemas
 import {
@@ -82,6 +88,8 @@ import {
   updateBrandingSchema,
   createApiKeySchema,
   getMultiTenantReportSchema,
+  createContractSchema, updateContractSchema, renewContractSchema, cancelContractSchema,
+  addContractItemSchema, updateContractItemSchema, markInvoicePaidSchema,
 } from '../validators/schemas';
 
 const router = Router();
@@ -207,10 +215,28 @@ router.put('/billing/addons/:id', updateAddon);
 router.delete('/billing/addons/:id', deleteAddon);
 router.get('/gyms/:id/addons', listGymAddons);
 router.post('/gyms/:id/addons', grantGymAddon);
-router.put('/gyms/:id/addons/:assignmentId', updateGymAddon);
-router.post('/gyms/:id/addons/:assignmentId/cancel', cancelGymAddon);
+router.put('/gyms/:gymId/addons/:itemId', updateGymAddon);
+router.post('/gyms/:gymId/addons/:itemId/cancel', cancelGymAddon);
 router.get('/billing/invoices', listInvoices);
 router.get('/billing/summary', getBillingSummary);
+
+// §40: عقود المنصة — مصدر الحقيقة التعاقدية (تستبدل إسناد gym_addons اليدوي)
+router.get('/billing/contracts', listContracts);
+router.post('/billing/contracts', validate(createContractSchema), createContract);
+router.get('/billing/contracts/:id', getContract);
+router.patch('/billing/contracts/:id', validate(updateContractSchema), updateContract);
+router.post('/billing/contracts/:id/cancel', validate(cancelContractSchema), cancelContract);
+router.post('/billing/contracts/:id/renew', validate(renewContractSchema), renewContract);
+router.post('/billing/contracts/:id/invoices', issueContractInvoice);
+router.post('/billing/contracts/:id/items', validate(addContractItemSchema), addContractItem);
+router.patch('/billing/contract-items/:id', validate(updateContractItemSchema), updateContractItem);
+router.post('/billing/contract-items/:id/cancel', cancelContractItem);
+router.post('/billing/invoices/:id/mark-paid', validate(markInvoicePaidSchema), markInvoicePaid);
+
+// §40: رؤى المنصة الحية + طابور الإيقاف + تدقيق المنصة
+router.get('/overview', getPlatformOverview);
+router.get('/enforcement', listEnforcementQueue);
+router.get('/security/audit', listPlatformAuditLogs);
 
 // Coupons & Promo Codes
 router.get('/billing/coupons', listCoupons);

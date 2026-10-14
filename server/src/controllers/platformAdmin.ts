@@ -8,6 +8,7 @@ import path from 'path';
 import * as Sentry from '@sentry/node';
 import { getAdminClient } from '../config/database';
 import logger from '../config/logger';
+import { logPlatformAudit } from '../utils/platformAudit';
 import { getFrontendUrl } from '../config/frontendUrl';
 import { sendPasswordResetEmail } from '../services/email';
 import { verifyTOTPToken } from '../services/totp.service';
@@ -107,6 +108,7 @@ export const platformAdminLogin = async (req: Request, res: Response): Promise<v
     );
 
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'LOGIN', tableName: 'platform_admins', recordId: admin.id, newValues: { email: admin.email, role_type: admin.role_type }, req });
 
     res.status(200).json({
       expires_in: 28800,
@@ -616,6 +618,7 @@ export const updateTicketStatus = async (req: Request, res: Response): Promise<v
     await client.query(`INSERT INTO activity_logs (gym_id, platform_admin_id, action_description, ip_address) VALUES ($1, $2, $3, $4)`,
       [result.rows[0].gym_id, req.platformAdmin?.platform_admin_id, `Support ticket ${id} â†’ ${status}`, req.ip]);
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'TICKET_UPDATE', tableName: 'support_tickets', recordId: id, newValues: { status }, req });
     res.json({ data: result.rows[0] });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -688,6 +691,7 @@ export const assignTicket = async (req: Request, res: Response): Promise<void> =
     );
     if (result.rows.length === 0) { await client.query('ROLLBACK').catch(() => {}); res.status(404).json({ error: 'Ticket not found' }); return; }
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'TICKET_UPDATE', tableName: 'support_tickets', recordId: id, newValues: { assigned_to: assigned_to || null }, req });
     res.json({ data: result.rows[0] });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -825,6 +829,7 @@ export const createBroadcast = async (req: Request, res: Response): Promise<void
     await client.query(`INSERT INTO activity_logs (gym_id, platform_admin_id, action_description, ip_address) VALUES (NULL, $1, $2, $3)`,
       [req.platformAdmin?.platform_admin_id, `Broadcast sent: ${title}`, req.ip]);
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'BROADCAST', tableName: 'platform_broadcasts', recordId: result.rows[0].id, newValues: { title, target_roles: target_roles || [] }, req });
     res.status(201).json({ data: result.rows[0] });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});

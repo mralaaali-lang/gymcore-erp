@@ -1,6 +1,7 @@
 import { getAdminClient } from '../config/database';
 import cron from 'node-cron';
 import logger from '../config/logger';
+import { logPlatformAudit } from '../utils/platformAudit';
 
 /**
  * Gym subscription enforcement — the 14-day grace policy (product decision,
@@ -46,6 +47,14 @@ export const executeSubscriptionEnforcement = async (): Promise<number> => {
     }
 
     await client.query('COMMIT');
+
+    // §40: نظام التدقيق العام للمصدر لنقاط التوقف — حدث نظامي (actor_id = NULL)
+    for (const gym of result.rows) {
+      await logPlatformAudit({
+        action: 'DEACTIVATE', tableName: 'gyms', recordId: gym.id,
+        newValues: { auto_suspended: true, subscription_expires_at: gym.subscription_expires_at, grace_days: GRACE_DAYS },
+      });
+    }
 
     if (result.rowCount && result.rowCount > 0) {
       logger.info(`Subscription enforcement suspended ${result.rowCount} gym(s)`, { count: result.rowCount });

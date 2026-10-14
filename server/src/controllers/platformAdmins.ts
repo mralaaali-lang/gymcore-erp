@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import * as Sentry from '@sentry/node';
 import { getAdminClient } from '../config/database';
 import logger from '../config/logger';
+import { logPlatformAudit } from '../utils/platformAudit';
 
 const PASSWORD_HASH_COST = 12;
 
@@ -73,6 +74,7 @@ export const createPlatformAdmin = async (req: Request, res: Response): Promise<
       [String(email).trim().toLowerCase(), phoneNumber ?? null, passwordHash, full_name, role_type || 'support_admin']
     );
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'CREATE', tableName: 'platform_admins', recordId: result.rows[0].id, newValues: result.rows[0], req });
     res.status(201).json({ data: result.rows[0] });
   } catch (error: unknown) {
     await client.query('ROLLBACK').catch(() => {});
@@ -157,6 +159,12 @@ export const updatePlatformAdmin = async (req: Request, res: Response): Promise<
     }
 
     await client.query('COMMIT');
+    await logPlatformAudit({
+      action: 'UPDATE', tableName: 'platform_admins', recordId: id,
+      oldValues: current,
+      newValues: { ...result.rows[0], password_rotated: password !== undefined, sessions_revoked: credentialsOrAccessChanged },
+      req,
+    });
     res.json({ data: result.rows[0] });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -204,6 +212,7 @@ export const deletePlatformAdmin = async (req: Request, res: Response): Promise<
       [id]
     );
     await client.query('COMMIT');
+    await logPlatformAudit({ action: 'DEACTIVATE', tableName: 'platform_admins', recordId: id, oldValues: current, newValues: { is_active: false }, req });
     res.json({ data: { message: 'Admin access deactivated; account history was preserved.' } });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});

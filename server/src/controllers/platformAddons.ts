@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import * as Sentry from '@sentry/node';
+import { PoolClient } from 'pg';
 import { getAdminClient } from '../config/database';
 import logger from '../config/logger';
+import { logPlatformAudit } from '../utils/platformAudit';
 
 /** Safely extract error message from unknown error type */
 function getErrorMessage(error: unknown): string {
@@ -9,19 +11,22 @@ function getErrorMessage(error: unknown): string {
 }
 
 // ====================================================================
-// §36: الوحدات والإضافات — كتالوج billing_addons + إسناد gym_addons
-// كل القراءة والكتابة من شاشة السوبر-أدمن فقط.
+// §36 → §40: الوحدات والإضافات — الكتالوج في billing_addons، والتشغيل
+// الفعلي عبر بنود عقود المنصة (platform_contract_addons). إسناد gym_addons
+// اليدوي مُوقف (migration 068): قراءات وكتابة هذه المسارات تتم على بنود
+// العقد الساري، مع تسجيل كل تغيير في platform_audit_logs.
 // ====================================================================
 
-// GET /billing/addons — الكتالوج كامل مع عدد الإسنادات السارية لكل إضافة
+// GET /billing/addons — الكتالوج كامل مع عدد البنود السارية في العقود
 export const listAddons = async (_req: Request, res: Response): Promise<void> => {
   const client = await getAdminClient();
   try {
     const result = await client.query(
       `SELECT ba.*,
-              (SELECT count(*)::int FROM gym_addons ga
-                WHERE ga.addon_id = ba.id AND ga.status = 'active'
-                  AND (ga.expires_at IS NULL OR ga.expires_at >= NOW())) AS live_assignments
+              (SELECT count(*)::int FROM platform_contract_addons pca
+                JOIN platform_contracts c ON c.id = pca.contract_id
+                WHERE pca.addon_id = ba.id AND pca.status = 'active' AND c.status = 'active'
+                  AND (pca.expires_at IS NULL OR pca.expires_at >= CURRENT_DATE)) AS live_assignments
        FROM billing_addons ba
        ORDER BY ba.is_active DESC, ba.price_monthly ASC, ba.created_at ASC`
     );
@@ -134,13 +139,15 @@ export const updateAddon = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-// DELETE /billing/addons/:id —soft إن كان عليها إسنادات، hard بصفتها فارغة
+// DELETE /billing/addons/:id —soft إن كان عليها بنود سارية، hard بصفتها فارغة
 export const deleteAddon = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
   const client = await getAdminClient();
   try {
     const used = await client.query(
-      `SELECT count(*)::int AS n FROM gym_addons WHERE addon_id = $1 AND status = 'active'`,
+      `SELECT count(*)::int AS n FROM platform_contract_addons pca
+        JOIN platform_contracts c ON c.id = pca.contract_id
+       WHERE pca.addon_id = $1 AND pca.status = 'active' AND c.status = 'active'`,
       [id]
     );
     if (used.rows[0].n > 0) {
@@ -169,7 +176,34 @@ export const deleteAddon = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-// GET /gyms/:id/addons — كل الإسنادات (سارية وملغاة) مع بيانات الكتالوج
+// ====================================================================
+// §40 write-through: نقاط /gyms/:id/addons تعمل الآن على بنود عقد الصالة
+// الساري (منصات العقود بديلة عن إسناد gym_addons اليدوي).
+// ====================================================================
+
+async function activeContractOf(client: PoolClient, gymId: string): Promise<{ id: string; cycle: string } | null> {
+  const r = await client.query(
+    `SELECT id, cycle FROM platform_contracts WHERE gym_id = $1 AND status = 'active'`,
+    [gymId]
+  );
+  return r.rows[0] ?? null;
+}
+
+/** شكل بند العقد بنفس أعمدة السند القديم حتى لا ينكسر التاب الحالي */
+const GYM_ADDON_ITEM_SELECT = `
+  SELECT pca.id, c.gym_id, pca.contract_id, pca.addon_id,
+         pca.unit_price AS price_charged, pca.unit_price, pca.quantity,
+         pca.cycle, pca.status, pca.started_at, pca.expires_at,
+         pca.cancelled_at, pca.notes, pca.created_at, pca.updated_at,
+         ba.code, ba.name, ba.name_ar, ba.module_keys, ba.limit_column, ba.limit_amount,
+         ba.price_monthly AS catalog_price_monthly, ba.price_yearly AS catalog_price_yearly,
+         (pca.expires_at IS NOT NULL AND pca.expires_at < CURRENT_DATE) AS is_expired
+  FROM platform_contract_addons pca
+  JOIN platform_contracts c ON c.id = pca.contract_id
+  JOIN billing_addons ba ON ba.id = pca.addon_id
+  WHERE c.gym_id = $1`;
+
+// GET /gyms/:id/addons — بنود عقد الصالة الساري (سارية وملغاة)
 export const listGymAddons = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
   const client = await getAdminClient();
@@ -181,13 +215,7 @@ export const listGymAddons = async (req: Request, res: Response): Promise<void> 
       return;
     }
     const result = await client.query(
-      `SELECT ga.*, ba.code, ba.name, ba.name_ar, ba.module_keys, ba.limit_column, ba.limit_amount,
-              ba.price_monthly AS catalog_price_monthly, ba.price_yearly AS catalog_price_yearly,
-              (ga.expires_at IS NOT NULL AND ga.expires_at < NOW()) AS is_expired
-       FROM gym_addons ga
-       JOIN billing_addons ba ON ba.id = ga.addon_id
-       WHERE ga.gym_id = $1
-       ORDER BY ga.status = 'active' DESC, ga.created_at DESC`,
+      `${GYM_ADDON_ITEM_SELECT} ORDER BY pca.status = 'active' DESC, pca.created_at DESC`,
       [id]
     );
     await client.query('COMMIT');
@@ -202,7 +230,7 @@ export const listGymAddons = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// POST /gyms/:id/addons — إسناد بسعر مخفّض اختياري
+// POST /gyms/:id/addons — إضافة بند إلى عقد الصالة الساري بسعر اختياري
 // body: { addon_id | code, cycle?, price_charged?, expires_at?, notes? }
 export const grantGymAddon = async (req: Request, res: Response): Promise<void> => {
   const { id: gymId } = req.params;
@@ -219,15 +247,15 @@ export const grantGymAddon = async (req: Request, res: Response): Promise<void> 
 
   const client = await getAdminClient();
   try {
-    const gym = await client.query('SELECT id FROM gyms WHERE id = $1', [gymId]);
-    if (gym.rows.length === 0) {
+    const contract = await activeContractOf(client, gymId);
+    if (!contract) {
       await client.query('COMMIT');
-      res.status(404).json({ error: 'Gym not found.' });
+      res.status(400).json({ error: 'The gym has no active contract — sign one first from Billing > Contracts.', code: 'NO_CONTRACT' });
       return;
     }
     const addonRes = addon_id
       ? await client.query('SELECT * FROM billing_addons WHERE id = $1', [addon_id])
-      : await client.query('SELECT * FROM billing_addons WHERE code = $1', [String(code).trim()]);
+      : await client.query('SELECT * FROM billing_addons WHERE code = $1', [String(code ?? '').trim()]);
     if (addonRes.rows.length === 0) {
       await client.query('COMMIT');
       res.status(404).json({ error: 'Addon not found.' });
@@ -239,26 +267,38 @@ export const grantGymAddon = async (req: Request, res: Response): Promise<void> 
       res.status(400).json({ error: 'Addon is inactive in the catalog.' });
       return;
     }
+    const dup = await client.query(
+      `SELECT id FROM platform_contract_addons WHERE contract_id = $1 AND addon_id = $2 AND status = 'active'`,
+      [contract.id, addon.id]
+    );
+    if (dup.rows.length) {
+      await client.query('COMMIT');
+      res.status(409).json({ error: 'This addon is already an active line on the contract.', code: 'ITEM_EXISTS' });
+      return;
+    }
 
     const chosenCycle = cycle === 'yearly' ? 'yearly' : 'monthly';
-    // السعر الافتراضي من الكتالوج حسب الدورة؛ price_charged صريح يتقدم (تخفيض السوبر-أدمن)
     const catalogPrice = Number(
       chosenCycle === 'yearly' ? addon.price_yearly : addon.price_monthly
     ) || Number(addon.price) || 0;
     const finalPrice = price_charged !== undefined ? Number(price_charged) : catalogPrice;
 
-    const result = await client.query(
-      `INSERT INTO gym_addons (gym_id, addon_id, price_charged, cycle, status, expires_at, notes, granted_by)
-       VALUES ($1, $2, $3, $4, 'active', $5, $6, $7)
-       RETURNING *`,
-      [gymId, addon.id, finalPrice, chosenCycle, expires_at || null, notes || null, req.platformAdmin?.platform_admin_id || null]
+    const inserted = await client.query(
+      `INSERT INTO platform_contract_addons (contract_id, addon_id, quantity, unit_price, cycle, status, started_at, expires_at, notes, added_by)
+       VALUES ($1, $2, 1, $3, $4, 'active', CURRENT_DATE, $5, $6, $7)
+       RETURNING id`,
+      [contract.id, addon.id, finalPrice, chosenCycle,
+       expires_at ? String(expires_at).slice(0, 10) : null, notes || null,
+       req.platformAdmin?.platform_admin_id || null]
     );
+    const row = await client.query(`${GYM_ADDON_ITEM_SELECT} AND pca.id = $2`, [gymId, inserted.rows[0].id]);
     await client.query('COMMIT');
-    res.status(201).json({ data: result.rows[0] });
+    await logPlatformAudit({ action: 'GRANT', tableName: 'platform_contract_addons', recordId: inserted.rows[0].id, newValues: row.rows[0], req });
+    res.status(201).json({ data: row.rows[0] });
   } catch (error: unknown) {
     await client.query('ROLLBACK').catch(() => {});
     if ((error as { code?: string }).code === '23505') {
-      res.status(409).json({ error: 'This addon is already assigned to the gym.' });
+      res.status(409).json({ error: 'This addon is already an active line on the contract.' });
       return;
     }
     Sentry.captureException(error);
@@ -269,44 +309,47 @@ export const grantGymAddon = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// PUT /gyms/:gymId/addons/:assignmentId — تعديل سعر/تاريخ انتهاء/ملاحظة سند ساري
+// PUT /gyms/:gymId/addons/:itemId — تعديل سعر/تاريخ انتهاء/ملاحظة بند ساري
 export const updateGymAddon = async (req: Request, res: Response): Promise<void> => {
-  const { gymId, assignmentId } = req.params;
-  const { price_charged, expires_at, notes } = req.body;
+  const { gymId, itemId } = req.params;
+  const { price_charged, unit_price, quantity, expires_at, notes } = req.body;
 
-  if (price_charged !== undefined && !(Number(price_charged) >= 0)) {
+  const price = price_charged !== undefined ? price_charged : unit_price;
+  if (price !== undefined && !(Number(price) >= 0)) {
     res.status(400).json({ error: 'price_charged must be a non-negative number.' });
-    return;
-  }
-
-  const sets: string[] = [];
-  const params: unknown[] = [];
-  const add = (col: string, val: unknown) => {
-    params.push(val);
-    sets.push(`${col} = $${params.length}`);
-  };
-  if (price_charged !== undefined) add('price_charged', Number(price_charged));
-  if (expires_at !== undefined) add('expires_at', expires_at || null);
-  if (notes !== undefined) add('notes', notes || null);
-  if (sets.length === 0) {
-    res.status(400).json({ error: 'No fields provided to update.' });
     return;
   }
 
   const client = await getAdminClient();
   try {
-    const result = await client.query(
-      `UPDATE gym_addons SET ${sets.join(', ')}
-       WHERE id = $${params.length + 1} AND gym_id = $${params.length + 2} AND status = 'active'
-       RETURNING *`,
-      [...params, assignmentId, gymId]
+    const before = await client.query(
+      `SELECT pca.* FROM platform_contract_addons pca
+       JOIN platform_contracts c ON c.id = pca.contract_id
+       WHERE pca.id = $1 AND c.gym_id = $2 AND pca.status = 'active' FOR UPDATE`,
+      [itemId, gymId]
     );
-    await client.query('COMMIT');
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'Active assignment not found for this gym.' });
+    if (before.rows.length === 0) {
+      await client.query('COMMIT');
+      res.status(404).json({ error: 'Active contract item not found for this gym.' });
       return;
     }
-    res.json({ data: result.rows[0] });
+    await client.query(
+      `UPDATE platform_contract_addons SET
+         unit_price = coalesce($2::numeric, unit_price),
+         quantity = coalesce($3::int, quantity),
+         expires_at = CASE WHEN $4::text = '' THEN NULL ELSE coalesce($4::date, expires_at) END,
+         notes = coalesce($5::text, notes)
+       WHERE id = $1`,
+      [itemId,
+       price !== undefined ? Number(price) : null,
+       quantity !== undefined ? parseInt(String(quantity), 10) || null : null,
+       expires_at === undefined ? null : (expires_at ? String(expires_at).slice(0, 10) : ''),
+       notes ?? null]
+    );
+    const row = await client.query(`${GYM_ADDON_ITEM_SELECT} AND pca.id = $2`, [gymId, itemId]);
+    await client.query('COMMIT');
+    await logPlatformAudit({ action: 'UPDATE', tableName: 'platform_contract_addons', recordId: itemId, oldValues: before.rows[0], newValues: row.rows[0], req });
+    res.json({ data: row.rows[0] });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     Sentry.captureException(error);
@@ -317,23 +360,30 @@ export const updateGymAddon = async (req: Request, res: Response): Promise<void>
   }
 };
 
-// POST /gyms/:gymId/addons/:assignmentId/cancel — إلغاء مع إبقاء الأثر
+// POST /gyms/:gymId/addons/:itemId/cancel — إيقاف البند مع إبقاء الأثر
 export const cancelGymAddon = async (req: Request, res: Response): Promise<void> => {
-  const { gymId, assignmentId } = req.params;
+  const { gymId, itemId } = req.params;
   const client = await getAdminClient();
   try {
-    const result = await client.query(
-      `UPDATE gym_addons SET status = 'cancelled', cancelled_at = NOW()
-       WHERE id = $1 AND gym_id = $2 AND status = 'active'
-       RETURNING *`,
-      [assignmentId, gymId]
+    const before = await client.query(
+      `SELECT pca.* FROM platform_contract_addons pca
+       JOIN platform_contracts c ON c.id = pca.contract_id
+       WHERE pca.id = $1 AND c.gym_id = $2 AND pca.status = 'active' FOR UPDATE`,
+      [itemId, gymId]
     );
-    await client.query('COMMIT');
-    if (result.rows.length === 0) {
-      res.status(404).json({ error: 'Active assignment not found for this gym.' });
+    if (before.rows.length === 0) {
+      await client.query('COMMIT');
+      res.status(404).json({ error: 'Active contract item not found for this gym.' });
       return;
     }
-    res.json({ data: result.rows[0] });
+    await client.query(
+      `UPDATE platform_contract_addons SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1`,
+      [itemId]
+    );
+    const row = await client.query(`${GYM_ADDON_ITEM_SELECT} AND pca.id = $2`, [gymId, itemId]);
+    await client.query('COMMIT');
+    await logPlatformAudit({ action: 'REVOKE', tableName: 'platform_contract_addons', recordId: itemId, oldValues: before.rows[0], newValues: row.rows[0], req });
+    res.json({ data: row.rows[0] });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     Sentry.captureException(error);
