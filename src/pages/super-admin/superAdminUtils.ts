@@ -1,10 +1,9 @@
 // ── Super Admin Shared Utilities ──
+// §40-M4: the dead SUPER_ADMIN_NAV array and its NavItem/phosphor imports were
+// removed — the live super-admin sidebar is built solely from
+// src/components/layout/navConfig.ts (buildNavItems), and every nav target
+// there has a mounted route in src/routes/index.tsx backed by a real endpoint.
 import { formatDate as isoFormatDate, formatDateTime as isoFormatDateTime } from '../../utils/date';
-import {
-  Buildings, CreditCard, ChartBar, Bell, Shield, Monitor, Gear,
-  Code, Headset, Users, Megaphone, Rocket,
-} from '@phosphor-icons/react';
-import type { Icon } from '@phosphor-icons/react';
 
 /**
  * Unified translation helper — returns Arabic string if `isRtl` is true, else English.
@@ -12,37 +11,6 @@ import type { Icon } from '@phosphor-icons/react';
 export function tr(isRtl: boolean, en: string, ar: string): string {
   return isRtl ? ar : en;
 }
-
-/**
- * Shortcut for `tr(true, en, ar)` / `tr(false, en, ar)`.
- */
-export const t = (en: string, ar: string, isRtl: boolean) => (isRtl ? ar : en);
-
-// ── Sidebar Navigation ──
-export interface NavItem {
-  key: string;
-  labelEn: string;
-  labelAr: string;
-  icon: Icon;
-  path: string;
-  badge?: number;
-}
-
-export const SUPER_ADMIN_NAV: NavItem[] = [
-  { key: 'dashboard', labelEn: 'Dashboard', labelAr: 'لوحة التحكم', icon: ChartBar, path: '/super-admin/dashboard' },
-  { key: 'tenants', labelEn: 'Tenants', labelAr: 'الصالات', icon: Buildings, path: '/super-admin/tenants' },
-  { key: 'billing', labelEn: 'Billing', labelAr: 'الفواتير', icon: CreditCard, path: '/super-admin/billing' },
-  { key: 'reports', labelEn: 'Reports & AI', labelAr: 'التقارير والذكاء الاصطناعي', icon: ChartBar, path: '/super-admin/reports' },
-  { key: 'notifications', labelEn: 'Notifications', labelAr: 'الإشعارات', icon: Bell, path: '/super-admin/notifications' },
-  { key: 'security', labelEn: 'Security', labelAr: 'الأمان', icon: Shield, path: '/super-admin/security' },
-  { key: 'system', labelEn: 'System', labelAr: 'النظام', icon: Monitor, path: '/super-admin/monitor' },
-  { key: 'marketing', labelEn: 'Marketing', labelAr: 'التسويق', icon: Megaphone, path: '/super-admin/marketing' },
-  { key: 'support', labelEn: 'Support', labelAr: 'الدعم', icon: Headset, path: '/super-admin/support' },
-  { key: 'admins', labelEn: 'Admins', labelAr: 'المشرفين', icon: Users, path: '/super-admin/admins' },
-  { key: 'developer', labelEn: 'Developer', labelAr: 'المطورين', icon: Code, path: '/super-admin/developer' },
-  { key: 'settings', labelEn: 'Settings', labelAr: 'الإعدادات', icon: Gear, path: '/super-admin/settings' },
-  { key: 'onboarding', labelEn: 'Onboarding', labelAr: 'الإعداد', icon: Rocket, path: '/super-admin/onboarding' },
-];
 
 // ── Tenant / Plan Helpers ──
 export const PLAN_BADGE: Record<string, string> = {

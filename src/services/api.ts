@@ -859,32 +859,6 @@ export async function listPendingActions(params?: { status?: string }) {
   return { actions: (res.data.data || res.data.actions || []) as PendingAction[] };
 }
 
-export interface WorkflowDefinition {
-  id: string;
-  name: string;
-  name_ar: string;
-  description: string;
-  description_ar: string;
-  icon: string;
-  enabled: boolean;
-  last_triggered_at: string | null;
-}
-
-export async function listWorkflows(): Promise<{ data: WorkflowDefinition[] }> {
-  const res = await api.get('/api/workflows');
-  return res.data;
-}
-
-export async function updateWorkflow(id: string, enabled: boolean): Promise<{ data: WorkflowDefinition }> {
-  const res = await api.put(`/api/workflows/${id}`, { enabled });
-  return res.data;
-}
-
-export async function triggerWorkflow(id: string): Promise<{ data: WorkflowDefinition }> {
-  const res = await api.post(`/api/workflows/${id}/trigger`);
-  return res.data;
-}
-
 export async function createPendingAction(data: {
   action_type: string;
   target_table: string;

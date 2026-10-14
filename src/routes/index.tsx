@@ -62,7 +62,6 @@ export default function AppRouter() {
         <Route path="/super-admin/broadcast" element={lazyLoad(() => import('../pages/super-admin/BroadcastEngine'), ['super-admin'])} />
         <Route path="/super-admin/notifications" element={lazyLoad(() => import('../pages/super-admin/NotificationsEngine'), ['super-admin'])} />
         <Route path="/super-admin/audit" element={lazyLoad(() => import('../pages/super-admin/AuditLogs'), ['super-admin'])} />
-        <Route path="/super-admin/workflows" element={lazyLoad(() => import('../pages/super-admin/WorkflowAutomation'), ['super-admin'])} />
         <Route path="/super-admin/sms" element={lazyLoad(() => import('../pages/super-admin/SmsGateway'), ['super-admin'])} />
         <Route path="/super-admin/monitor" element={lazyLoad(() => import('../pages/super-admin/SystemMonitor'), ['super-admin'])} />
         <Route path="/super-admin/security" element={lazyLoad(() => import('../pages/super-admin/SecurityCenter'), ['super-admin'])} />
