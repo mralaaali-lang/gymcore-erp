@@ -56,8 +56,11 @@ export const planGuard = (opts: PlanGuardOptions = {}) => {
     const client = await getAdminClient();
     try {
       const gymResult = await client.query(
-        `SELECT g.plan_id, g.features, g.member_limit, g.subscription_status,
-                p.max_members, p.max_staff, p.max_branches, p.features AS plan_features, p.name AS plan_name
+        `SELECT g.subscription_status, g.features,
+                gym_effective_features(g.id) AS eff_features,
+                gym_effective_limit(g.id, 'max_members') AS max_members,
+                gym_effective_limit(g.id, 'max_staff') AS max_staff,
+                p.max_branches, p.name AS plan_name
          FROM gyms g
          LEFT JOIN billing_plans p ON p.id = g.plan_id
          WHERE g.id = $1`,
@@ -81,33 +84,13 @@ export const planGuard = (opts: PlanGuardOptions = {}) => {
         return;
       }
 
-      // Feature flags support both legacy array format and structured JSONB:
-      // Legacy: features = '["dashboard","products"]'::jsonb
-      // New:     features = '{"modules":{"dashboard":true,"products":false}}'::jsonb
-      const rawFeatures = gym.plan_features || gym.features || {};
-      let planFeatures: string[];
-      if (typeof rawFeatures === 'string') {
-        try { planFeatures = JSON.parse(rawFeatures); } catch { planFeatures = []; }
-      } else if (Array.isArray(rawFeatures)) {
-        planFeatures = rawFeatures;
-      } else if (typeof rawFeatures === 'object' && rawFeatures !== null) {
-        const modules = (rawFeatures as Record<string, unknown>).modules;
-        if (modules && typeof modules === 'object') {
-          planFeatures = Object.entries(modules as Record<string, boolean>)
-            .filter(([, v]) => v === true)
-            .map(([k]) => k);
-        } else {
-          planFeatures = [];
-        }
-      } else {
-        planFeatures = [];
-      }
-
-      const gymFeatures: string[] = Array.isArray(gym.features) ? gym.features : [];
+      // §36: الخطة الفعّالة = موديولات الباقة true + إضافات gym_addons السارية
+      // + overrides القديمة (تُحسب داخل SQL عبر gym_effective_features).
+      const planFeatures: string[] = Array.isArray(gym.eff_features) ? gym.eff_features : [];
 
       // Required features check
       if (opts.requireFeatures && opts.requireFeatures.length > 0) {
-        const missing = opts.requireFeatures.filter((f) => !planFeatures.includes(f) && !gymFeatures.includes(f));
+        const missing = opts.requireFeatures.filter((f) => !planFeatures.includes(f));
         if (missing.length > 0) {
           res.status(403).json({
             error: 'Feature not available on current plan',

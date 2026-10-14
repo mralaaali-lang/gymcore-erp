@@ -35,6 +35,11 @@ import {
   setTrialPeriod, listTrials,
   setAutoUpgradeRule, listAutoUpgradeRules, deleteAutoUpgradeRule,
 } from '../controllers/platformBilling';
+// §36 Units & addons
+import {
+  listAddons, createAddon, updateAddon, deleteAddon,
+  listGymAddons, grantGymAddon, updateGymAddon, cancelGymAddon,
+} from '../controllers/platformAddons';
 // Coupons
 import {
   listCoupons, createCoupon, deleteCoupon, validateCoupon,
@@ -195,6 +200,15 @@ router.get('/billing/plans', listBillingPlans);
 router.post('/billing/plans', validate(createBillingPlanSchema), createBillingPlan);
 router.put('/billing/plans/:id', validate(updateBillingPlanSchema), updateBillingPlan);
 router.delete('/billing/plans/:id', deleteBillingPlan);
+// §36: كتالوج الإضافات + إسناد لكل صالة (سعر مخفّض بيد السوبر-أدمن)
+router.get('/billing/addons', listAddons);
+router.post('/billing/addons', createAddon);
+router.put('/billing/addons/:id', updateAddon);
+router.delete('/billing/addons/:id', deleteAddon);
+router.get('/gyms/:id/addons', listGymAddons);
+router.post('/gyms/:id/addons', grantGymAddon);
+router.put('/gyms/:id/addons/:assignmentId', updateGymAddon);
+router.post('/gyms/:id/addons/:assignmentId/cancel', cancelGymAddon);
 router.get('/billing/invoices', listInvoices);
 router.get('/billing/summary', getBillingSummary);
 

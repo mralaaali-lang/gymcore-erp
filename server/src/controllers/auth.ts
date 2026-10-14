@@ -25,6 +25,7 @@ const REFRESH_TOKEN_EXPIRY = '7d';
 const gymBrief = async (gymId: string) => {
   const g = await query(
     `SELECT g.id, g.name, g.subdomain, g.plan_tier, g.plan_id, p.name AS plan_name,
+            gym_effective_features(g.id) AS features,
             g.currency, g.subscription_status, g.is_active,
             gt.trial_end,
             CASE WHEN gt.trial_end > NOW()
