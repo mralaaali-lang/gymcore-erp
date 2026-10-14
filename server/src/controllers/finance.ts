@@ -130,31 +130,84 @@ export const createPayment = async (req: Request, res: Response) => {
 };
 
 // === EXPENSES (financial_transactions — type='expense') ===
+// §44 — the expenses screen sends ?from=YYYY-MM-DD&to=YYYY-MM-DD and reads
+// time-based stats (range sum/count, today, month) for its four cards.
+// Same §34ث rule as §43: every boundary is computed in the GYM timezone.
+// There is deliberately no method filter here — expenses leave the drawer
+// as cash/register payouts and the screen stays simpler than payments.
 export const listExpenses = async (req: Request, res: Response) => {
   const gym_id = req.staff?.gym_id;
+  const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string, 10) || 100));
+  const offset = (page - 1) * limit;
+  const from = ISO_DATE.test(String(req.query.from || '')) ? String(req.query.from) : null;
+  const to = ISO_DATE.test(String(req.query.to || '')) ? String(req.query.to) : null;
   try {
     const tz = await getGymTz(gym_id);
-    const [data, agg] = await Promise.all([
-      query(`SELECT ft.*, ec.name AS category_name FROM financial_transactions ft LEFT JOIN expense_categories ec ON ft.category_id=ec.id WHERE ft.gym_id=$1 AND ft.type='expense' ORDER BY ft.created_at DESC`, [gym_id]),
-      // §34ث: SalesPage used to client-side reduce the whole page of rows for
-      // "Total Expenses" — the server now states the true sums.
-      query(`SELECT COALESCE(SUM(amount),0) AS total_sum,
-                    COALESCE(SUM(amount) FILTER (WHERE created_at >= ${TZ_MONTH}),0) AS month_sum
-             FROM financial_transactions WHERE gym_id=$1 AND type='expense'`, [gym_id, tz]),
-    ]);
-    res.json({ data: data.rows, stats: { total_sum: Number(agg.rows[0].total_sum), month_sum: Number(agg.rows[0].month_sum) } });
+    // All-time + month aggregates (kept for the older consumers).
+    const agg = await query(
+      `SELECT COUNT(*)::int AS total_count,
+              COALESCE(SUM(amount),0) AS total_sum,
+              COALESCE(SUM(amount) FILTER (WHERE created_at >= ${TZ_MONTH}),0) AS month_sum,
+              COUNT(*) FILTER (WHERE created_at >= ${TZ_MONTH})::int AS month_count,
+              COALESCE(SUM(amount) FILTER (WHERE created_at >= ${TZ_TODAY}),0) AS today_sum,
+              COUNT(*) FILTER (WHERE created_at >= ${TZ_TODAY})::int AS today_count
+       FROM financial_transactions WHERE gym_id=$1 AND type='expense'`, [gym_id, tz]);
+    const a = agg.rows[0] || {};
+    // §44 — the applied date range drives the «إجمالي الفترة» card.
+    const range = await query(
+      `SELECT COUNT(*)::int AS range_count, COALESCE(SUM(ft.amount),0) AS range_sum
+       FROM financial_transactions ft
+       WHERE ft.gym_id=$1 AND ft.type='expense'${RANGE_CLAUSE}`,
+      [gym_id, from, tz, to]);
+    const r = range.rows[0] || {};
+    const data = await query(
+      `SELECT ft.*, ec.name AS category_name, su.full_name AS staff_name
+       FROM financial_transactions ft
+       LEFT JOIN expense_categories ec ON ft.category_id=ec.id
+       LEFT JOIN staff_users su ON su.id = ft.staff_user_id
+       WHERE ft.gym_id=$1 AND ft.type='expense'${RANGE_CLAUSE}
+       ORDER BY ft.created_at DESC LIMIT $5 OFFSET $6`,
+      [gym_id, from, tz, to, limit, offset]);
+    res.json({
+      data: data.rows,
+      pagination: { page, limit, total: Number(r.range_count || 0), total_pages: Math.max(1, Math.ceil(Number(r.range_count || 0) / limit)) },
+      // avg lives server-side too — the card must not divide client-side
+      // against a page of rows (the §34ث mistake this replaces).
+      stats: {
+        total_count: Number(a.total_count || 0),
+        total_sum: Number(a.total_sum),
+        month_count: Number(a.month_count || 0),
+        month_sum: Number(a.month_sum),
+        today_sum: Number(a.today_sum),
+        today_count: Number(a.today_count || 0),
+        range_count: Number(r.range_count || 0),
+        range_sum: Number(r.range_sum),
+        range_avg: Number(r.range_count || 0) > 0 ? Number(r.range_sum) / Number(r.range_count) : 0,
+      },
+    });
   } catch (e: any) { logger.error('listExpenses failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };
 
 export const createExpense = async (req: Request, res: Response) => {
-  const { amount, description, category_id, payment_method } = req.body;
+  const { amount, description, category_id, payment_method, date } = req.body;
   const gym_id = req.staff?.gym_id;
   const staff_user_id = req.staff?.staff_user_id;
   try {
     // §34ث: method was silently dropped — every payout looked like a wallet
     // ghost in the drawer. Default stays 'cash' (the register reality).
+    // §44: optional ISO date → created_at is that day's start in the gym
+    // timezone, so the §34ث range boundaries count it under the right day.
+    if (date) {
+      const tz = await getGymTz(gym_id);
+      const r = await query(
+        `INSERT INTO financial_transactions (gym_id, type, amount, description, category_id, staff_user_id, payment_method, cash_session_id, created_at)
+         VALUES ($1,'expense',$2,$3,$4,$5,$6,${OPEN_SESSION}, ($7::date)::timestamp AT TIME ZONE $8) RETURNING *`,
+        [gym_id, amount, description || null, category_id || null, staff_user_id, payment_method || 'cash', date, tz]);
+      return res.status(201).json({ data: r.rows[0] });
+    }
     const r = await query(`INSERT INTO financial_transactions (gym_id, type, amount, description, category_id, staff_user_id, payment_method, cash_session_id)
-       VALUES ($1,'expense',$2,$3,$4,$5,$6,${OPEN_SESSION}) RETURNING *`, [gym_id, amount, description, category_id || null, staff_user_id, payment_method || 'cash']);
+       VALUES ($1,'expense',$2,$3,$4,$5,$6,${OPEN_SESSION}) RETURNING *`, [gym_id, amount, description || null, category_id || null, staff_user_id, payment_method || 'cash']);
     res.status(201).json({ data: r.rows[0] });
   } catch (e: any) { logger.error('createExpense failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };

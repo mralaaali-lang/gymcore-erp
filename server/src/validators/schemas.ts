@@ -201,8 +201,13 @@ export const createPaymentSchema = z.object({
 
 export const createExpenseSchema = z.object({
   amount: z.number().min(0),
-  description: sanitizedString({ max: 500 }),
+  // §44: description is now optional — the screen's quick-add records
+  // category+amount in seconds; the drawer reconciles on those alone.
+  description: sanitizedString({ max: 500 }).optional().or(z.literal('')),
   category_id: z.string().uuid().optional().nullable(),
+  // §44: optional ISO date (the modal defaults to today); stored at that
+  // calendar day's start in the GYM timezone (§34ث boundary rule).
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   // §34ث: payouts must state the method or the drawer cannot reconcile.
   // §43: kept in sync with createPaymentSchema (visa included).
   payment_method: z.enum(['cash', 'card', 'bank', 'wallet', 'vodafone_cash', 'instapay', 'visa']).optional(),

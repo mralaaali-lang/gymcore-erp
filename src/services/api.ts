@@ -1255,11 +1255,13 @@ export async function createPayment(data: { member_id: string; amount: number; d
 }
 // §34ث — expenses now carry honest server-side totals (sum of all + this month),
 // so pages must not re-add rows client-side.
-export async function listExpenses() {
-  const res = await api.get('/api/finance/expenses');
-  return res.data as { data: any[]; stats: { total_sum: string | number; month_sum: string | number } };
+// §44 — opts accepts the expenses-screen date range (ISO) + paging; calling
+// with no arguments keeps the old behavior (server defaults: current month).
+export async function listExpenses(opts?: { page?: number; limit?: number; from?: string; to?: string }) {
+  const res = await api.get('/api/finance/expenses', { params: opts });
+  return res.data as { data: any[]; pagination?: any; stats?: any };
 }
-export async function createExpense(data: { amount: number; description: string; category_id?: string | null; payment_method?: string }) {
+export async function createExpense(data: { amount: number; description?: string; category_id?: string | null; payment_method?: string; date?: string }) {
   const res = await api.post('/api/finance/expenses', data);
   return res.data as { data: any };
 }
