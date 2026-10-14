@@ -403,10 +403,43 @@ export interface PlatformGym {
   dba_name?: string;
   timezone?: string;
   last_activity_at?: string | null;
+  // §40 — أعمدة العقد الفعلي من listGyms (مصدر الحقيقة: platform_contracts)
+  tenant_status?: string;
+  subscription_status?: string;
+  plan_id?: string | null;
+  plan_name?: string | null;
+  contract_id?: string | null;
+  contract_status?: string | null;
+  contract_cycle?: string | null;
+  contract_price?: string | null;
+  contract_currency?: string | null;
+  contract_renewal_date?: string | null;
+  auto_renew?: boolean | null;
+  effective_features?: string[];
+  effective_max_members?: number | null;
+  effective_max_staff?: number | null;
+  live_addon_items?: number;
+  on_trial?: boolean;
+  trial_end?: string | null;
+  active_staff_count?: number;
+  active_branches_count?: number;
 }
 
-export async function listPlatformGyms(): Promise<{ data: PlatformGym[] }> {
+export async function listPlatformGyms(): Promise<{ data: PlatformGym[]; total: number; limit: number; offset: number }> {
   const res = await api.get('/platform/gyms');
+  return res.data;
+}
+
+/** §40 — نسخة الفلاتر الحقيقية (بحث/حالة/ترتيب) لصفحات الأدمن الجديدة. */
+export async function listPlatformGymsFiltered(params: {
+  search?: string;
+  status?: 'active' | 'suspended' | 'trial' | 'expired';
+  sort?: 'name' | 'created_at' | 'members' | 'renewal_date';
+  plan_id?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: PlatformGym[]; total: number; limit: number; offset: number }> {
+  const res = await api.get('/platform/gyms', { params });
   return res.data;
 }
 
@@ -1747,6 +1780,284 @@ export async function listInvoices(params?: { status?: string; limit?: number })
 
 export async function getBillingSummary(): Promise<{ data: BillingSummary }> {
   const res = await api.get('/platform/billing/summary');
+  return res.data;
+}
+
+// ====================================================================
+// PLATFORM ADMIN — §40 عقود المنصة (مصدر الحقيقة التعاقدية)
+// ====================================================================
+export type ContractCycle = 'monthly' | 'yearly';
+
+export interface PlatformContract {
+  id: string;
+  gym_id: string;
+  gym_name: string;
+  subdomain: string;
+  plan_id: string;
+  plan_name: string;
+  plan_name_ar: string | null;
+  cycle: ContractCycle;
+  price: string;
+  currency: string;
+  status: 'active' | 'cancelled';
+  start_date: string;
+  renewal_date: string | null;
+  auto_renew: boolean;
+  notes: string | null;
+  created_by: string | null;
+  created_by_email: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+  effective_features: string[];
+  live_items: number;
+  items_total: string;
+}
+
+export interface ContractItem {
+  id: string;
+  contract_id: string;
+  addon_id: string;
+  name: string;
+  name_ar: string | null;
+  code: string;
+  limit_column: string | null;
+  limit_amount: number | null;
+  quantity: number;
+  unit_price: string;
+  line_total: string;
+  cycle: ContractCycle;
+  status: 'active' | 'cancelled';
+  started_at: string;
+  expires_at: string | null;
+  cancelled_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContractInvoice {
+  id: string;
+  invoice_number: string;
+  billing_period_start: string;
+  billing_period_end: string;
+  base_amount: string;
+  total_amount: string;
+  currency: string;
+  status: string;
+  due_date: string | null;
+  paid_at: string | null;
+  payment_method: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export async function listContracts(params?: {
+  gym_id?: string;
+  status?: 'active' | 'cancelled';
+  search?: string;
+}): Promise<{ data: PlatformContract[] }> {
+  const res = await api.get('/platform/billing/contracts', { params });
+  return res.data;
+}
+
+export async function getContractFull(id: string): Promise<{
+  data: { contract: PlatformContract; items: ContractItem[]; invoices: ContractInvoice[] };
+}> {
+  const res = await api.get(`/platform/billing/contracts/${id}`);
+  return res.data;
+}
+
+export async function createContract(payload: {
+  gym_id: string;
+  plan_id: string;
+  cycle?: ContractCycle;
+  price?: number;
+  currency?: string;
+  auto_renew?: boolean;
+  start_date?: string;
+  notes?: string;
+}): Promise<{ data: PlatformContract }> {
+  const res = await api.post('/platform/billing/contracts', payload);
+  return res.data;
+}
+
+export async function updateContract(id: string, payload: {
+  price?: number;
+  renewal_date?: string;
+  auto_renew?: boolean;
+  notes?: string;
+  cycle?: ContractCycle;
+}): Promise<{ data: PlatformContract }> {
+  const res = await api.patch(`/platform/billing/contracts/${id}`, payload);
+  return res.data;
+}
+
+export async function cancelContract(id: string, reason?: string): Promise<{ data: PlatformContract }> {
+  const res = await api.post(`/platform/billing/contracts/${id}/cancel`, { reason: reason || null });
+  return res.data;
+}
+
+// التجديد يرجّع العقد وحده، أو {contract, invoice} عند طلب إصدار فاتورة
+export async function renewContract(id: string, periods: number, issueInvoice?: boolean): Promise<{
+  data: PlatformContract | { contract: PlatformContract; invoice: ContractInvoice };
+}> {
+  const res = await api.post(`/platform/billing/contracts/${id}/renew`, {
+    periods,
+    issue_invoice: issueInvoice === true,
+  });
+  return res.data;
+}
+
+export async function issueContractInvoice(id: string): Promise<{
+  data: { id: string; invoice_number: string; total_amount: string; due_date: string };
+}> {
+  const res = await api.post(`/platform/billing/contracts/${id}/invoices`, {});
+  return res.data;
+}
+
+export async function addContractItem(contractId: string, payload: {
+  addon_id: string;
+  quantity?: number;
+  unit_price?: number;
+  cycle?: ContractCycle;
+  expires_at?: string | null;
+  notes?: string | null;
+}): Promise<{ data: ContractItem }> {
+  const res = await api.post(`/platform/billing/contracts/${contractId}/items`, payload);
+  return res.data;
+}
+
+export async function updateContractItem(itemId: string, payload: {
+  quantity?: number;
+  unit_price?: number;
+  expires_at?: string | null;
+  notes?: string | null;
+}): Promise<{ data: ContractItem }> {
+  const res = await api.patch(`/platform/billing/contract-items/${itemId}`, payload);
+  return res.data;
+}
+
+export async function cancelContractItem(itemId: string): Promise<{ data: ContractItem }> {
+  const res = await api.post(`/platform/billing/contract-items/${itemId}/cancel`, {});
+  return res.data;
+}
+
+export async function markInvoicePaid(invoiceId: string, payload?: {
+  payment_method?: string;
+  payment_reference?: string;
+}): Promise<{ data: ContractInvoice }> {
+  const res = await api.post(`/platform/billing/invoices/${invoiceId}/mark-paid`, payload ?? {});
+  return res.data;
+}
+
+// ====================================================================
+// PLATFORM ADMIN — §40 رؤى المنصة الحية + طابور التنفيذ + تدقيق المنصة
+// ====================================================================
+export interface OverviewRenewalItem {
+  id: string;
+  renewal_date: string;
+  cycle: ContractCycle;
+  price: string;
+  currency: string;
+  gym_id: string;
+  gym_name: string;
+  subdomain: string;
+}
+
+export interface OverviewSystemAction {
+  gym_id: string;
+  gym_name: string;
+  action_description: string;
+  created_at: string;
+}
+
+export interface OverviewTicketItem {
+  id: string;
+  ticket_number: string;
+  subject: string;
+  priority: string;
+  status: string;
+  created_at: string;
+  gym_name: string | null;
+}
+
+export interface PlatformOverviewData {
+  gyms: { total: number; active: number; suspended: number; on_trial: number; new_this_month: number };
+  billing: {
+    active_contracts: number;
+    mrr_by_currency: { currency: string; mrr: string }[];
+    renewals_due_7d: number;
+    live_items: number;
+    items_month_total: string;
+    pending_invoices: number;
+    pending_amount: string;
+    overdue_invoices: number;
+    overdue_amount: string;
+  };
+  operations: { open_tickets: number; enforcement_actioned: number; non_active_gyms: number };
+  feeds: {
+    renewals_next_14d: OverviewRenewalItem[];
+    last_system_actions: OverviewSystemAction[];
+    open_tickets_recent: OverviewTicketItem[];
+  };
+}
+
+export async function getPlatformOverview(): Promise<{ data: PlatformOverviewData }> {
+  const res = await api.get('/platform/overview');
+  return res.data;
+}
+
+export interface EnforcementRow {
+  id: string;
+  name: string;
+  subdomain: string;
+  is_active: boolean;
+  tenant_status: string;
+  subscription_status: string;
+  subscription_expires_at: string | null;
+  expired: boolean;
+  last_system_action: string | null;
+  last_system_note: string | null;
+  contract_id: string | null;
+  contract_status: string | null;
+  cycle: ContractCycle | null;
+  price: string | null;
+  currency: string | null;
+  plan_name: string | null;
+  member_count: number;
+}
+
+export async function getEnforcementQueue(): Promise<{ data: EnforcementRow[] }> {
+  const res = await api.get('/platform/enforcement');
+  return res.data;
+}
+
+export interface PlatformAuditEntry {
+  id: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  action_type: string;
+  table_name: string;
+  record_id: string | null;
+  old_values: unknown;
+  new_values: unknown;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export async function listPlatformAudit(params?: {
+  action?: string;
+  table_name?: string;
+  gym_id?: string;
+  from?: string;
+  to?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: PlatformAuditEntry[]; total: number; limit: number; offset: number }> {
+  const res = await api.get('/platform/security/audit', { params });
   return res.data;
 }
 
