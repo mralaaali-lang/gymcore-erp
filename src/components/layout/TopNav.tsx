@@ -126,20 +126,33 @@ export default function TopNav({ navItems }: { navItems: NavItem[] }) {
   return (
     <header className="bg-gradient-to-br from-petrol-dark via-petrol to-petrol-light w-full sticky top-0 z-30 shrink-0">
       <div className="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-5 md:py-6 gap-3">
-        {/* Start: page title (§35أ — per-tab, resolved from the nav config).
-            The gym name, date and plan live in the sidebar brand block, so
-            they are deliberately not repeated here. */}
-        <div className="min-w-0">
-          <h1 className="text-headline-md md:text-headline-lg font-bold text-white tracking-tight truncate">
-            {heading?.title ?? page?.label ?? t('sidebar.dashboard')}
-          </h1>
-          {heading?.subtitle && (
-            <p className="text-[11px] md:text-xs text-white/70 truncate mt-0.5">{heading.subtitle}</p>
-          )}
+        {/* §42ب — Start side (geometric RIGHT in Arabic, left in English):
+            the mobile menu button sits here so it matches the side the
+            drawer docks from (Sidebar opens inset-y-0 right-0 in RTL),
+            followed by the page title. The gym name, date and plan live
+            in the sidebar brand block, so they are deliberately not
+            repeated here. */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={t('header.menu', 'القائمة')}
+            title={t('header.menu', 'القائمة')}
+            className="md:hidden shrink-0 flex items-center justify-center w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all duration-200"
+          >
+            <MenuIcon size={20} />
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-headline-md md:text-headline-lg font-bold text-white tracking-tight truncate">
+              {heading?.title ?? page?.label ?? t('sidebar.dashboard')}
+            </h1>
+            {heading?.subtitle && (
+              <p className="text-[11px] md:text-xs text-white/70 truncate mt-0.5">{heading.subtitle}</p>
+            )}
+          </div>
         </div>
 
-        {/* End (geometric left in Arabic): mobile menu button + language
-            toggle + "What's new?" pill with live unread badge. */}
+        {/* End: language toggle + "What's new?" pill with live unread badge. */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
@@ -226,18 +239,8 @@ export default function TopNav({ navItems }: { navItems: NavItem[] }) {
             </div>
           )}
         </div>
-          {/* §35أ — mobile menu button: last child so in Arabic RTL it lands
-              on the geometric left (far side from the page title); md:hidden
-              because desktop keeps the permanent sidebar. */}
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            aria-label={t('header.menu', 'القائمة')}
-            title={t('header.menu', 'القائمة')}
-            className="md:hidden order-last flex items-center justify-center w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all duration-200"
-          >
-            <MenuIcon size={20} />
-          </button>
+          {/* §42ب — the mobile menu button moved to the start side above so it
+              matches the drawer's docking edge in both languages. */}
         </div>
       </div>
     </header>
