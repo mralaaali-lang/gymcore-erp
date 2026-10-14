@@ -213,6 +213,9 @@ export const createGymSchema = z.object({
   // Extended Create Gym Wizard fields — consumed by platformGyms.createGym.
   dba_name: sanitizedString({ max: 255 }).optional(),
   address_street: sanitizedString({ max: 500 }).optional(),
+  // §33-توحيد: بقية حقول العنوان — كانت تُقص من zod فلا تصل إلى الكونترولر ولا تُخزن.
+  address_city: sanitizedString({ max: 255 }).optional(),
+  address_zip: sanitizedString({ max: 20 }).optional(),
   address_state: sanitizedString({ max: 255 }).optional(),
   address_country: sanitizedString({ max: 255 }).optional(),
   date_format: z.string().max(20).optional(),

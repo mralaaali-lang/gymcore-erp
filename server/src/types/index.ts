@@ -38,7 +38,13 @@ export interface Gym {
   id: string;
   name: string;
   subdomain: string;
+  /** §33-توحيد: billing_plans.id هو مصدر الحقيقة؛ plan_tier مرآة DB-maintained. */
+  plan_id: string | null;
+  plan_name: string | null;
   plan_tier: string;
+  email: string | null;
+  address_city: string | null;
+  address_zip: string | null;
   is_active: boolean;
   created_at: string;
 }

@@ -12,12 +12,13 @@ export async function getReportsOverview(_req: Request, res: Response) {
     const gymsResult = await client.query(`
       SELECT
         COUNT(*)::int AS total_gyms,
-        COUNT(*) FILTER (WHERE is_active)::int AS active_gyms,
-        COUNT(*) FILTER (WHERE plan_tier = 'basic')::int AS basic_plan,
-        COUNT(*) FILTER (WHERE plan_tier = 'premium')::int AS premium_plan,
-        COUNT(*) FILTER (WHERE plan_tier = 'enterprise')::int AS enterprise_plan,
-        COUNT(*) FILTER (WHERE is_active = false)::int AS suspended_gyms
-      FROM gyms
+        COUNT(*) FILTER (WHERE g.is_active)::int AS active_gyms,
+        COUNT(*) FILTER (WHERE gym_plan_tier_from_name(p.name) = 'basic')::int AS basic_plan,
+        COUNT(*) FILTER (WHERE gym_plan_tier_from_name(p.name) = 'premium')::int AS premium_plan,
+        COUNT(*) FILTER (WHERE gym_plan_tier_from_name(p.name) = 'enterprise')::int AS enterprise_plan,
+        COUNT(*) FILTER (WHERE g.is_active = false)::int AS suspended_gyms
+      FROM gyms g
+      LEFT JOIN billing_plans p ON p.id = g.plan_id
     `);
 
     // Members stats
@@ -556,16 +557,17 @@ export async function getPlanPerformance(_req: Request, res: Response) {
   try {
     const result = await client.query(`
       SELECT
-        COALESCE(g.plan_tier, 'unknown') AS plan_tier,
+        COALESCE(gym_plan_tier_from_name(p.name), 'unknown') AS plan_tier,
         COUNT(DISTINCT g.id)::int AS gym_count,
         COUNT(DISTINCT m.id)::int AS total_members,
         COUNT(DISTINCT m.id) FILTER (WHERE m.is_blacklisted = false)::int AS active_members,
         COALESCE(SUM(bi.total_amount) FILTER (WHERE bi.status = 'paid'), 0)::numeric(12,2) AS total_revenue,
         COALESCE(AVG(bi.total_amount) FILTER (WHERE bi.status = 'paid'), 0)::numeric(10,2) AS avg_revenue
       FROM gyms g
+      LEFT JOIN billing_plans p ON p.id = g.plan_id
       LEFT JOIN members m ON m.gym_id = g.id
       LEFT JOIN billing_invoices bi ON bi.gym_id = g.id
-      GROUP BY g.plan_tier
+      GROUP BY gym_plan_tier_from_name(p.name)
       ORDER BY total_revenue DESC
     `);
 
@@ -639,7 +641,7 @@ export async function getGymPerformance(_req: Request, res: Response) {
   try {
     const result = await client.query(`
       SELECT
-        g.id, g.name, g.subdomain, g.plan_tier, g.is_active,
+        g.id, g.name, g.subdomain, gym_plan_tier_from_name(p.name) AS plan_tier, p.name AS plan_name, g.is_active,
         COALESCE(m.members, 0)::int AS members,
         COALESCE(m.active_members, 0)::int AS active_members,
         COALESCE(m.new_members_this_month, 0)::int AS new_members_this_month,
@@ -648,6 +650,7 @@ export async function getGymPerformance(_req: Request, res: Response) {
         COALESCE(bi.monthly_revenue, 0)::numeric(12,2) AS monthly_revenue,
         COALESCE(su.staff_count, 0)::int AS staff_count
       FROM gyms g
+      LEFT JOIN billing_plans p ON p.id = g.plan_id
       LEFT JOIN (
         SELECT gym_id,
           COUNT(*)::int AS members,

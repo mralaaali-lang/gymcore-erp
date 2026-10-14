@@ -1032,3 +1032,24 @@ server `tsc` ✓ • frontend `tsc` ✓ • `npm run build` ✓ (10.3s) • إع
 - **lookup بالكود**: `100002` أعاد محمد عليا عبر `/attendance/lookup` و`/api/members?search=100002`؛ الحالات الثلاث للردّ في المتصفح سليمة (وحيد ⇒ Enter يسجّل حضور؛ محمد عليا كان عنده جلسة اليوم فأظهر حارس التكرار اليومي الصادق «تم تسجيل حضور هذا العضو اليوم بالفعل»؛ غير موجود ⇒ رسالة الكود المعدوم؛ متعدد ⇒ «اختر العضو»). تجربة 100001 (أحمد المتدرب) رفضت بحضور صادق «ليس له اشتراك نشط» — قاعدة عمل فعلية، لا عيب.
 - **البطاقة**: `window.open` mock-capture أكد HTML المطبوع (len=3716) فيه svg QR + `100002` + `محمد عليا` + `NONOGYM` + `2026-11-10` — نافذة الطباعة الحقيقية لا تُرى في متصفح الاختبار الآلي؛ **المستخدم يعيد فحص حوار الطباعة في متصفحه اليدوي** كما اتفقنا.
 - **الترقيم**: select يعرض 50/100/300، تغييره يعيد إلى صفحة 1، footer «صفحة 1 من 1» مع 3 اشتراكات، وبحث `100002` في الجدول صفّى إلى صف محمد وحده (يثبت `m.card_code` في بحث السيرفر عبر الـUI). **ملاحظة صدق**: أزرار الأرقام نفسها لم تُختبر بصريًا لأن بيانات التطوير لا تتجاوز صفحة واحدة — الخوارزمية نسخة مطابق من MemberList المختبَر سابقًا.
+
+---
+
+## §33-توحيد — باقة الصالة: مصدر واحد حقيقي (billing_plans) + تخزين بريد/عنوان المعالج (2026-10-14)
+
+**العيب الجوهري الذي أُغلق:** كل صالة كانت تحمل **نسختين من باقتها**: `gyms.plan_tier` نصي (basic/premium/enterprise) تقرأه شاشات الأوفرات، و`gyms.plan_id` FK إلى `billing_plans` — وهو الذي يعمل به فعليًا `planGuard` والفوترة — بلا أي ضمان تطابق بينهما. `updateGymSubscription` كان **يكتب plan_tier ولا يلمس plan_id إطلاقًا** (ترقية صالة لا تغيّر حدودها الفعلية!). ومعالم المعالج `email`/`address_city`/`address_zip` كانت تُجمع في الواجهة ثم تُرمى: اثنان يسقطان في zod قبل الوصول للكونترولر، والثالث لم يكن له عمود أصلًا. بقرار المستخدم: **plan_id مصدرًا وحيدًا** + الحقول تُخزن فعليًا + سلّم أسعار مقترح ينتظر مراجعته.
+
+### القاعدة (migration `064_plan_unification.sql`)
+- أعمدة حقيقية جديدة: `gyms.email VARCHAR(255)` + `address_city VARCHAR(255)` + `address_zip VARCHAR(20)`؛ `email` الخالي يُملأ من بريد مدير الصالة الأول (بيانات موجودة فعلية، لا وهم).
+- **backfill**: كل `plan_id NULL` أخذ خطته من التير القديم بالمطابقة المتفق عليها (basic→Starter، premium→Pro، enterprise→Enterprise)؛ وحيث تعارض العمودان انتصرت `billing_plans` (أُعيدت المرآة من اسم الخطة).
+- **دالتا مطابقة** SQL: `gym_plan_tier_from_name` (Starter→basic، Growth/Pro→premium، Enterprise→enterprise) و`gym_plan_id_from_tier` (premium→Pro كخطة مفضلة).
+- **Trigger مازج `trg_gyms_plan_sync`** قبل كل INSERT/UPDATE على gyms: الكتابة بـplan_id تحدّث المرآة، الكتابة بالتير وحدها تحلّ إلى plan_id (بما في ذلك بذور وSQL خام ومعالم قديمة)، والتحديث الجزئي الذي لا يلمس أياً منهما لا يغيّر شيء — **مستحيل بنيويًا أن يتباعد العمودان بعد اليوم**.
+
+### السيرفر — قراءة من الحقيقة لا من المرآة
+- `auth gymBrief` (رد /auth/me وlogin): يضيف `plan_id` + `plan_name` من join بـbilling_plans (الخريطة القديمة بقيت متسقة بالـtrigger).
+- `platformGyms`: `createGym` يخزن email (gym_email→contact_email→owner_email بالأولوية) + address_city/address_zip ويعيدها في RETURNING؛ `getGym`/`listGyms` يعيدان plan_name/plan_id والحقول الجديدة؛ `updateGymSubscription` صار **يكتب plan_id فعليًا** (يُقبل plan_id أو تير legacy للمتوافق، مع 400 صادقة لخطة غير موجودة)؛ `updateGymFull` يحفظ email/city/zip ويعيدها.
+- `platformReports` (overview/plan-performance/gym-performance): التوزيعات صارت **مشتقة من join** بـ`gym_plan_tier_from_name(p.name)` بدل قراءة العمود النصي.
+- `schemas.ts`: address_city/address_zip أضيفا لـcreateGymSchema (كان zod يقصهما قبل الوصول للكونترولر).
+- **ملاحظة سيادية**: الخطة الخامسة «Growth» لا تير لها في السلّم القديم — مرآتها premium، وهذا مقصود: السلّم القديم ثلاثي والحقيقة رباعية؛ planGuard يستخدم الحدود الفعلية من billing_plans دائمًا.
+
+**التحقق الحي (docker :4001):** tsc سيرفر EXIT=0، image backend أُعيد بناؤه، migration 064 جرى عند الإقلاع («All migrations complete»). **backfill**: 11/11 صالة لها plan_id، **0 تعارض** بين العمودين بفرز مباشر، وemails ملأت من مديري الصالات. **Matrix الـtrigger بالـSQL**: INSERT بالتير premium ⇒ Pro؛ INSERT بالخطة Growth ⇒ المرآة premium؛ UPDATE بالتير ⇒ الخطة تتحرك؛ UPDATE بالخطة ⇒ التير ينعكس — وكل صفوف الاختبار حُذفت وعاد العدد 11. **قراءة حية**: `/auth/me` أعاد `{'plan_tier':'basic','plan_id':'3682d21a…','plan_name':'Starter'}` لـNONOGYM. دالتا المطابقة والفهرسة اختُبراا SQL-يًا (4 basic من 11 مطابقة للتوزيع السابق حرفيًا). **فجوة موثقة**: مسارات الأوفرات الكتابية (createGym/updateGymSubscription API) تتطلب توكن سوبر-أدمان غير متوفر في جلسة الاختبار — منطقها typechecked والسلوك مكافئ له في الـtrigger المختبَر؛ يُعاد فحصها من واجهة الأوفرات في متصفحك اليدوي. **التسعير لم يُمس**: سلّم Starter 3000/Growth 4500/Pro 6000/Enterprise 9000 (شهري، والسنوي 10×) معروض على المستخدم ولم يُطبق بعد بقراره.

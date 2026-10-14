@@ -23,7 +23,7 @@ function getErrorMessage(error: unknown): string {
 export const createGym = async (req: Request, res: Response): Promise<void> => {
   const {
     gym_name, subdomain, owner_email, owner_password, owner_full_name, plan_tier,
-    contact_email, phone, password, billing_cycle, plan_id, currency, timezone, logo_url,
+    contact_email, gym_email, phone, password, billing_cycle, plan_id, currency, timezone, logo_url,
     dba_name, address_street, address_city,
     address_state, address_zip, address_country,
     date_format, time_format, first_day_of_week, language,
@@ -91,18 +91,18 @@ export const createGym = async (req: Request, res: Response): Promise<void> => {
     const gymResult = await client.query(
       `INSERT INTO gyms (
         name, subdomain, plan_tier, is_active, plan_id,
-        dba_name, phone, address_street, address_state, address_country, timezone,
+        email, dba_name, phone, address_street, address_city, address_state, address_zip, address_country, timezone,
         date_format, time_format, first_day_of_week, language,
         logo_url, currency, subscription_status, subscription_expires_at
        ) VALUES (
         $1, $2, $3, $18::boolean, $4,
-        $5, $6, $7, $8, $9, $10,
+        $19, $5, $6, $7, $20, $8, $21, $9, $10,
         $11, $12, $13, $14,
         $15, $16, 'active', $17
        )
        RETURNING id, name, subdomain, plan_tier, is_active, created_at,
-                 dba_name, phone, address_street,
-                 address_state, address_country, timezone,
+                 plan_id, email, dba_name, phone, address_street, address_city,
+                 address_state, address_zip, address_country, timezone,
                  date_format, time_format, first_day_of_week, language,
                  logo_url, currency, subscription_expires_at`,
       [
@@ -115,6 +115,10 @@ export const createGym = async (req: Request, res: Response): Promise<void> => {
         language || 'ar', logo_url || null,
         currency || 'EGP', resolvedSubscriptionExpiresAt,
         is_active !== false,
+        // §33-توحيد: بريد الصالة وعنوانها يخزنان فعليًا (كان المعالج يجمعهما والسيرفر يتجاهلهما)
+        gym_email || contact_email || owner_email || null,
+        address_city || null,
+        address_zip || null,
       ]
     );
     const gym = gymResult.rows[0];
@@ -203,8 +207,9 @@ export const listGyms = async (_req: Request, res: Response): Promise<void> => {
     const result = await client.query(
       `SELECT g.id, g.name, g.subdomain, g.plan_tier, g.is_active,
               g.created_at, g.subscription_expires_at, g.currency,
-              g.phone, g.dba_name, g.timezone,
+              g.phone, g.dba_name, g.timezone, g.email, g.address_city,
               g.address_street, g.address_country,
+              g.plan_id, p.name AS plan_name,
               (SELECT MAX(al.check_in_time) FROM attendance_logs al WHERE al.gym_id = g.id) AS last_activity_at,
               COALESCE(uc.current_members_count, 0) AS active_members_count,
               COALESCE(uc.current_staff_count, 0) AS active_staff_count,
@@ -240,11 +245,11 @@ export const getGym = async (req: Request, res: Response): Promise<void> => {
      const result = await client.query(
        `SELECT g.id, g.name, g.subdomain, g.plan_tier, g.is_active,
                g.created_at, g.subscription_expires_at, g.currency,
-               g.phone, g.address_country,
-               g.address_street, g.address_state,
+               g.phone, g.email, g.address_city, g.address_country,
+               g.address_street, g.address_state, g.address_zip,
                g.timezone, g.language, g.logo_url, g.dba_name,
                g.date_format, g.time_format, g.first_day_of_week,
-               g.plan_id,
+               g.plan_id, p.name AS plan_name, p.price_monthly, p.price_yearly,
                (SELECT COUNT(*)::int
                 FROM members m
                 WHERE m.gym_id = g.id
@@ -261,6 +266,7 @@ export const getGym = async (req: Request, res: Response): Promise<void> => {
                 ORDER BY su.created_at ASC
                 LIMIT 1) AS owner_email
         FROM gyms g
+        LEFT JOIN billing_plans p ON p.id = g.plan_id
         WHERE g.id = $1`,
       [id]
     );
@@ -356,9 +362,9 @@ export const setGymActive = async (req: Request, res: Response): Promise<void> =
 // ====================================================================
 export const updateGymSubscription = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
-  const { plan_tier, subscription_expires_at } = req.body;
+  const { plan_tier, plan_id, subscription_expires_at } = req.body;
 
-  const VALID_TIERS = ['basic', 'professional', 'enterprise'];
+  const VALID_TIERS = ['basic', 'professional', 'premium', 'enterprise'];
 
   if (plan_tier && !VALID_TIERS.includes(plan_tier)) {
     res.status(400).json({ error: `plan_tier must be one of: ${VALID_TIERS.join(', ')}` });
@@ -368,18 +374,34 @@ export const updateGymSubscription = async (req: Request, res: Response): Promis
     res.status(400).json({ error: 'subscription_expires_at must be a valid ISO date.' });
     return;
   }
-  if (!plan_tier && !subscription_expires_at) {
-    res.status(400).json({ error: 'At least one of plan_tier or subscription_expires_at is required.' });
+  if (!plan_tier && !plan_id && !subscription_expires_at) {
+    res.status(400).json({ error: 'At least one of plan_id, plan_tier or subscription_expires_at is required.' });
     return;
   }
 
   const client = await getAdminClient();
   try {
+    // §33-توحيد: plan_id هو مصدر الحقيقة؛ plan_tier صار مرآة DB-maintained.
+    // المعالج القديم الذي يرسل plan_tier فقط لا يزال مدعومًا — الـtrigger
+    // يربطه بالخطة المناسبة تلقائيًا.
+    let resolvedPlanId: string | null = plan_id || null;
+    if (plan_id) {
+      const planCheck = await client.query('SELECT id FROM billing_plans WHERE id = $1', [plan_id]);
+      if (planCheck.rows.length === 0) {
+        await client.query('ROLLBACK').catch(() => {});
+        res.status(400).json({ error: 'plan_id does not reference an existing billing plan.' });
+        return;
+      }
+    }
+
     const sets: string[] = [];
     const params: unknown[] = [];
     let idx = 1;
 
-    if (plan_tier) {
+    if (resolvedPlanId) {
+      sets.push(`plan_id = $${idx++}`);
+      params.push(resolvedPlanId);
+    } else if (plan_tier) {
       sets.push(`plan_tier = $${idx++}`);
       params.push(plan_tier);
     }
@@ -390,7 +412,7 @@ export const updateGymSubscription = async (req: Request, res: Response): Promis
 
     const result = await client.query(
       `UPDATE gyms SET ${sets.join(', ')} WHERE id = $${idx}
-       RETURNING id, name, plan_tier, subscription_expires_at, is_active, created_at`,
+       RETURNING id, name, plan_tier, plan_id, subscription_expires_at, is_active, created_at`,
       [...params, id]
     );
 
@@ -401,7 +423,7 @@ export const updateGymSubscription = async (req: Request, res: Response): Promis
     }
 
     const gym = result.rows[0];
-    const changes = [plan_tier ? `plan → ${plan_tier}` : '', subscription_expires_at ? `expires → ${subscription_expires_at}` : ''].filter(Boolean).join(', ');
+    const changes = [resolvedPlanId || plan_tier ? `plan → ${resolvedPlanId || plan_tier}` : '', subscription_expires_at ? `expires → ${subscription_expires_at}` : ''].filter(Boolean).join(', ');
 
     await client.query(
       `INSERT INTO activity_logs (gym_id, staff_user_id, platform_admin_id, action_description, ip_address)
@@ -460,8 +482,11 @@ export const updateGymFull = async (req: Request, res: Response): Promise<void> 
     add('name', gym_name);
     add('dba_name', dba_name);
     add('phone', phone);
+    add('email', gym_email);
     add('address_street', address_street);
+    add('address_city', address_city);
     add('address_state', address_state);
+    add('address_zip', address_zip);
     add('address_country', address_country);
     add('timezone', timezone);
     add('date_format', date_format);
@@ -481,8 +506,8 @@ export const updateGymFull = async (req: Request, res: Response): Promise<void> 
 
      const result = await client.query(
        `UPDATE gyms SET ${sets.join(', ')} WHERE id = $${idx}
-        RETURNING id, name, subdomain, plan_tier, is_active, subscription_expires_at,
-                  dba_name, phone, address_country,
+        RETURNING id, name, subdomain, plan_tier, plan_id, is_active, subscription_expires_at,
+                  dba_name, phone, email, address_street, address_city, address_state, address_zip, address_country,
                   timezone, language, logo_url, currency`,
       [...params, id]
     );
