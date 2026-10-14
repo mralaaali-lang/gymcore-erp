@@ -8,10 +8,13 @@ import {
   listBillingPlans, listInvoices,
   listCoupons, createCoupon, deleteCoupon,
   initiateFawryPayment,
+  listAddons, createAddon, updateAddon, deleteAddon,
+  listGymAddons, grantGymAddon, cancelGymAddon,
+  listPlatformGyms,
   type BillingPlan, type BillingInvoice,
-  type BillingCoupon,
+  type BillingCoupon, type BillingAddon, type GymAddon, type PlatformGym,
 } from '../../services/api';
-import { FloppyDisk, Plus, X, MagnifyingGlass, CheckCircle, Calendar, Trash, ArrowSquareOut, Ticket, Bank } from '@phosphor-icons/react';
+import { FloppyDisk, Plus, X, MagnifyingGlass, CheckCircle, Calendar, Trash, ArrowSquareOut, Ticket, Bank, PuzzlePiece } from '@phosphor-icons/react';
 import PageLoader from '../../components/shared/PageLoader';
 import PageHeader from '../../components/shared/PageHeader';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
@@ -33,7 +36,7 @@ const statusLabels: Record<string, Record<string, string>> = {
   cancelled: { ar: 'ملغي', en: 'Cancelled' },
 };
 
-type Tab = 'plans' | 'invoices' | 'coupons' | 'payments';
+type Tab = 'plans' | 'addons' | 'invoices' | 'coupons' | 'payments';
 
 export default function BillingEngine() {
   const { language } = useApp();
@@ -71,6 +74,141 @@ export default function BillingEngine() {
   const [showFawryModal, setShowFawryModal] = useState(false);
   const [fawryInvoice, setFawryInvoice] = useState<BillingInvoice | null>(null);
   const [fawryResult, setFawryResult] = useState<{ ref: string; url: string } | null>(null);
+
+  // ── §36 add-ons state ────────────────────────────────
+  const addonsQuery = useApiQuery(['billing-addons'], listAddons, { staleTime: 15_000 });
+  const gymsQuery = useApiQuery(['platform-gyms', 'addons-brief'], listPlatformGyms, { staleTime: 60_000 });
+  const [addonGymId, setAddonGymId] = useState('');
+  const gymAddonsQuery = useApiQuery(
+    ['gym-addons', addonGymId],
+    () => listGymAddons(addonGymId),
+    { enabled: !!addonGymId, staleTime: 10_000 },
+  );
+  const addons: BillingAddon[] = addonsQuery.data?.data ?? [];
+  const allGyms: PlatformGym[] = gymsQuery.data?.data ?? [];
+  const gymAddons: GymAddon[] = gymAddonsQuery.data?.data ?? [];
+
+  // catalog modal (null = مغلق، 'new' = إنشاء، غير ذلك = تعديل)
+  const [addonModal, setAddonModal] = useState<'new' | BillingAddon | null>(null);
+  const [acode, setAcode] = useState('');
+  const [aname, setAname] = useState('');
+  const [anameAr, setAnameAr] = useState('');
+  const [akeys, setAkeys] = useState('');
+  const [limitColumn, setLimitColumn] = useState('');
+  const [limitAmount, setLimitAmount] = useState(0);
+  const [aMonthly, setAMonthly] = useState(0);
+  const [aYearly, setAYearly] = useState(0);
+  const [addonError, setAddonError] = useState('');
+
+  // grant modal
+  const [grantModal, setGrantModal] = useState(false);
+  const [grantAddonId, setGrantAddonId] = useState('');
+  const [grantCycle, setGrantCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [grantPrice, setGrantPrice] = useState<number | ''>('');
+  const [grantExpires, setGrantExpires] = useState('');
+  const [grantNotes, setGrantNotes] = useState('');
+  const [grantError, setGrantError] = useState('');
+
+  const asKeys = (v: BillingAddon['module_keys']): string[] => {
+    if (Array.isArray(v)) return v;
+    try { const p = JSON.parse(String(v)); return Array.isArray(p) ? p : []; } catch { return []; }
+  };
+
+  const resetAddonForm = () => {
+    setAcode(''); setAname(''); setAnameAr(''); setAkeys('');
+    setLimitColumn(''); setLimitAmount(0); setAMonthly(0); setAYearly(0); setAddonError('');
+  };
+
+  const openEditAddon = (a: BillingAddon) => {
+    setAcode(a.code); setAname(a.name); setAnameAr(a.name_ar);
+    setAkeys(asKeys(a.module_keys).join(', '));
+    setLimitColumn(a.limit_column || ''); setLimitAmount(a.limit_amount || 0);
+    setAMonthly(Number(a.price_monthly)); setAYearly(Number(a.price_yearly)); setAddonError('');
+    setAddonModal(a);
+  };
+
+  const addonPayload = () => ({
+    code: acode.trim().toLowerCase().replace(/\s+/g, '_'),
+    name: aname.trim(),
+    name_ar: anameAr.trim(),
+    module_keys: akeys.split(',').map((s) => s.trim()).filter(Boolean),
+    limit_column: limitColumn || null,
+    limit_amount: limitColumn ? limitAmount : null,
+    price_monthly: aMonthly,
+    price_yearly: aYearly,
+  });
+
+  const saveAddonMutation = useMutation({
+    mutationFn: (editing: BillingAddon | 'new') => {
+      const body = addonPayload();
+      return editing === 'new' ? createAddon(body) : updateAddon(editing.id, body);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['billing-addons'] });
+      showToast(t('Addon saved', 'تم حفظ الإضافة'), 'success');
+      setAddonModal(null);
+      resetAddonForm();
+    },
+    onError: (err: unknown) => {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setAddonError(axiosErr?.response?.data?.error || t('Failed to save addon', 'فشل حفظ الإضافة'));
+    },
+  });
+
+  const deleteAddonMutation = useMutation({
+    mutationFn: (id: string) => deleteAddon(id),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['billing-addons'] });
+      queryClient.invalidateQueries({ queryKey: ['gym-addons'] });
+      showToast(res.data.soft_deleted
+        ? t('Addon has live assignments — disabled instead of deleting', 'عليها إسنادات سارية: عُطّلت بدل الحذف')
+        : t('Addon deleted', 'تم حذف الإضافة'), 'success');
+    },
+    onError: () => showToast(t('Failed to delete addon', 'فشل حذف الإضافة'), 'error'),
+  });
+
+  const toggleAddonMutation = useMutation({
+    mutationFn: (a: BillingAddon) => updateAddon(a.id, { is_active: !a.is_active }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['billing-addons'] });
+      showToast(t('Addon updated', 'تم تحديث الإضافة'), 'success');
+    },
+    onError: () => showToast(t('Failed to update addon', 'فشل تحديث الإضافة'), 'error'),
+  });
+
+  const grantAddonMutation = useMutation({
+    mutationFn: () => {
+      if (!addonGymId || !grantAddonId) throw new Error('no selection');
+      return grantGymAddon(addonGymId, {
+        addon_id: grantAddonId,
+        cycle: grantCycle,
+        price_charged: grantPrice === '' ? undefined : Number(grantPrice),
+        expires_at: grantExpires || null,
+        notes: grantNotes || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gym-addons', addonGymId] });
+      queryClient.invalidateQueries({ queryKey: ['billing-addons'] });
+      showToast(t('Addon granted to gym', 'تم إسناد الإضافة للصالة'), 'success');
+      setGrantModal(false);
+      setGrantAddonId(''); setGrantPrice(''); setGrantExpires(''); setGrantNotes(''); setGrantError('');
+    },
+    onError: (err: unknown) => {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setGrantError(axiosErr?.response?.data?.error || t('Failed to grant addon', 'فشل إسناد الإضافة'));
+    },
+  });
+
+  const cancelAddonMutation = useMutation({
+    mutationFn: (assignmentId: string) => cancelGymAddon(addonGymId, assignmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gym-addons', addonGymId] });
+      queryClient.invalidateQueries({ queryKey: ['billing-addons'] });
+      showToast(t('Assignment cancelled', 'تم إلغاء الإسناد'), 'success');
+    },
+    onError: () => showToast(t('Failed to cancel assignment', 'فشل إلغاء الإسناد'), 'error'),
+  });
 
   // ── Mutations ────────────────────────────────────────
   const createCouponMutation = useMutation({
@@ -159,6 +297,7 @@ export default function BillingEngine() {
   // ── Tab Definitions ──────────────────────────────────
   const tabs = [
     { key: 'plans' as Tab, labelAr: 'الباقات', labelEn: 'Plans', icon: 'credit-card' },
+    { key: 'addons' as Tab, labelAr: 'الوحدات والإضافات', labelEn: 'Add-ons', icon: 'extension' },
     { key: 'invoices' as Tab, labelAr: 'الفواتير', labelEn: 'Invoices', icon: 'receipt' },
     { key: 'coupons' as Tab, labelAr: 'كوبونات الخصم', labelEn: 'Coupons', icon: 'ticket' },
     { key: 'payments' as Tab, labelAr: 'بوابة الدفع', labelEn: 'Payments', icon: 'bank' },
@@ -579,6 +718,358 @@ export default function BillingEngine() {
     );
   };
 
+  // ── Render: §36 Add-ons ──────────────────────────────
+  const renderAddons = () => (
+    <div className="space-y-6">
+      {/* Catalog */}
+      <div className="bg-white rounded-3xl border shadow-sm border-gray-200 overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">{t('Add-ons Catalog', 'كتالوج الإضافات')}</h2>
+            <p className="text-sm text-gray-500 mt-0.5">{t('Units sold on top of plans (store, reports, seats…)', 'وحدات تُباع فوق الباقة: متجر/تقارير/مقاعد…')}</p>
+          </div>
+          <button onClick={() => { resetAddonForm(); setAddonModal('new'); }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl font-semibold hover:opacity-90 transition-opacity">
+            <Plus size={16} /> {t('New Add-on', 'إضافة جديدة')}
+          </button>
+        </div>
+        {addonsQuery.isLoading ? (
+          <div className="p-8 text-center text-gray-400">{t('Loading…', 'جارٍ التحميل…')}</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500">
+                <tr>
+                  <th className="text-start p-4 font-semibold">{t('Addon', 'الإضافة')}</th>
+                  <th className="text-start p-4 font-semibold">{t('Unlocks', 'تُفعّل')}</th>
+                  <th className="text-start p-4 font-semibold">{t('Monthly', 'شهري')}</th>
+                  <th className="text-start p-4 font-semibold">{t('Yearly', 'سنوي')}</th>
+                  <th className="text-start p-4 font-semibold">{t('Live gyms', 'صالات سارية')}</th>
+                  <th className="text-start p-4 font-semibold">{t('Status', 'الحالة')}</th>
+                  <th className="text-end p-4 font-semibold">{t('Actions', 'إجراءات')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {addons.map((a) => (
+                  <tr key={a.id} className={!a.is_active ? 'opacity-50' : ''}>
+                    <td className="p-4">
+                      <div className="font-semibold text-gray-900">{isRtl ? a.name_ar : a.name}</div>
+                      <div className="text-xs text-gray-400 font-mono">{a.code}</div>
+                    </td>
+                    <td className="p-4 text-gray-600">
+                      {asKeys(a.module_keys).length > 0
+                        ? asKeys(a.module_keys).join(', ')
+                        : a.limit_column
+                          ? `+${a.limit_amount} ${a.limit_column === 'max_members' ? t('members', 'عضو') : t('staff', 'موظف')}`
+                          : '—'}
+                    </td>
+                    <td className="p-4 font-mono text-gray-900">{formatCurrency(a.price_monthly)}</td>
+                    <td className="p-4 font-mono text-gray-900">{Number(a.price_yearly) > 0 ? formatCurrency(a.price_yearly) : '—'}</td>
+                    <td className="p-4 font-mono text-gray-600">{a.live_assignments ?? 0}</td>
+                    <td className="p-4">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${a.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {a.is_active ? t('Active', 'مفعّلة') : t('Disabled', 'معطّلة')}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => toggleAddonMutation.mutate(a)} title={a.is_active ? t('Disable', 'تعطيل') : t('Enable', 'تفعيل')}
+                          className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
+                          <CheckCircle size={16} className={a.is_active ? 'text-green-600' : ''} />
+                        </button>
+                        <button onClick={() => openEditAddon(a)} title={t('Edit', 'تعديل')}
+                          className="px-2 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs font-semibold">
+                          {t('Edit', 'تعديل')}
+                        </button>
+                        <button onClick={() => { if (window.confirm(t('Delete this addon?', 'حذف هذه الإضافة؟'))) deleteAddonMutation.mutate(a.id); }}
+                          title={t('Delete', 'حذف')}
+                          className="p-1.5 rounded-lg border border-gray-200 text-red-400 hover:bg-red-50">
+                          <Trash size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Per-gym assignments */}
+      <div className="bg-white rounded-3xl border shadow-sm border-gray-200 overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">{t('Gym Assignments', 'إسنادات الصالات')}</h2>
+            <p className="text-sm text-gray-500 mt-0.5">{t('Grant an addon to a gym with an optional discounted price', 'أسنِد إضافة لصالة بسعر مخفّض اختياري')}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <select value={addonGymId} onChange={(e) => setAddonGymId(e.target.value)}
+              className="px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent min-w-52">
+              <option value="">{t('Choose a gym…', 'اختر صالة…')}</option>
+              {allGyms.map((g) => <option key={g.id} value={g.id}>{g.name} — {g.plan_tier}</option>)}
+            </select>
+            <button onClick={() => { setGrantError(''); setGrantModal(true); }} disabled={!addonGymId}
+              className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl font-semibold hover:opacity-90 transition-opacity disabled:opacity-40">
+              <Plus size={16} /> {t('Grant Addon', 'إسناد إضافة')}
+            </button>
+          </div>
+        </div>
+        {!addonGymId ? (
+          <div className="p-8 text-center text-gray-400">{t('Pick a gym to view its addons', 'اختر صالة لعرض إضافاتها')}</div>
+        ) : gymAddonsQuery.isLoading ? (
+          <div className="p-8 text-center text-gray-400">{t('Loading…', 'جارٍ التحميل…')}</div>
+        ) : gymAddons.length === 0 ? (
+          <div className="p-8 text-center text-gray-400">{t('No addons granted to this gym yet', 'لا إضافات مُسنَدة لهذه الصالة بعد')}</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500">
+                <tr>
+                  <th className="text-start p-4 font-semibold">{t('Addon', 'الإضافة')}</th>
+                  <th className="text-start p-4 font-semibold">{t('Price', 'السعر')}</th>
+                  <th className="text-start p-4 font-semibold">{t('Cycle', 'الدورة')}</th>
+                  <th className="text-start p-4 font-semibold">{t('Expires', 'الانتهاء')}</th>
+                  <th className="text-start p-4 font-semibold">{t('Status', 'الحالة')}</th>
+                  <th className="text-end p-4 font-semibold">{t('Actions', 'إجراءات')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {gymAddons.map((ga) => {
+                  const expired = ga.expires_at && new Date(ga.expires_at) < new Date();
+                  const catalog = addons.find((a) => a.id === ga.addon_id);
+                  const listPrice = catalog ? Number(ga.cycle === 'yearly' ? catalog.price_yearly : catalog.price_monthly) : 0;
+                  const discounted = listPrice > 0 && Number(ga.price_charged) < listPrice;
+                  return (
+                    <tr key={ga.id} className={ga.status === 'cancelled' ? 'opacity-50' : ''}>
+                      <td className="p-4">
+                        <div className="font-semibold text-gray-900">{isRtl ? ga.name_ar : ga.name}</div>
+                        <div className="text-xs text-gray-400 font-mono">{ga.code}</div>
+                      </td>
+                      <td className="p-4 font-mono text-gray-900">
+                        {formatCurrency(ga.price_charged)}
+                        {discounted && <span className="ms-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-xs font-bold">{t('discounted', 'مخفّض')}</span>}
+                      </td>
+                      <td className="p-4 text-gray-600">{ga.cycle === 'yearly' ? t('Yearly', 'سنوي') : t('Monthly', 'شهري')}</td>
+                      <td className="p-4 text-gray-600">{ga.expires_at ? formatDate(ga.expires_at) : t('Open-ended', 'بلا نهاية')}</td>
+                      <td className="p-4">
+                        {ga.status === 'cancelled'
+                          ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">{t('Cancelled', 'ملغاة')}</span>
+                          : expired
+                            ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-600">{t('Expired', 'منتهية')}</span>
+                            : <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">{t('Active', 'سارية')}</span>}
+                      </td>
+                      <td className="p-4 text-end">
+                        {ga.status === 'active' && (
+                          <button onClick={() => { if (window.confirm(t('Cancel this assignment? The gym loses the unit immediately.', 'إلغاء هذا الإسناد؟ ستفقد الصالة الوحدة فورًا.'))) cancelAddonMutation.mutate(ga.id); }}
+                            className="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50">
+                            {t('Cancel', 'إلغاء')}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ── Render: Addon catalog modal (وسطي) ───────────────
+  const renderAddonModal = () => {
+    if (!addonModal) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setAddonModal(null)}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <PuzzlePiece size={20} className="text-primary" />
+              <h2 className="text-lg font-bold text-gray-900">{addonModal === 'new' ? t('New Add-on', 'إضافة جديدة') : t('Edit Add-on', 'تعديل الإضافة')}</h2>
+            </div>
+            <button onClick={() => setAddonModal(null)} className="p-1.5 hover:bg-gray-50 rounded-lg"><X size={18} /></button>
+          </div>
+          <form className="space-y-4" onSubmit={(e) => {
+            e.preventDefault();
+            setAddonError('');
+            if (!acode.trim() || !anameAr.trim()) {
+              setAddonError(t('Code and Arabic name are required', 'الرمز والاسم العربي مطلوبان'));
+              return;
+            }
+            saveAddonMutation.mutate(addonModal);
+          }}>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Code', 'الرمز')} *</label>
+                <input type="text" value={acode} onChange={(e) => setAcode(e.target.value)} disabled={addonModal !== 'new'}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent font-mono disabled:bg-gray-50"
+                  placeholder="store" required />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('English name', 'الاسم بالإنجليزية')}</label>
+                <input type="text" value={aname} onChange={(e) => setAname(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Arabic name', 'الاسم بالعربية')} *</label>
+              <input type="text" value={anameAr} onChange={(e) => setAnameAr(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                placeholder={t('Store (POS & Inventory)', 'المتجر (نقاط بيع ومخزون)')} required />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Module keys (comma separated)', 'مفاتيح الوحدات (بفاصلة)')}</label>
+              <input type="text" value={akeys} onChange={(e) => setAkeys(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent font-mono"
+                placeholder="products, inventory" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Raises limit', 'ترفع حدًا')}</label>
+                <select value={limitColumn} onChange={(e) => setLimitColumn(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                  <option value="">{t('None', 'بدون')}</option>
+                  <option value="max_members">{t('Members', 'أعضاء')}</option>
+                  <option value="max_staff">{t('Staff', 'موظفون')}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Limit amount', 'المقدار')}</label>
+                <input type="number" min={0} value={limitAmount} onChange={(e) => setLimitAmount(parseInt(e.target.value) || 0)}
+                  disabled={!limitColumn}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-gray-50" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Monthly price', 'السعر الشهري')} *</label>
+                <input type="number" min={0} step="0.01" value={aMonthly} onChange={(e) => setAMonthly(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Yearly price', 'السعر السنوي')}</label>
+                <input type="number" min={0} step="0.01" value={aYearly} onChange={(e) => setAYearly(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" />
+              </div>
+            </div>
+
+            {addonError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{addonError}</p>}
+
+            <div className="flex gap-3">
+              <button type="submit" disabled={saveAddonMutation.isPending}
+                className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2">
+                {saveAddonMutation.isPending && (<span className="material-symbols-outlined animate-spin text-base">progress_activity</span>)}
+                <FloppyDisk size={16} />
+                {t('Save', 'حفظ')}
+              </button>
+              <button type="button" onClick={() => setAddonModal(null)}
+                className="px-5 py-3 border border-gray-200 rounded-xl text-gray-500 font-medium hover:bg-gray-50 transition-colors">
+                {t('Cancel', 'إلغاء')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Render: Grant modal (وسطي) ───────────────────────
+  const renderGrantModal = () => {
+    if (!grantModal) return null;
+    const catalog = addons.filter((a) => a.is_active);
+    const chosen = addons.find((a) => a.id === grantAddonId);
+    const suggested = chosen ? Number(grantCycle === 'yearly' ? chosen.price_yearly : chosen.price_monthly) || Number(chosen.price) || 0 : 0;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setGrantModal(false)}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <PuzzlePiece size={20} className="text-primary" />
+              <h2 className="text-lg font-bold text-gray-900">{t('Grant Addon', 'إسناد إضافة')}</h2>
+            </div>
+            <button onClick={() => setGrantModal(false)} className="p-1.5 hover:bg-gray-50 rounded-lg"><X size={18} /></button>
+          </div>
+          <form className="space-y-4" onSubmit={(e) => {
+            e.preventDefault();
+            setGrantError('');
+            if (!grantAddonId) {
+              setGrantError(t('Choose an addon', 'اختر الإضافة'));
+              return;
+            }
+            grantAddonMutation.mutate();
+          }}>
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Gym', 'الصالة')}</label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 font-semibold">
+                {allGyms.find((g) => g.id === addonGymId)?.name || '—'}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Addon', 'الإضافة')} *</label>
+              <select value={grantAddonId} onChange={(e) => { setGrantAddonId(e.target.value); setGrantPrice(''); }}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                <option value="">{t('Choose…', 'اختر…')}</option>
+                {catalog.map((a) => <option key={a.id} value={a.id}>{isRtl ? a.name_ar : a.name} — {formatCurrency(a.price_monthly)}/mo</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Cycle', 'الدورة')}</label>
+                <select value={grantCycle} onChange={(e) => { setGrantCycle(e.target.value as 'monthly' | 'yearly'); setGrantPrice(''); }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                  <option value="monthly">{t('Monthly', 'شهري')}</option>
+                  <option value="yearly">{t('Yearly', 'سنوي')}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1.5">
+                  {t('Price for this gym', 'السعر لهذه الصالة')}
+                  {suggested > 0 && <span className="font-normal text-gray-400"> ({t('catalog', 'الكتالوج')}: {formatCurrency(suggested)})</span>}
+                </label>
+                <input type="number" min={0} step="0.01" placeholder={String(suggested || '')}
+                  value={grantPrice === '' ? '' : grantPrice} onChange={(e) => setGrantPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" />
+              </div>
+            </div>
+            {grantPrice !== '' && suggested > 0 && Number(grantPrice) < suggested && (
+              <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                {t('Discounted below catalog price', 'سعر مخفّض تحت سعر الكتالوج')} ({formatCurrency(suggested - Number(grantPrice))} {t('off', 'خصم')})
+              </p>
+            )}
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Expires (optional)', 'تاريخ الانتهاء (اختياري)')}</label>
+              <input type="date" value={grantExpires} onChange={(e) => setGrantExpires(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Notes', 'ملاحظة')}</label>
+              <input type="text" value={grantNotes} onChange={(e) => setGrantNotes(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                placeholder={t('Deal with the owner', 'اتفاق مع صاحب الصالة')} />
+            </div>
+
+            {grantError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{grantError}</p>}
+
+            <div className="flex gap-3">
+              <button type="submit" disabled={grantAddonMutation.isPending}
+                className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2">
+                {grantAddonMutation.isPending && (<span className="material-symbols-outlined animate-spin text-base">progress_activity</span>)}
+                <CheckCircle size={16} />
+                {t('Grant', 'إسناد')}
+              </button>
+              <button type="button" onClick={() => setGrantModal(false)}
+                className="px-5 py-3 border border-gray-200 rounded-xl text-gray-500 font-medium hover:bg-gray-50 transition-colors">
+                {t('Cancel', 'إلغاء')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen" dir={isRtl ? 'rtl' : 'ltr'}>
       <PageHeader
@@ -596,12 +1087,15 @@ export default function BillingEngine() {
       />
 
       {activeTab === 'plans' && renderPlans()}
+      {activeTab === 'addons' && renderAddons()}
       {activeTab === 'invoices' && renderInvoices()}
       {activeTab === 'coupons' && renderCoupons()}
       {activeTab === 'payments' && renderPayments()}
 
       {renderCouponModal()}
       {renderFawryModal()}
+      {renderAddonModal()}
+      {renderGrantModal()}
     </div>
   );
 }

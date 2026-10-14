@@ -98,6 +98,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     root.lang = state.language;
   }, [state.language]);
 
+  // §36 — login pages dispatch LOGIN without an app reload, so the restore
+  // effect above never re-runs and gymProfile stays null for the session.
+  // Pull the tenant block (incl. effective features) once whenever a gym
+  // session is active but the profile hasn't loaded yet.
+  useEffect(() => {
+    if (!state.isAuthenticated || state.role === 'super-admin' || gymProfile) return;
+    tryRestoreSession()
+      .then((r) => {
+        if (r?.gym) setGymProfile(r.gym);
+      })
+      .catch(() => {});
+  }, [state.isAuthenticated, state.role, gymProfile]);
+
   const updateBranding = (payload: Partial<GymBranding>) =>
     dispatch({ type: 'UPDATE_BRANDING', payload });
   const setLanguage = (payload: 'ar' | 'en') => {

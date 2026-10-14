@@ -57,7 +57,7 @@ export function buildNavItems(base: string, role: UserRole, badges?: NavBadges):
       // ── الأعضاء ──
       { label: i18n.t('sidebar.members'), icon: 'users', path: `${base}/members`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers') },
       { label: i18n.t('sidebar.subscriptions'), icon: 'subscriptions', path: `${base}/subscriptions`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers') },
-      { label: i18n.t('sidebar.attendance'), icon: 'attendance', path: `${base}/attendance`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers'), badge: badges?.attendance },
+      { label: i18n.t('sidebar.attendance'), icon: 'attendance', path: `${base}/attendance`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers'), badge: badges?.attendance, requiresFeatures: ['attendance'] },
       // الجدول stays — the owner's list didn't place it elsewhere and the
       // restructure is additive (no route loses its only sidebar entrance).
       { label: i18n.t('sidebar.schedule'), icon: 'schedule', path: `${base}/gym`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers') },
@@ -70,16 +70,16 @@ export function buildNavItems(base: string, role: UserRole, badges?: NavBadges):
       { label: i18n.t('sidebar.debts'), icon: 'debts', path: `${base}/billing?tab=Debts`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance') },
       { label: i18n.t('sidebar.cashbox'), icon: 'cashbox', path: `${base}/cashbox`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance') },
       { label: i18n.t('sidebar.shiftSheets'), icon: 'statements', path: `${base}/cashbox/shifts`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance') },
-      { label: i18n.t('sidebar.sales'), icon: 'sales', path: `${base}/sales`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance') },
+      { label: i18n.t('sidebar.sales'), icon: 'sales', path: `${base}/sales`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance'), requiresFeatures: ['products'] },
       // ── التقارير ──
-      { label: i18n.t('sidebar.reports'), icon: 'reports', path: `${base}/reports`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionReports') },
-      { label: i18n.t('sidebar.staffSales'), icon: 'sales', path: `${base}/sales?tab=Report`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionReports') },
+      { label: i18n.t('sidebar.reports'), icon: 'reports', path: `${base}/reports`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionReports'), requiresFeatures: ['daily_reports'] },
+      { label: i18n.t('sidebar.staffSales'), icon: 'sales', path: `${base}/sales?tab=Report`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionReports'), requiresFeatures: ['products'] },
       // التنبيهات = the real ending-soon view (subscriptions prefiltered via
       // ?status=ending_soon, same link the dashboard action card uses).
       { label: i18n.t('sidebar.alerts'), icon: 'alerts', path: `${base}/subscriptions?status=ending_soon`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionReports'), badge: badges?.alerts },
       { label: i18n.t('sidebar.announcements'), icon: 'announcements', path: `${base}/marketing?tab=Announcements`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionReports') },
       // ── التشغيل (kept whole per owner) ──
-      { label: i18n.t('sidebar.store'), icon: 'products', path: `${base}/products`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionOps') },
+      { label: i18n.t('sidebar.store'), icon: 'products', path: `${base}/products`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionOps'), requiresFeatures: ['products'] },
       { label: i18n.t('sidebar.marketing'), icon: 'marketing', path: `${base}/marketing`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionOps') },
       { label: i18n.t('sidebar.crm'), icon: 'crm', path: `${base}/crm`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionOps') },
       // §34ح — growth page joined the sidebar after the members-page tab
@@ -122,8 +122,8 @@ export function buildNavItems(base: string, role: UserRole, badges?: NavBadges):
     return [
       { label: i18n.t('nav.dashboard'), icon: 'dashboard', path: `${base}/dashboard`, roles: ['reception'], section: i18n.t('nav.sectionMain') },
       { label: i18n.t('nav.members'), icon: 'users', path: `${base}/members`, roles: ['reception'], section: i18n.t('nav.sectionMembers') },
-      { label: i18n.t('nav.attendance'), icon: 'attendance', path: `${base}/attendance`, roles: ['reception'], section: i18n.t('nav.sectionMembers'), badge: badges?.attendance },
-      { label: i18n.t('nav.products'), icon: 'products', path: `${base}/products`, roles: ['reception'], section: i18n.t('nav.sectionSales') },
+      { label: i18n.t('nav.attendance'), icon: 'attendance', path: `${base}/attendance`, roles: ['reception'], section: i18n.t('nav.sectionMembers'), badge: badges?.attendance, requiresFeatures: ['attendance'] },
+      { label: i18n.t('nav.products'), icon: 'products', path: `${base}/products`, roles: ['reception'], section: i18n.t('nav.sectionSales'), requiresFeatures: ['products'] },
       { label: i18n.t('nav.settings'), icon: 'settings', path: `${base}/settings`, roles: ['reception'], section: i18n.t('nav.sectionSettings') },
     ];
   }

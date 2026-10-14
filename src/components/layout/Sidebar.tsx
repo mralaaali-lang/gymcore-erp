@@ -126,8 +126,16 @@ export default function Sidebar({ items }: SidebarProps) {
       ].filter(Boolean).join(' · ')
     : t('sidebar.brandTagline');
 
+  // §36 — hide nav items whose module isn't in the gym's effective features
+  // (plan modules ∪ live add-ons, via gym_effective_features in /auth/me).
+  // When the features array is absent (platform session or older backend)
+  // nothing is hidden — the server-side planGuard still 403s the writes.
+  const feats = gymProfile?.features;
   const filteredItems = items.filter((item) =>
-    item.roles.some((r) => r === role)
+    item.roles.some((r) => r === role) &&
+    (!item.requiresFeatures ||
+      !Array.isArray(feats) ||
+      item.requiresFeatures.every((k) => feats.includes(k)))
   );
 
   const groups = useMemo(

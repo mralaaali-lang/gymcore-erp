@@ -271,6 +271,9 @@ export interface GymBrief {
   is_active?: boolean;
   trial_end?: string | null;
   trial_days_remaining?: number | null;
+  /** §36 — effective module keys (plan modules + live add-ons), from
+   *  gym_effective_features(); drives sidebar gating. Undefined = old backend. */
+  features?: string[];
 }
 
 export interface RestoredSession {
@@ -1597,6 +1600,79 @@ export interface BillingSummary {
 
 export async function listBillingPlans(): Promise<{ data: BillingPlan[] }> {
   const res = await api.get('/platform/billing/plans');
+  return res.data;
+}
+
+// ====================================================================
+// PLATFORM ADMIN — §36 addons (catalog + per-gym assignments)
+// ====================================================================
+export interface BillingAddon {
+  id: string; code: string; name: string; name_ar: string;
+  pricing_type: string; price: number;
+  module_keys: string[] | string; limit_column: string | null; limit_amount: number | null;
+  price_monthly: number; price_yearly: number;
+  is_active: boolean; created_at: string;
+  live_assignments?: number;
+}
+
+export interface GymAddon {
+  id: string; gym_id: string; addon_id: string;
+  price_charged: number; cycle: 'monthly' | 'yearly';
+  status: 'active' | 'cancelled';
+  starts_at: string; expires_at: string | null;
+  notes: string | null; created_at: string; cancelled_at: string | null;
+  code: string; name: string; name_ar: string;
+  module_keys: string[] | string; limit_column: string | null; limit_amount: number | null;
+  catalog_price_monthly: number; catalog_price_yearly: number;
+  is_expired?: boolean;
+}
+
+export async function listAddons(): Promise<{ data: BillingAddon[] }> {
+  const res = await api.get('/platform/billing/addons');
+  return res.data;
+}
+
+export async function createAddon(payload: {
+  code: string; name: string; name_ar: string;
+  module_keys?: string[]; limit_column?: string | null; limit_amount?: number | null;
+  price_monthly: number; price_yearly: number;
+}): Promise<{ data: BillingAddon }> {
+  const res = await api.post('/platform/billing/addons', payload);
+  return res.data;
+}
+
+export async function updateAddon(id: string, payload: Partial<BillingAddon>): Promise<{ data: BillingAddon }> {
+  const res = await api.put(`/platform/billing/addons/${id}`, payload);
+  return res.data;
+}
+
+export async function deleteAddon(id: string): Promise<{ data: { deleted?: boolean; soft_deleted?: boolean } }> {
+  const res = await api.delete(`/platform/billing/addons/${id}`);
+  return res.data;
+}
+
+export async function listGymAddons(gymId: string): Promise<{ data: GymAddon[] }> {
+  const res = await api.get(`/platform/gyms/${gymId}/addons`);
+  return res.data;
+}
+
+export async function grantGymAddon(gymId: string, payload: {
+  addon_id?: string; code?: string; cycle?: 'monthly' | 'yearly';
+  price_charged?: number; expires_at?: string | null; notes?: string | null;
+}): Promise<{ data: GymAddon }> {
+  const res = await api.post(`/platform/gyms/${gymId}/addons`, payload);
+  return res.data;
+}
+
+export async function updateGymAddon(gymId: string, assignmentId: string, payload: {
+  price_charged?: number; expires_at?: string | null; notes?: string | null;
+}): Promise<{ data: GymAddon }> {
+  const res = await api.put(`/platform/gyms/${gymId}/addons/${assignmentId}`, payload);
+  return res.data;
+}
+
+export async function cancelGymAddon(gymId: string, assignmentId: string): Promise<{ data: GymAddon }> {
+  const res = await api.post(`/platform/gyms/${gymId}/addons/${assignmentId}/cancel`, {});
   return res.data;
 }
 

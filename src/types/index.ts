@@ -171,6 +171,11 @@ export interface NavItem {
   section?: string;
   badge?: string | number;
   premium?: boolean;
+  /** §36 — sidebar hides the item unless EVERY key is in the gym's effective
+   *  features (gym_effective_features via /auth/me). Only keys that exist in
+   *  the plan modules vocabulary are ever used here (products, attendance,
+   *  daily_reports) — gating on unknown keys would mass-hide. */
+  requiresFeatures?: string[];
 }
 
 export interface MetricCard {
