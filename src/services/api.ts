@@ -2672,50 +2672,20 @@ export async function getAIRevenueForecast(months: number = 3): Promise<{ data: 
   return res.data;
 }
 
-// ===== MARKETING CAMPAIGNS & LOYALTY (Phase 5) =====
-
-export interface MarketingCampaign {
-  id: string;
-  name: string;
-  name_ar?: string;
-  type: string;
-  description?: string;
-  budget: number;
-  status: string;
-  reach: number;
-  conversions: number;
-  scheduled_at?: string;
-  start_date?: string;
-  end_date?: string;
-  gym_name?: string;
-  created_at: string;
-}
-
-export interface EmailTemplate {
-  id: string;
-  name: string;
-  name_ar?: string;
-  type: string;
-  subject: string;
-  content?: string;
-  created_at: string;
-}
-
-export interface LoyaltySummary {
-  total_points: number;
-  total_points_given: number;
-  total_points_used: number;
-  active_members: number;
-  total_redeemed: number;
-  by_plan?: { plan_name: string; members: number }[];
-}
+// ===== GYM REFERRALS (§40-M5) =====
+// The old Phase-5 marketing family (listCampaigns / email templates /
+// getLoyaltySummary / listReferrals) called bare '/marketing/*' paths that the
+// nginx proxy never forwards to the backend — every consumer got index.html
+// served as "JSON". Those functions and their orphan pages were removed.
+// What remains is the one live consumer: the gym marketing page's Referrals
+// tab, now backed by the real staff endpoint GET /api/marketing/referrals
+// (analytics.getGymReferrals, scoped to the tenant via referrer_gym_id).
 
 export interface ReferralData {
   id: string;
   referral_code: string;
   referrer_name?: string;
   referred_name?: string;
-  gym_name?: string;
   referred_member_name?: string;
   reward_amount: number;
   reward_status: string;
@@ -2723,61 +2693,8 @@ export interface ReferralData {
   created_at: string;
 }
 
-export async function listCampaigns(): Promise<{ data: MarketingCampaign[] }> {
-  const res = await api.get('/marketing/campaigns');
-  return res.data;
-}
-
-export async function createCampaign(payload: {
-  name: string;
-  name_ar?: string;
-  type: string;
-  description?: string;
-  budget?: number;
-  scheduled_at?: string;
-}): Promise<{ data: MarketingCampaign }> {
-  const res = await api.post('/marketing/campaigns', payload);
-  return res.data;
-}
-
-export async function updateCampaignStatus(id: string, status: string): Promise<{ data: { message: string } }> {
-  const res = await api.patch(`/marketing/campaigns/${id}/status`, { status });
-  return res.data;
-}
-
-export async function deleteCampaign(id: string): Promise<{ data: { message: string } }> {
-  const res = await api.delete(`/marketing/campaigns/${id}`);
-  return res.data;
-}
-
-export async function listEmailTemplates(): Promise<{ data: EmailTemplate[] }> {
-  const res = await api.get('/marketing/email-templates');
-  return res.data;
-}
-
-export async function createEmailTemplate(payload: {
-  name: string;
-  name_ar?: string;
-  type: string;
-  subject: string;
-  content?: string;
-}): Promise<{ data: EmailTemplate }> {
-  const res = await api.post('/marketing/email-templates', payload);
-  return res.data;
-}
-
-export async function deleteEmailTemplate(id: string): Promise<{ data: { message: string } }> {
-  const res = await api.delete(`/marketing/email-templates/${id}`);
-  return res.data;
-}
-
-export async function getLoyaltySummary(): Promise<{ data: LoyaltySummary }> {
-  const res = await api.get('/marketing/loyalty-summary');
-  return res.data;
-}
-
-export async function listReferrals(): Promise<{ data: ReferralData[] }> {
-  const res = await api.get('/marketing/referrals');
+export async function listGymReferrals(): Promise<{ data: ReferralData[] }> {
+  const res = await api.get('/api/marketing/referrals');
   return res.data;
 }
 
@@ -2840,44 +2757,10 @@ export async function getApiUsage(gym_id?: string, days?: number): Promise<{ dat
 }
 
 // ===== TRAINER PROGRESS =====
-
-export interface TrainerProgressLog {
-  id?: string;
-  trainerId: string;
-  gymId: string;
-  date: string;
-  clientCount: number;
-  sessionCount: number;
-  durationMinutes: number;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export async function getTrainerProgressToday(trainerId: string, gymId: string): Promise<{ data: TrainerProgressLog }> {
-  const res = await api.get(`/trainer/${trainerId}/progress/today`, { params: { gymId } });
-  return res.data;
-}
-
-export async function getTrainerProgressHistory(trainerId: string, gymId: string): Promise<{ data: TrainerProgressLog[] }> {
-  const res = await api.get(`/trainer/${trainerId}/progress/history`, { params: { gymId } });
-  return res.data;
-}
-
-export async function createTrainerProgress(progress: Partial<TrainerProgressLog>): Promise<{ data: TrainerProgressLog }> {
-  const res = await api.post('/trainer/progress', progress);
-  return res.data;
-}
-
-export async function updateTrainerProgress(id: string, data: Partial<TrainerProgressLog>): Promise<{ data: TrainerProgressLog }> {
-  const res = await api.put(`/trainer/progress/${id}`, data);
-  return res.data;
-}
-
-export async function deleteTrainerProgress(id: string): Promise<{ data: { message: string } }> {
-  const res = await api.delete(`/trainer/progress/${id}`);
-  return res.data;
-}
+// §40-M5: removed. The five trainer-progress functions called bare
+// '/trainer/*/progress/*' paths that exist on neither the nginx proxy nor any
+// backend route, and had zero page consumers (the trainerProgressContext that
+// wrapped them was itself never mounted). Deleted with the context file.
 
 export default api;
 

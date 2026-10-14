@@ -390,3 +390,29 @@ export async function getMarketingFunnel(req: Request, res: Response): Promise<v
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+// §40-M5 — Real staff-scoped referrals for the gym marketing page.
+// marketing_referrals carries referrer_gym_id (migration 045), so a gym only
+// ever sees its own referral rows; names resolve against members/member_profiles.
+// This replaces the frontend's bare '/marketing/referrals' call, which pointed at
+// a path nginx never proxies (the page received index.html as "JSON").
+export async function getGymReferrals(req: Request, res: Response): Promise<void> {
+  const gym_id = req.staff?.gym_id;
+  try {
+    const result = await query(`
+      SELECT r.id, r.referral_code, r.reward_amount, r.reward_status, r.status, r.created_at,
+             ref_m.full_name  AS referrer_name,
+             mem.full_name    AS referred_name
+      FROM marketing_referrals r
+      LEFT JOIN members ref_m ON ref_m.id = r.referrer_member_id
+      LEFT JOIN members mem   ON mem.id = r.referred_member_id
+      WHERE r.referrer_gym_id = $1
+      ORDER BY r.created_at DESC
+      LIMIT 100
+    `, [gym_id]);
+    res.status(200).json({ data: result.rows });
+  } catch (error) {
+    logger.error('Gym referrals query failed', { error: (error as Error).message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}

@@ -3,7 +3,7 @@ import { formatDate } from '../../utils/date';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { listReferrals, type ReferralData } from '../../services/api';
+import { listGymReferrals, type ReferralData } from '../../services/api';
 import { getMarketingFunnel, type MarketingFunnel, type FunnelSeriesPoint } from '../../services/analytics';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
@@ -125,7 +125,7 @@ function referralStatusVariant(status: string): 'success' | 'warning' | 'error' 
 }
 
 function referralName(r: ReferralData): string {
-  const referrer = r.referrer_name || r.gym_name || r.referral_code;
+  const referrer = r.referrer_name || r.referral_code;
   const referred = r.referred_name || r.referred_member_name || '';
   return referred ? `${referrer} → ${referred}` : `${referrer}`;
 }
@@ -166,7 +166,7 @@ export default function MarketingAutomation() {
 
   const { data: referralsRes, isLoading: referralsLoading } = useApiQuery<{ data: ReferralData[] }>(
     ['referrals'],
-    () => listReferrals(),
+    () => listGymReferrals(),
   );
   const referrals = referralsRes?.data || [];
 

@@ -118,7 +118,7 @@ import {
 import {
   listLeads, getLeadById, createLead, updateLead, deleteLead, getLeadStats,
 } from '../controllers/crm';
-import { getRetentionRate, getPeakHours, getRevenueForecast, getEnrollmentTrend, getRevenueBreakdown, getBusinessMetrics, getEngagement, getMarketingFunnel } from '../controllers/analytics';
+import { getRetentionRate, getPeakHours, getRevenueForecast, getEnrollmentTrend, getRevenueBreakdown, getBusinessMetrics, getEngagement, getMarketingFunnel, getGymReferrals } from '../controllers/analytics';
 import { getExpiringSoon, getInactiveMembers, getOverdueDebts, getNavBadges } from '../controllers/dashboard';
 import { handlePaymentWebhook } from '../controllers/webhooks';
 import { webhookIdempotency } from '../middleware/webhookIdempotency';
@@ -324,6 +324,7 @@ router.get('/api/analytics/revenue-breakdown', requireRole('manager'), getRevenu
 router.get('/api/analytics/business-metrics', requireRole('manager'), getBusinessMetrics); // §34أ
 router.get('/api/analytics/engagement', requireRole('manager'), getEngagement); // §34ب
 router.get('/api/analytics/marketing-funnel', requireRole('manager'), getMarketingFunnel); // §34ت
+router.get('/api/marketing/referrals', requireRole('manager'), getGymReferrals); // §40-M5 — real gym-scoped referrals
 
 // ====================================================================
 // MANAGER DASHBOARD — "needs your action" feeds (§24, read-only)

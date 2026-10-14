@@ -36,13 +36,13 @@ export default function OtaUpdateManager() {
 
   const { data: status, isLoading } = useApiQuery<OtaStatus>(
     ['ota-status'],
-    () => api.get('/admin/ota/status').then(r => r.data),
+    () => api.get('/api/v1/admin/ota/status').then(r => r.data),
     { staleTime: 60_000 }
   );
 
   async function handleBackup() {
     try {
-      const res = await api.post('/admin/ota/backup', { version: `manual_v${Date.now()}` });
+      const res = await api.post('/api/v1/admin/ota/backup', { version: `manual_v${Date.now()}` });
       setActionMsg(res.data.message);
       queryClient.invalidateQueries({ queryKey: ['ota-status'] });
     } catch (err: any) {
@@ -53,7 +53,7 @@ export default function OtaUpdateManager() {
   async function handleDeploy() {
     if (!deployUrl) { setActionMsg('Please enter a package URL'); return; }
     try {
-      const res = await api.post('/admin/ota/deploy', { packageUrl: deployUrl, buildCommand: buildCmd });
+      const res = await api.post('/api/v1/admin/ota/deploy', { packageUrl: deployUrl, buildCommand: buildCmd });
       setActionMsg(res.data.message);
       queryClient.invalidateQueries({ queryKey: ['ota-status'] });
     } catch (err: any) {
@@ -63,7 +63,7 @@ export default function OtaUpdateManager() {
 
   async function handleRollback(folder: string) {
     try {
-      const res = await api.post('/admin/ota/rollback', { folder });
+      const res = await api.post('/api/v1/admin/ota/rollback', { folder });
       setActionMsg(res.data.message);
       queryClient.invalidateQueries({ queryKey: ['ota-status'] });
     } catch (err: any) {
@@ -73,7 +73,7 @@ export default function OtaUpdateManager() {
 
   async function handleDelete(folder: string) {
     try {
-      const res = await api.post('/admin/ota/delete', { folder });
+      const res = await api.post('/api/v1/admin/ota/delete', { folder });
       setActionMsg(res.data.message);
       queryClient.invalidateQueries({ queryKey: ['ota-status'] });
     } catch (err: any) {
@@ -84,7 +84,7 @@ export default function OtaUpdateManager() {
   const [armingReset, setArmingReset] = useState(false);
   const { data: resetStatus } = useApiQuery<{ state?: string; step?: string; logTail?: string[] }>(
     ['ota-reset-status'],
-    () => api.get('/admin/ota/reset/status').then(r => r.data.data),
+    () => api.get('/api/v1/admin/ota/reset/status').then(r => r.data.data),
     { staleTime: 5_000, refetchInterval: 5000, retry: false }
   );
   async function handleReset() {
@@ -98,7 +98,7 @@ export default function OtaUpdateManager() {
     }
     setArmingReset(false);
     try {
-      const res = await api.post('/admin/ota/reset');
+      const res = await api.post('/api/v1/admin/ota/reset');
       setActionMsg(res.data.message);
     } catch (err: any) {
       setActionMsg(`Error: ${err.response?.data?.error || err.message}`);

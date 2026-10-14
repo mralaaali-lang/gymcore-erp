@@ -17,7 +17,9 @@ interface BackupEntry {
 }
 
 /**
- * BackupTab — §27: merged /admin/backup (TenantBackup) into the Settings hub.
+ * BackupTab — §27: merged tenant backup into the Settings hub.
+ * §40-M5 — calls use the nginx-proxied '/api/v1/admin/backup/*' mount:
+ * bare '/admin/*' is a SPA route space (served index.html), never the API.
  * Renders inside SettingsPage's content Card, so no page-level shell here.
  */
 export default function BackupTab() {
@@ -30,7 +32,7 @@ export default function BackupTab() {
 
   const { data: backups, isLoading } = useApiQuery<BackupEntry[]>(
     ['backups'],
-    () => api.get('/admin/backup/list').then(r => r.data.data || []),
+    () => api.get('/api/v1/admin/backup/list').then(r => r.data.data || []),
     { staleTime: 60_000 }
   );
 
@@ -38,7 +40,7 @@ export default function BackupTab() {
     setCreating(true);
     setActionMsg('');
     try {
-      const res = await api.post('/admin/backup/create');
+      const res = await api.post('/api/v1/admin/backup/create');
       setActionMsg(res.data.message || 'Backup created');
       queryClient.invalidateQueries({ queryKey: ['backups'] });
     } catch (err: any) {
@@ -57,7 +59,7 @@ export default function BackupTab() {
     setRestoring(folder);
     setActionMsg('');
     try {
-      const res = await api.post('/admin/backup/restore', { folder });
+      const res = await api.post('/api/v1/admin/backup/restore', { folder });
       setActionMsg(res.data.message || 'Backup restored');
       queryClient.invalidateQueries({ queryKey: ['backups'] });
     } catch (err: any) {
@@ -68,8 +70,11 @@ export default function BackupTab() {
   }
 
   function handleDownload(folder: string) {
+    // Same-origin relative path → nginx proxies /api/ to the backend in every
+    // deployment (VITE_API_URL, if set, already ends with /api/v1 — strip it
+    // and re-append the full proxied path to avoid a doubled prefix).
     const root = (import.meta.env.VITE_API_URL || '').replace(/\/api\/v1$/, '');
-    window.open(`${root}/admin/backup/download/${folder}`, '_blank');
+    window.open(`${root}/api/v1/admin/backup/download/${folder}`, '_blank');
   }
 
   function formatBytes(bytes: number): string {
