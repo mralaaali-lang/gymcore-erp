@@ -117,7 +117,9 @@ export default function AppRouter() {
         <Route path="/admin/trainers" element={<Navigate to="/admin/users?tab=staff&role=coach" replace />} />
         <Route path="/admin/users" element={lazyLoad(() => import('../pages/gym-admin/team/TeamPage'), ['gym-admin'])} />
         {/* Legacy aliases — one canonical URL per page */}
-        <Route path="/admin/payments" element={<Navigate to="/admin/reports" replace />} />
+        {/* §43 — payments got their own full screen (attendance pattern);
+            the old /admin/payments → /admin/reports redirect is retired. */}
+        <Route path="/admin/payments" element={lazyLoad(() => import('../pages/gym-admin/PaymentsPage'), ['gym-admin'])} />
         <Route path="/admin/retention" element={<Navigate to="/admin/crm" replace />} />
         <Route path="/admin/ai-coach" element={<Navigate to="/admin/analytics" replace />} />
         <Route path="/admin/leaderboard" element={<Navigate to="/admin/analytics" replace />} />

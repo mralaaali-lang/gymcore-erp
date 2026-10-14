@@ -195,7 +195,8 @@ export const createPaymentSchema = z.object({
   amount: z.number().min(0),
   description: sanitizedString({ max: 500 }).optional().or(z.literal('')),
   // §34ي: طرق الدفع المصرية — تخزين varchar أصلًا، التوسعة هنا فقط.
-  payment_method: z.enum(['cash', 'card', 'bank', 'wallet', 'vodafone_cash', 'instapay']).default('cash'),
+  // §43: + visa — شاشة المدفوعات تعرض 7 طرق (نقدي/بطاقة/انستاباي/تحويل/فيزا/فودافون كاش/تطبيق).
+  payment_method: z.enum(['cash', 'card', 'bank', 'wallet', 'vodafone_cash', 'instapay', 'visa']).default('cash'),
 });
 
 export const createExpenseSchema = z.object({
@@ -203,7 +204,8 @@ export const createExpenseSchema = z.object({
   description: sanitizedString({ max: 500 }),
   category_id: z.string().uuid().optional().nullable(),
   // §34ث: payouts must state the method or the drawer cannot reconcile.
-  payment_method: z.enum(['cash', 'card', 'bank', 'wallet', 'vodafone_cash', 'instapay']).optional(),
+  // §43: kept in sync with createPaymentSchema (visa included).
+  payment_method: z.enum(['cash', 'card', 'bank', 'wallet', 'vodafone_cash', 'instapay', 'visa']).optional(),
 });
 
 export const createStaffSchemaV2 = z.object({

@@ -31,13 +31,27 @@ const CASH_OUT = `ft.type = 'expense' AND (ft.payment_method IS NULL OR ft.payme
 // §34ث: the list used to fake `NULL::text AS member_name` and the insert
 // dropped member_id/payment_method even though the schema required them.
 // Migration 058 added the columns; now they are stored and joined for real.
+// §43 — the payments screen sends ?from=YYYY-MM-DD&to=YYYY-MM-DD&method=...
+// Range boundaries are computed in the GYM timezone (§34ث rule), never UTC.
+// Cards (range sums) respect only the date range — the method filter narrows
+// the table, not the money cards. member_phone joins live now (058 members).
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const RANGE_CLAUSE =
+  ` AND ($2::date IS NULL OR ft.created_at >= ($2::date)::timestamp AT TIME ZONE $3)` +
+  ` AND ($4::date IS NULL OR ft.created_at < (($4::date) + 1)::timestamp AT TIME ZONE $3)`;
+
 export const listPayments = async (req: Request, res: Response) => {
   const gym_id = req.staff?.gym_id;
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 20;
+  const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
   const offset = (page - 1) * limit;
+  const from = ISO_DATE.test(String(req.query.from || '')) ? String(req.query.from) : null;
+  const to = ISO_DATE.test(String(req.query.to || '')) ? String(req.query.to) : null;
+  const methodQ = String(req.query.method || '');
+  const method = methodQ && methodQ !== 'all' ? methodQ.slice(0, 30) : null;
   try {
     const tz = await getGymTz(gym_id);
+    // Global + this-month aggregates (kept for the BillingOverview tabs).
     const agg = await query(
       `SELECT COUNT(*)::int AS total,
               COALESCE(SUM(amount), 0) AS total_sum,
@@ -45,17 +59,53 @@ export const listPayments = async (req: Request, res: Response) => {
               COALESCE(SUM(amount) FILTER (WHERE created_at >= ${TZ_MONTH}), 0) AS month_sum
        FROM financial_transactions WHERE gym_id=$1 AND type='payment'`, [gym_id, tz]);
     const a = agg.rows[0] || {};
-    const total = Number(a.total || 0);
+    // §43 — date-range aggregates drive the four summary cards.
+    const range = await query(
+      `SELECT COUNT(*)::int AS range_count,
+              COALESCE(SUM(ft.amount), 0) AS range_sum,
+              COALESCE(SUM(ft.amount) FILTER (WHERE ft.payment_method = 'cash'), 0) AS range_cash,
+              COALESCE(SUM(ft.amount) FILTER (WHERE ft.payment_method IN ('bank', 'bank_transfer')), 0) AS range_bank,
+              COALESCE(SUM(ft.amount) FILTER (WHERE ft.payment_method = 'vodafone_cash'), 0) AS range_vodafone
+       FROM financial_transactions ft
+       WHERE ft.gym_id=$1 AND ft.type='payment'${RANGE_CLAUSE}`,
+      [gym_id, from, tz, to]);
+    // "+N عملية" chip: what landed today (gyms ask for a same-day pulse).
+    const today = await query(
+      `SELECT COUNT(*)::int AS today_count FROM financial_transactions
+       WHERE gym_id=$1 AND type='payment' AND created_at >= ${TZ_TODAY}`, [gym_id, tz]);
+    const r = range.rows[0] || {};
+    // Filtered feed + its own count for pagination (newest first).
+    const countQ = await query(
+      `SELECT COUNT(*)::int AS total FROM financial_transactions ft
+       WHERE ft.gym_id=$1 AND ft.type='payment'${RANGE_CLAUSE}
+         AND ($5::text IS NULL OR ft.payment_method = $5)`,
+      [gym_id, from, tz, to, method]);
+    const total = Number(countQ.rows[0]?.total || 0);
     const data = await query(
-      `SELECT ft.*, m.full_name AS member_name
+      // §43 — phones live in phone_encrypted (trg_members_encrypt); the
+      // established read pattern is decrypt_sensitive (attendance/customer360).
+      `SELECT ft.*, m.full_name AS member_name, decrypt_sensitive(m.phone_encrypted) AS member_phone
        FROM financial_transactions ft
        LEFT JOIN members m ON m.id = ft.member_id
-       WHERE ft.gym_id=$1 AND ft.type='payment'
-       ORDER BY ft.created_at DESC LIMIT $2 OFFSET $3`, [gym_id, limit, offset]);
+       WHERE ft.gym_id=$1 AND ft.type='payment'${RANGE_CLAUSE}
+         AND ($5::text IS NULL OR ft.payment_method = $5)
+       ORDER BY ft.created_at DESC LIMIT $6 OFFSET $7`,
+      [gym_id, from, tz, to, method, limit, offset]);
     res.json({
       data: data.rows,
       pagination: { page, limit, total, total_pages: Math.max(1, Math.ceil(total / limit)) },
-      stats: { total_count: total, total_sum: Number(a.total_sum), month_count: Number(a.month_count || 0), month_sum: Number(a.month_sum) },
+      stats: {
+        total_count: total,
+        total_sum: Number(a.total_sum),
+        month_count: Number(a.month_count || 0),
+        month_sum: Number(a.month_sum),
+        range_count: Number(r.range_count || 0),
+        range_sum: Number(r.range_sum),
+        range_cash: Number(r.range_cash),
+        range_bank: Number(r.range_bank),
+        range_vodafone: Number(r.range_vodafone),
+        today_count: Number(today.rows[0]?.today_count || 0),
+      },
     });
   } catch (e: any) { logger.error('listPayments failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };

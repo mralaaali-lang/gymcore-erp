@@ -16,12 +16,13 @@ import DebtsPanel from './billing/DebtsPanel';
 // /admin/debts URL working through a redirect.
 // §34ج — Discounts/Payment Forms/Growth/Settings removed: they only rendered
 // a "قيد التطوير" card; they return when real screens exist.
-const BILLING_TABS = ['Overview', 'Payments', 'Recurring', 'Accounting', 'Debts'] as const;
+// §43 — the Payments tab was removed: المدفوعات now has its own full screen
+// at /admin/payments (PaymentsPage) with filters + summary cards + PDF.
+const BILLING_TABS = ['Overview', 'Recurring', 'Accounting', 'Debts'] as const;
 type BillingTab = typeof BILLING_TABS[number];
 
 const TAB_LABELS: Record<BillingTab, { en: string; ar: string }> = {
   Overview: { en: 'Overview', ar: 'نظرة عامة' },
-  Payments: { en: 'Payments', ar: 'المدفوعات' },
   Recurring: { en: 'Recurring', ar: 'المتكررة' },
   Accounting: { en: 'Accounting', ar: 'المحاسبة' },
   Debts: { en: 'Debts', ar: 'الديون' },
@@ -29,7 +30,6 @@ const TAB_LABELS: Record<BillingTab, { en: string; ar: string }> = {
 
 const TAB_ICONS: Record<BillingTab, string> = {
   Overview: 'dashboard',
-  Payments: 'receipt_long',
   Recurring: 'autorenew',
   Accounting: 'account_balance',
   Debts: 'account_balance_wallet',
@@ -64,16 +64,16 @@ export default function BillingOverview() {
     next.set('tab', tab);
     setParams(next, { replace: true });
   };
-  const [page, setPage] = useState(1);
 
   const money = (v: number | undefined | null) =>
     formatMoney(Number(v || 0), gymProfile?.currency);
 
-  // Overview + Payments share the payments feed
+  // Overview keeps the recent-payments feed (the Payments tab is now the
+  // dedicated /admin/payments screen — §43).
   const { data: paymentsRes, isLoading: paymentsLoading } = useApiQuery<{ data: any[]; pagination: any; stats?: any }>(
-    ['billing-payments', String(page)],
-    () => listPayments(page),
-    { enabled: activeTab === 'Overview' || activeTab === 'Payments' },
+    ['billing-payments'],
+    () => listPayments(),
+    { enabled: activeTab === 'Overview' },
   );
   const { data: summaryRes, isLoading: summaryLoading } = useApiQuery<any>(
     ['billing-summary'],
@@ -108,9 +108,6 @@ export default function BillingOverview() {
   // the old code counted the current 20-row page slice and filtered a
   // `status` column that financial_transactions does not even have.
   const payStats = paymentsRes?.stats || {};
-
-  const pagination: any = paymentsRes?.pagination || {};
-  const totalPages: number = pagination.total_pages || 1;
 
   const fmtDate = (v?: string) => {
     if (!v) return '-';
@@ -170,79 +167,6 @@ export default function BillingOverview() {
         )}
       </Card>
     </div>
-  );
-
-  const renderPayments = () => (
-    <Card>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-bold text-gray-900">{rtl ? 'سجل المدفوعات' : 'Payments Log'}</h3>
-        <span className="text-xs text-gray-400">
-          {pagination.total ? `${pagination.total} ${rtl ? 'عملية' : 'records'}` : ''}
-        </span>
-      </div>
-
-      {paymentsLoading ? (
-        <PageLoader />
-      ) : payments.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          <span className="material-symbols-outlined text-4xl block mb-2">receipt_long</span>
-          <p className="text-sm">{rtl ? 'لا توجد مدفوعات' : 'No payments yet'}</p>
-        </div>
-      ) : (
-        <>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-start text-xs text-gray-400 border-b border-gray-100">
-                  <th className="py-2 px-3 text-start font-medium">{rtl ? 'العضو' : 'Member'}</th>
-                  <th className="py-2 px-3 text-start font-medium">{rtl ? 'الوصف' : 'Description'}</th>
-                  <th className="py-2 px-3 text-start font-medium">{rtl ? 'التاريخ' : 'Date'}</th>
-                  <th className="py-2 px-3 text-start font-medium">{rtl ? 'طريقة الدفع' : 'Method'}</th>
-                  <th className="py-2 px-3 text-end font-medium">{rtl ? 'المبلغ' : 'Amount'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map((p: any, i: number) => (
-                  <tr key={p.id || i} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
-                    <td className="py-2.5 px-3 font-medium text-gray-900">{p.member_name || '—'}</td>
-                    <td className="py-2.5 px-3 text-gray-500">{p.description || '—'}</td>
-                    <td className="py-2.5 px-3 text-gray-500 whitespace-nowrap">{fmtDate(p.created_at)}</td>
-                    <td className="py-2.5 px-3 text-gray-500">
-                      {p.payment_method
-                        ? ({ cash: rtl ? 'نقدًا' : 'Cash', card: rtl ? 'بطاقة' : 'Card', bank: rtl ? 'بنك' : 'Bank', wallet: rtl ? 'محفظة' : 'Wallet' } as Record<string, string>)[p.payment_method] || p.payment_method
-                        : '—'}
-                    </td>
-                    <td className="py-2.5 px-3 text-end font-bold text-gray-900">{money(p.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 mt-4">
-              <button
-                onClick={() => setPage((v) => Math.max(1, v - 1))}
-                disabled={page <= 1}
-                className="px-4 py-1.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-200"
-              >
-                {rtl ? 'السابق' : 'Prev'}
-              </button>
-              <span className="text-xs text-gray-500">
-                {rtl ? `صفحة ${page} من ${totalPages}` : `Page ${page} of ${totalPages}`}
-              </span>
-              <button
-                onClick={() => setPage((v) => Math.min(totalPages, v + 1))}
-                disabled={page >= totalPages}
-                className="px-4 py-1.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-200"
-              >
-                {rtl ? 'التالي' : 'Next'}
-              </button>
-            </div>
-          )}
-        </>
-      )}
-    </Card>
   );
 
   const renderRecurring = () => (
@@ -376,7 +300,6 @@ export default function BillingOverview() {
       />
 
       {activeTab === 'Overview' && renderOverview()}
-      {activeTab === 'Payments' && renderPayments()}
       {activeTab === 'Recurring' && renderRecurring()}
       {activeTab === 'Accounting' && renderAccounting()}
       {activeTab === 'Debts' && <DebtsPanel />}

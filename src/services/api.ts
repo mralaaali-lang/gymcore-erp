@@ -1242,9 +1242,12 @@ export async function deleteProduct(id: string) {
 // ====================================================================
 // FINANCE — Payments, Expenses, Sales, Purchases, Suppliers, Debts, Cashbox
 // ====================================================================
-export async function listPayments(page?: number) {
-  const res = await api.get('/api/finance/payments', { params: { page, limit: 20 } });
-  return res.data as { data: any[]; pagination: any };
+// §43 — opts accepts the payments-screen filters (ISO dates + method).
+// Passing a plain page number (BillingOverview) stays supported unchanged.
+export async function listPayments(opts?: number | { page?: number; limit?: number; from?: string; to?: string; method?: string }) {
+  const params = typeof opts === 'number' ? { page: opts, limit: 20 } : opts;
+  const res = await api.get('/api/finance/payments', { params });
+  return res.data as { data: any[]; pagination: any; stats?: any };
 }
 export async function createPayment(data: { member_id: string; amount: number; description?: string; payment_method?: string }) {
   const res = await api.post('/api/finance/payments', data);

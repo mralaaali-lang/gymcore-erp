@@ -65,7 +65,8 @@ export function buildNavItems(base: string, role: UserRole, badges?: NavBadges):
       // signs members in) — a real page, not the manager-inaccessible /player.
       { label: i18n.t('sidebar.memberPortal'), icon: 'portal', path: '/team-login', roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers') },
       // ── المالية (مدفوعات·مصروفات·ديون·خزنة·شيتات + مبيعات kept per owner) ──
-      { label: i18n.t('sidebar.payments'), icon: 'invoices', path: `${base}/billing`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance'), badge: badges?.payments },
+      // §43 — المدفوعات now opens its own screen (was the /admin/billing hub).
+      { label: i18n.t('sidebar.payments'), icon: 'invoices', path: `${base}/payments`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance'), badge: badges?.payments },
       { label: i18n.t('sidebar.expenses'), icon: 'expenses', path: `${base}/expenses`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance') },
       { label: i18n.t('sidebar.debts'), icon: 'debts', path: `${base}/billing?tab=Debts`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance') },
       { label: i18n.t('sidebar.cashbox'), icon: 'cashbox', path: `${base}/cashbox`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance') },
@@ -188,7 +189,12 @@ export const PAGE_TITLES: Record<string, PageHeading> = {
   },
   '/admin/billing': {
     title: { ar: 'الفواتير', en: 'Invoices' },
-    subtitle: { ar: 'إدارة الفواتير والمدفوعات', en: 'Manage invoices and payments' },
+    // §43 — المدفوعات moved to its own /admin/payments screen.
+    subtitle: { ar: 'نظرة عامة والاشتراكات المتكررة والمحاسبة', en: 'Overview, recurring revenue and accounting' },
+  },
+  '/admin/payments': {
+    title: { ar: 'المدفوعات', en: 'Payments' },
+    subtitle: { ar: 'كل مقبوضات الصالة — سجل وفلاتر وملخص على النطاق', en: 'Every gym receipt — log, filters and range summary' },
   },
   '/admin/expenses': {
     title: { ar: 'المصروفات', en: 'Expenses' },
