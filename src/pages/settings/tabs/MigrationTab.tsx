@@ -2,7 +2,8 @@ import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../../context/GymBrandContext';
 import { useToast } from '../../../context/ToastContext';
-import { importCsv, type ImportResult, type ImportType } from '../../../services/api';
+import { importCsv, getSettings, resetGym, type ImportResult, type ImportType } from '../../../services/api';
+import { useApiQuery } from '../../../hooks/useApiQuery';
 import { parseCsv, downloadCsv } from '../../../utils/csv';
 import Button from '../../../components/ui/Button';
 import Card from '../../../components/ui/Card';
@@ -241,6 +242,73 @@ export default function MigrationTab() {
             : 'Note: importing subscriptions, payments and attendance requires the member to exist with a matching phone — import members first. Duplicate rows are rejected with a clear message and never double-inserted.'}
         </p>
       </Card>
+
+      <DangerZone rtl={rtl} />
+    </div>
+  );
+}
+
+// منطقة الخطر: تصفير الصالة — نسخة احتياطية أولًا server-side، ثم مسح
+// بيانات التشغيل وإعادة بذر الكتالوجات. يبقى: الصالة والموظفون والفروع
+// ومفاتيح API وعقود المنصة وسجل الأنشطة (محمي من الحذف). التأكيد بكتابة
+// اسم الصالة حرفيًا.
+function DangerZone({ rtl }: { rtl: boolean }) {
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: settingsRes } = useApiQuery(['settings'], getSettings, { staleTime: 5 * 60_000 });
+  const gymName = String(settingsRes?.data?.gym_name || '');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const match = confirm.trim().toLowerCase() === gymName.trim().toLowerCase() && gymName.trim() !== '';
+
+  const doReset = async () => {
+    if (!match || busy) return;
+    if (!window.confirm(rtl ? 'تأكيد أخير: سيُمسح كل شيء!' : 'Final confirm: everything goes!')) return;
+    setBusy(true);
+    try {
+      const res = await resetGym(confirm.trim());
+      queryClient.invalidateQueries();
+      showToast(
+        rtl ? `تم التصفير — نسخة الأمان: ${res.data.backup}` : `Reset done — safety backup: ${res.data.backup}`,
+        'success',
+      );
+      setConfirm('');
+      window.location.href = '/admin/dashboard';
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      showToast(msg || (rtl ? 'فشل التصفير — لم يُمسح شيء' : 'Reset failed — nothing deleted'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="border-2 border-red-200 bg-red-50/50 rounded-3xl p-4 md:p-5">
+      <h3 className="font-bold text-red-700 flex items-center gap-2">
+        <span className="material-symbols-outlined">warning</span>
+        {rtl ? 'منطقة الخطر: تصفير الصالة' : 'Danger zone: factory reset'}
+      </h3>
+      <p className="mt-1.5 text-xs text-red-600/80 leading-relaxed">
+        {rtl
+          ? 'يمسح الأعضاء والاشتراكات والديون والمالية والمخزون والحضور والموارد وكل الإعدادات، ويعيد الصالة نظيفة (كتالوج الرياضات والباقات الافتراضية يُعاد بذرهما). يبقى: الصالة والموظفون والفروع ومفاتيح API وعقود المنصة وسجل الأنشطة. نسخة احتياطية تُؤخذ أولًا تلقائيًا.'
+          : 'Wipes members, subs, debts, finance, stock, attendance, HR and all settings, then reseeds catalogs. Keeps: gym, staff, branches, API keys, platform contracts and the audit log. A safety backup runs first.'}
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          placeholder={rtl ? `اكتب اسم الصالة للتأكيد: ${gymName || '…'}` : 'Type the gym name to confirm'}
+          className="flex-1 min-w-[220px] px-4 py-2.5 bg-white border border-red-200 rounded-2xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500/40 placeholder:text-gray-400"
+        />
+        <button
+          type="button"
+          onClick={doReset}
+          disabled={!match || busy}
+          className="min-h-[44px] px-6 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed transition"
+        >
+          {busy ? (rtl ? 'جارٍ التصفير…' : 'Resetting…') : (rtl ? 'تصفير الصالة' : 'Reset gym')}
+        </button>
+      </div>
     </div>
   );
 }

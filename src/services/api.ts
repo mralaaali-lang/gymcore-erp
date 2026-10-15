@@ -2297,6 +2297,12 @@ export async function updateSettings(settings: Record<string, string>) {
   return res.data as { success: boolean };
 }
 
+// تصفير الصالة — يتطلب اسم الصالة حرفيًا؛ نسخة احتياطية أولًا server-side
+export async function resetGym(confirmName: string): Promise<{ data: { backup: string; wiped: Record<string, number> } }> {
+  const res = await api.post('/api/gym/reset', { confirm_name: confirmName });
+  return res.data;
+}
+
 // ====================================================================
 // SETUP PROGRESS
 // ====================================================================

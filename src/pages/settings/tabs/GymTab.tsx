@@ -17,7 +17,7 @@ const CURRENCIES = ['EGP', 'SAR', 'AED', 'KWD', 'QAR', 'BHD', 'OMR', 'JOD', 'USD
 // البروفايل، لون البراند في شريط السايدبار، وأيام/ساعات التشغيل بوابة
 // دخول في تسجيل الحضور (الفارغ = بلا قيد).
 export default function GymTab() {
-  const { language } = useApp();
+  const { language, setLanguage } = useApp();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const rtl = language === 'ar';
@@ -66,6 +66,10 @@ export default function GymTab() {
       work_open: form.work_open || '',
       work_close: form.work_close || '',
       work_days: workDays.join(','),
+      date_format: form.date_format || 'DD/MM/YYYY',
+      time_format: form.time_format || '12h',
+      first_day_of_week: form.first_day_of_week || 'Sunday',
+      language_setting: form.language_setting || 'ar',
     });
   };
 
@@ -86,6 +90,10 @@ export default function GymTab() {
   };
 
   const inputCls = 'w-full px-4 py-2.5 bg-white border border-gray-200 rounded-2xl text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder:text-gray-400 transition';
+
+  const TIME_FORMATS = ['12h', '24h'];
+  const DATE_FORMATS = ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'];
+  const WEEK_STARTS = ['Saturday', 'Sunday', 'Monday'];
 
   if (isLoading) {
     return <PageLoader variant="skeleton" rows={6} />;
@@ -224,6 +232,51 @@ export default function GymTab() {
         <p className="mt-2 text-xs text-gray-400">
           {rtl ? 'الفارغ = مفتوح دائمًا. خارج المواعيد يُرفض تسجيل الحضور.' : 'Empty = always open. Check-ins outside hours are refused.'}
         </p>
+      </div>
+
+      {/* اللغة والتنسيقات — مدمجة هنا بدل زرار الهيدر */}
+      <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
+        <h3 className="font-bold text-gray-900 mb-3">
+          <span className="material-symbols-outlined text-lg align-middle ml-1">translate</span>
+          {rtl ? 'اللغة والتنسيقات' : 'Language & formats'}
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'اللغة' : 'Language'}</label>
+            <div className="flex gap-1.5 bg-white border border-gray-200 rounded-2xl p-1">
+              {(['ar', 'en'] as const).map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => { setField('language_setting', l); setLanguage(l); }}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
+                    (form.language_setting || 'ar') === l ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  {l === 'ar' ? 'العربية' : 'English'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'صيغة التاريخ' : 'Date format'}</label>
+            <select value={form.date_format || 'DD/MM/YYYY'} onChange={(e) => setField('date_format', e.target.value)} className={inputCls}>
+              {DATE_FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'صيغة الوقت' : 'Time format'}</label>
+            <select value={form.time_format || '12h'} onChange={(e) => setField('time_format', e.target.value)} className={inputCls}>
+              {TIME_FORMATS.map((f) => <option key={f} value={f}>{f} ({f === '12h' ? 'AM/PM' : '00–23'})</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'أول أيام الأسبوع' : 'Week starts'}</label>
+            <select value={form.first_day_of_week || 'Sunday'} onChange={(e) => setField('first_day_of_week', e.target.value)} className={inputCls}>
+              {WEEK_STARTS.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-start pt-1">

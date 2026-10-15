@@ -2,9 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { getStaffRole } from '../../services/api';
-import PageHeader from '../../components/shared/PageHeader';
 import Card from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
+import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import GymTab from './tabs/GymTab';
 import SubscriptionsTab from './tabs/SubscriptionsTab';
 import NotificationsTab from './tabs/NotificationsTab';
@@ -43,7 +42,7 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
 };
 
 export default function SettingsPage() {
-  const { language, setLanguage, role } = useApp();
+  const { language, role } = useApp();
   const rtl = language === 'ar';
 
   // §27 fix — getStaffRole() decodes the localStorage JWT, which staff cookie
@@ -86,50 +85,33 @@ export default function SettingsPage() {
   const ActiveComponent = TAB_COMPONENTS[activeTab];
 
   return (
-    <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
-      <PageHeader
-        actions={
-          <Button variant="outline" onClick={() => setLanguage(rtl ? 'en' : 'ar')}>
-            <span className="material-symbols-outlined text-lg">translate</span>
-            {rtl ? 'English' : 'العربية'}
-          </Button>
-        }
-      />
-
-      <div className={`flex flex-col ${rtl ? 'lg:flex-row' : 'lg:flex-row'} gap-6`}>
-        {/* ===== SIDEBAR TABS ===== */}
-        <aside className="lg:w-56 shrink-0">
-          <Card className="p-2 overflow-hidden">
-            {visibleTabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => selectTab(tab.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-2xl transition-all ${
-                    isActive
-                      ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25'
-                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-xl">{tab.icon}</span>
-                  <span>{rtl ? tab.labelAr : tab.labelEn}</span>
-                </button>
-              );
-            })}
-          </Card>
-        </aside>
-
-        {/* ===== CONTENT AREA ===== */}
-        <div className="flex-1 min-w-0">
-          <Card>
-            {ActiveComponent ? <ActiveComponent /> : (
-              <div className="text-center py-12 text-gray-500">
-                {rtl ? 'يرجى اختيار تبويب' : 'Select a tab'}
-              </div>
-            )}
-          </Card>
+    <div className="space-y-6">
+      {/* ===== التبويبات بالعرض (فوق) بدل الطول (جنب) ===== */}
+      <Card className="p-2 overflow-hidden">
+        <div className="overflow-x-auto">
+          <UnifiedTabs
+            variant="pills"
+            tabs={visibleTabs.map((tab) => ({
+              key: tab.id,
+              labelAr: tab.labelAr,
+              labelEn: tab.labelEn,
+              icon: tab.icon,
+            }))}
+            activeKey={activeTab}
+            onChange={selectTab}
+          />
         </div>
+      </Card>
+
+      {/* ===== CONTENT AREA ===== */}
+      <div className="min-w-0">
+        <Card>
+          {ActiveComponent ? <ActiveComponent /> : (
+            <div className="text-center py-12 text-gray-500">
+              {rtl ? 'يرجى اختيار تبويب' : 'Select a tab'}
+            </div>
+          )}
+        </Card>
       </div>
     </div>
   );

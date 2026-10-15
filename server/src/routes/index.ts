@@ -194,6 +194,7 @@ import {
   listAnnouncements, createAnnouncement,
   getSettings, updateSettings,
 } from '../controllers/gym';
+import { resetGym } from '../controllers/gymReset';
 import { getSetupProgress } from '../controllers/setup';
 import { getPublicBranding } from '../controllers/branding';
 import { listWorkflows, updateWorkflow, triggerWorkflow } from '../controllers/workflows';
@@ -545,6 +546,7 @@ router.get('/api/announcements', requireRole('manager', 'receptionist', 'coach',
 router.post('/api/announcements', requireRole('manager'), validate(createAnnouncementSchema), createAnnouncement);
 router.get('/api/settings', requireRole('manager'), getSettings);
 router.put('/api/settings', requireRole('manager'), validate(updateSettingsSchema), updateSettings);
+router.post('/api/gym/reset', requireRole('manager'), resetGym);
 
 // ====================================================================
 // SESSION MANAGEMENT — View & revoke active sessions
