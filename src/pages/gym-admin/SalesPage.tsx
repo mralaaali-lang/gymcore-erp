@@ -62,8 +62,7 @@ export default function SalesPage() {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const rtl = language === 'ar';
-  // §35أ — sidebar «مبيعات الموظفين» deep-links /admin/sales?tab=Report;
-  // honour any valid ?tab= on first mount (same pattern as the hubs pages).
+  // §35أ — honour any valid ?tab= on first mount (same pattern as the hubs pages).
   const [searchParams] = useSearchParams();
   const initialTab = POS_TABS.find(
     (t) => t.toLowerCase().replace(/\s+/g, '') === (searchParams.get('tab') ?? '').toLowerCase().replace(/[\s_-]/g, '')

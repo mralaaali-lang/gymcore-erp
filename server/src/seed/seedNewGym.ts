@@ -10,6 +10,28 @@ const OFFER_TEMPLATES = [
   { title: 'سنة كاملة', duration_days: 365, price: 1500 },
 ];
 
+// نفس السبعة الافتراضية في migration 074 — البذرة الحية للكتالوج
+export const DEFAULT_SPORTS = [
+  { code: 'gym', name_ar: 'جيم', icon: 'fitness_center', color: '#f97316', sort_order: 1 },
+  { code: 'cardio', name_ar: 'كارديو', icon: 'favorite', color: '#ef4444', sort_order: 2 },
+  { code: 'boxing', name_ar: 'ملاكمة', icon: 'sports_mma', color: '#8b5cf6', sort_order: 3 },
+  { code: 'kickboxing', name_ar: 'كيك بوكسينج', icon: 'bolt', color: '#eab308', sort_order: 4 },
+  { code: 'swimming', name_ar: 'سباحة', icon: 'pool', color: '#0ea5e9', sort_order: 5 },
+  { code: 'crossfit', name_ar: 'كروس فيت', icon: 'directions_run', color: '#22c55e', sort_order: 6 },
+  { code: 'yoga', name_ar: 'يوجا', icon: 'self_improvement', color: '#14b8a6', sort_order: 7 },
+];
+
+export async function seedDefaultSports(client: PoolClient, gymId: string): Promise<void> {
+  for (const s of DEFAULT_SPORTS) {
+    await client.query(
+      `INSERT INTO gym_sports (id, gym_id, code, name_ar, icon, color, sort_order, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+       ON CONFLICT (gym_id, code) DO NOTHING`,
+      [uuidv4(), gymId, s.code, s.name_ar, s.icon, s.color, s.sort_order],
+    );
+  }
+}
+
 /**
  * Seeds the standard membership-offer catalog for a gym. This is operating
  * catalog data (NOT demo junk): without it createMember(plan_id) can never
@@ -24,8 +46,8 @@ export async function seedDefaultOffers(client: PoolClient, gymId: string): Prom
     const offerId = uuidv4();
     offerIds.push(offerId);
     await client.query(
-      `INSERT INTO membership_offers (id, gym_id, title, duration_days, price, is_active)
-       VALUES ($1, $2, $3, $4, $5, true)`,
+      `INSERT INTO membership_offers (id, gym_id, title, duration_days, price, is_active, sport)
+       VALUES ($1, $2, $3, $4, $5, true, 'gym')`,
       [offerId, gymId, tmpl.title, tmpl.duration_days, tmpl.price],
     );
   }
@@ -58,6 +80,9 @@ export async function seedNewGym(gymId: string, gymName: string): Promise<void> 
   const client = await getAdminClient();
   try {
     await client.query('BEGIN');
+
+    // --- Sports catalog (plans require a sport — no uncategorized seeds) ---
+    await seedDefaultSports(client, gymId);
 
     // --- Membership Offers ---
     const offerIds = await seedDefaultOffers(client, gymId);

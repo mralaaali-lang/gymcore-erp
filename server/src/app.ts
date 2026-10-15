@@ -17,6 +17,7 @@ import { testConnection } from './config/database';
 import { runMigrations } from './config/migrate';
 import { scheduleDailyCron } from './cron/subscriptionCleanup';
 import { scheduleSubscriptionEnforcement } from './cron/subscriptionEnforcement';
+import { scheduleAutoBackups } from './cron/autoBackup';
 import { globalRateLimit } from './middleware/rateLimit';
 import { responseTimeMetrics, healthCheck } from './middleware/metrics';
 import { tenantMiddleware } from './middleware/tenant';
@@ -145,6 +146,7 @@ async function start() {
   await runMigrations();
   scheduleDailyCron();
   scheduleSubscriptionEnforcement();
+  scheduleAutoBackups();
 
   // HTTP server (required for graceful shutdown)
   const httpServer = http.createServer(app);

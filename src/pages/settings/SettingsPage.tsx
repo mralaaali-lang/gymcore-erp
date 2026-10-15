@@ -6,15 +6,8 @@ import PageHeader from '../../components/shared/PageHeader';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import GymTab from './tabs/GymTab';
-import BookingsTab from './tabs/BookingsTab';
-import MembersTab from './tabs/MembersTab';
-import AttendanceTab from './tabs/AttendanceTab';
-import ScheduleTab from './tabs/ScheduleTab';
-import MarketingTab from './tabs/MarketingTab';
-import BillingTab from './tabs/BillingTab';
-import SalesTab from './tabs/SalesTab';
-import EmailTab from './tabs/EmailTab';
-import IntegrationsTab from './tabs/IntegrationsTab';
+import SubscriptionsTab from './tabs/SubscriptionsTab';
+import NotificationsTab from './tabs/NotificationsTab';
 import SessionsTab from './tabs/SessionsTab';
 import BackupTab from './tabs/BackupTab';
 import MigrationTab from './tabs/MigrationTab';
@@ -28,15 +21,10 @@ interface TabDef {
 }
 
 const ALL_TABS: TabDef[] = [
-  { id: 'gym', icon: 'store', labelEn: 'Gym', labelAr: 'الصالة', roles: ['manager'] },
-  { id: 'bookings', icon: 'calendar_month', labelEn: 'Bookings', labelAr: 'الحجوزات', roles: ['manager'] },
-  { id: 'members', icon: 'group', labelEn: 'Members', labelAr: 'الأعضاء', roles: ['manager'] },
-  { id: 'attendance', icon: 'qr_code_scanner', labelEn: 'Attendance', labelAr: 'الحضور', roles: ['manager'] },
-  { id: 'schedule', icon: 'schedule', labelEn: 'Schedule', labelAr: 'الجدول', roles: ['manager'] },
-  { id: 'marketing', icon: 'campaign', labelEn: 'Marketing', labelAr: 'التسويق', roles: ['manager'] },
-  { id: 'billing', icon: 'payments', labelEn: 'Billing', labelAr: 'الفواتير', roles: ['manager'] },
-  { id: 'sales', icon: 'point_of_sale', labelEn: 'Sales', labelAr: 'المبيعات', roles: ['manager'] },
-  { id: 'email', icon: 'mail', labelEn: 'Email', labelAr: 'البريد', roles: ['manager'] },
+  { id: 'gym', icon: 'store', labelEn: 'Gym data', labelAr: 'بيانات الصالة', roles: ['manager'] },
+  { id: 'subscriptions', icon: 'subscriptions', labelEn: 'Subscriptions', labelAr: 'الاشتراكات', roles: ['manager'] },
+  { id: 'notifications', icon: 'notifications', labelEn: 'Notifications', labelAr: 'الإشعارات', roles: ['manager'] },
+  { id: 'backup', icon: 'backup', labelEn: 'Backup', labelAr: 'النسخ الاحتياطي', roles: ['manager'] },
   { id: 'sessions', icon: 'devices', labelEn: 'Sessions', labelAr: 'الجلسات', roles: ['manager'] },
   { id: 'integrations', icon: 'link', labelEn: 'Integrations', labelAr: 'التكامل', roles: ['manager'] },
   // §27 — merged standalone pages (was /admin/backup and /admin/settings/migration)
@@ -47,16 +35,9 @@ const ALL_TABS: TabDef[] = [
 
 const TAB_COMPONENTS: Record<string, React.ComponentType> = {
   gym: GymTab,
-  bookings: BookingsTab,
-  members: MembersTab,
-  attendance: AttendanceTab,
-  schedule: ScheduleTab,
-  marketing: MarketingTab,
-  billing: BillingTab,
-  sales: SalesTab,
-  email: EmailTab,
+  subscriptions: SubscriptionsTab,
+  notifications: NotificationsTab,
   sessions: SessionsTab,
-  integrations: IntegrationsTab,
   backup: BackupTab,
   migration: MigrationTab,
 };

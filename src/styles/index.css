@@ -197,7 +197,20 @@ html {
   }
 }
 
-/* Desktop (≥769px): the table never scrolls horizontally. */
+/* Desktop (≥769px): scroll only if the min-width table overflows (narrow windows). */
 .members-table {
-  overflow-x: hidden;
+  overflow-x: auto;
+}
+
+/* Shift report printing: window.print() on the report view — hide the app
+   chrome (sidebar/topnav are <aside>/<header>) and every .no-print control. */
+@media print {
+  body.shift-printing aside,
+  body.shift-printing header,
+  body.shift-printing .no-print {
+    display: none !important;
+  }
+  body.shift-printing main {
+    padding: 0 !important;
+  }
 }

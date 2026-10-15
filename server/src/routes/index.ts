@@ -65,8 +65,24 @@ import {
   revokeSession,
   revokeAllOtherSessions,
 } from '../controllers/auth';
-import { listOffers, listAllOffers, createOffer, updateOffer } from '../controllers/offers';
-import { createOfferSchema, updateOfferSchema, createSubscriptionSchema, updateSubscriptionSchema } from '../validators/schemas';
+import { listOffers, listAllOffers, createOffer, updateOffer, deleteOffer } from '../controllers/offers';
+import { createOfferSchema, updateOfferSchema, createSportSchema, updateSportSchema, createSubscriptionSchema, updateSubscriptionSchema, createPtEnrollmentSchema } from '../validators/schemas';
+import { listSports, createSport, updateSport, deleteSport } from '../controllers/sports';
+import { listQuickSessions, createQuickSession } from '../controllers/quickSessions';
+import {
+  listPtEnrollments, createPtEnrollment, consumePtSession, cancelPtEnrollment, ptReport,
+} from '../controllers/privateTraining';
+import {
+  listLeaves, requestLeave, decideLeave, leaveBalances,
+  listAdjustments, createAdjustment, deleteAdjustment, repayAdvance,
+  generatePayroll, getPayroll, approvePayroll, payPayroll, deletePayrollRun,
+  listContracts, createContract, deleteContract,
+  getHrAttendance, saveHrAttendance, selfCheckin,
+} from '../controllers/hr';
+import {
+  createLeaveSchema, decideLeaveSchema, createAdjustmentSchema, repayAdvanceSchema,
+  generatePayrollSchema, createHrContractSchema, saveAttendanceSchema, selfCheckinSchema,
+} from '../validators/schemas';
 import { listSubscriptions, createSubscription, updateSubscription } from '../controllers/subscriptions';
 import {
   loginSchema,
@@ -90,6 +106,7 @@ import {
   createProductSchema,
   createPaymentSchema,
   createExpenseSchema,
+  createRefundSchema,
   createStaffSchemaV2,
   createSaleSchema,
   createPurchaseSchema,
@@ -118,8 +135,12 @@ import {
 import {
   listLeads, getLeadById, createLead, updateLead, deleteLead, getLeadStats,
 } from '../controllers/crm';
-import { getRetentionRate, getPeakHours, getRevenueForecast, getEnrollmentTrend, getRevenueBreakdown, getBusinessMetrics, getEngagement, getMarketingFunnel, getGymReferrals } from '../controllers/analytics';
-import { getExpiringSoon, getInactiveMembers, getOverdueDebts, getNavBadges } from '../controllers/dashboard';
+import { getRetentionRate, getPeakHours, getRevenueForecast, getEnrollmentTrend, getRevenueBreakdown, getBusinessMetrics, getEngagement, getMarketingFunnel, getGymReferrals, getReportsOverview, getMembersReport, getFinancialReport, getAttendanceReport, getSubscriptionsReport, getAbsentReport, getEmployeeSalesReport } from '../controllers/analytics';
+// §41 — trainer daily progress logs (table: trainer_progress_logs, migration 069)
+import {
+  getTodayProgress, getProgressHistory, saveProgressLog, updateProgressLog, deleteProgressLog,
+} from '../controllers/trainerProgress';
+import { getExpiringSoon, getInactiveMembers, getOverdueDebts, getNavBadges, getAlertsCenter } from '../controllers/dashboard';
 import { handlePaymentWebhook } from '../controllers/webhooks';
 import { webhookIdempotency } from '../middleware/webhookIdempotency';
 import { verifyPaymentWebhookSignature } from '../middleware/webhookAuth';
@@ -144,7 +165,7 @@ import {
   listSuppliers, createSupplier,
   listDebts, createDebt, payDebt,
   listCashboxSessions, openCashbox, closeCashbox, getFinanceSummary,
-  getCashbook, listSessionLedger,
+  getCashbook, listSessionLedger, listMovements, createRefund, getShiftReport,
 } from '../controllers/finance';
 // §34ج — الاستيراد الحقيقي (CSV) لستة كيانات
 import { importData } from '../controllers/importData';
@@ -160,8 +181,9 @@ import {
 } from '../controllers/classes';
 import {
   listStaff, getStaff, createStaff, updateStaff, deleteStaff,
-  listTrainers,
-  listShifts, clockIn, clockOut,
+  listTrainers, listCoachesSummary,
+  listShifts, clockIn, clockOut, bulkClockInCoaches, updateShift,
+  listCoachAttendance, coachAttendanceReport,
   listPayroll, processPayroll, getStaffAttendanceSummary,
 } from '../controllers/staff';
 import {
@@ -173,6 +195,7 @@ import {
   getSettings, updateSettings,
 } from '../controllers/gym';
 import { getSetupProgress } from '../controllers/setup';
+import { getPublicBranding } from '../controllers/branding';
 import { listWorkflows, updateWorkflow, triggerWorkflow } from '../controllers/workflows';
 
 const router = Router();
@@ -213,6 +236,11 @@ router.post('/api/webhooks/whatsapp', (req, res) => {
 router.post('/api/auth/verify-pass', qrRateLimit, verifyPublicQrPass);
 
 // ====================================================================
+// PUBLIC BRANDING — footer/app-name/logo only (no auth: display fields).
+// ====================================================================
+router.get('/api/branding-public', getPublicBranding);
+
+// ====================================================================
 // AUTHENTICATED ROUTES — All require valid JWT + Tenant Isolation
 // ====================================================================
 router.use('/api', authenticateAndIsolateTenant);
@@ -249,7 +277,41 @@ router.get('/api/membership-offers', requireRole('manager', 'receptionist', 'coa
 router.get('/api/membership-offers/manage', requireRole('manager'), listAllOffers);
 router.post('/api/membership-offers', requireRole('manager'), validate(createOfferSchema), createOffer);
 router.put('/api/membership-offers/:id', requireRole('manager'), validate(updateOfferSchema), updateOffer);
+router.delete('/api/membership-offers/:id', requireRole('manager'), deleteOffer);
+router.get('/api/sports', requireRole('manager'), listSports);
+router.post('/api/sports', requireRole('manager'), validate(createSportSchema), createSport);
+router.put('/api/sports/:id', requireRole('manager'), validate(updateSportSchema), updateSport);
+router.delete('/api/sports/:id', requireRole('manager'), deleteSport);
+router.get('/api/quick-sessions', requireRole('manager', 'receptionist'), listQuickSessions);
+router.post('/api/quick-sessions', requireRole('manager', 'receptionist'), createQuickSession);
+router.get('/api/pt-enrollments', requireRole('manager'), listPtEnrollments);
+router.post('/api/pt-enrollments', requireRole('manager'), validate(createPtEnrollmentSchema), createPtEnrollment);
+router.post('/api/pt-enrollments/:id/consume', requireRole('manager'), consumePtSession);
+router.post('/api/pt-enrollments/:id/cancel', requireRole('manager'), cancelPtEnrollment);
+router.get('/api/pt-enrollments/report', requireRole('manager'), ptReport);
 
+// ====================================================================
+// HR — شئون الموظفين (manager only; self-checkin also receptionist)
+// ====================================================================
+router.get('/api/hr/leaves', requireRole('manager'), listLeaves);
+router.post('/api/hr/leaves', requireRole('manager'), validate(createLeaveSchema), requestLeave);
+router.post('/api/hr/leaves/:id/decision', requireRole('manager'), validate(decideLeaveSchema), decideLeave);
+router.get('/api/hr/leave-balances', requireRole('manager'), leaveBalances);
+router.get('/api/hr/adjustments', requireRole('manager'), listAdjustments);
+router.post('/api/hr/adjustments', requireRole('manager'), validate(createAdjustmentSchema), createAdjustment);
+router.delete('/api/hr/adjustments/:id', requireRole('manager'), deleteAdjustment);
+router.post('/api/hr/adjustments/:id/repay', requireRole('manager'), validate(repayAdvanceSchema), repayAdvance);
+router.post('/api/hr/payroll/generate', requireRole('manager'), validate(generatePayrollSchema), generatePayroll);
+router.get('/api/hr/payroll', requireRole('manager'), getPayroll);
+router.post('/api/hr/payroll/:id/approve', requireRole('manager'), approvePayroll);
+router.post('/api/hr/payroll/:id/pay', requireRole('manager'), payPayroll);
+router.delete('/api/hr/payroll/:id', requireRole('manager'), deletePayrollRun);
+router.get('/api/hr/contracts', requireRole('manager'), listContracts);
+router.post('/api/hr/contracts', requireRole('manager'), validate(createHrContractSchema), createContract);
+router.delete('/api/hr/contracts/:id', requireRole('manager'), deleteContract);
+router.get('/api/hr/attendance', requireRole('manager'), getHrAttendance);
+router.post('/api/hr/attendance', requireRole('manager'), validate(saveAttendanceSchema), saveHrAttendance);
+router.post('/api/staff/self-checkin', requireRole('manager', 'receptionist'), validate(selfCheckinSchema), selfCheckin);
 // ====================================================================
 // ATTENDANCE & QR CHECK-IN
 // ====================================================================
@@ -325,6 +387,13 @@ router.get('/api/analytics/business-metrics', requireRole('manager'), getBusines
 router.get('/api/analytics/engagement', requireRole('manager'), getEngagement); // §34ب
 router.get('/api/analytics/marketing-funnel', requireRole('manager'), getMarketingFunnel); // §34ت
 router.get('/api/marketing/referrals', requireRole('manager'), getGymReferrals); // §40-M5 — real gym-scoped referrals
+router.get('/api/reports/overview', requireRole('manager'), getReportsOverview);
+router.get('/api/reports/members', requireRole('manager'), getMembersReport);
+router.get('/api/reports/financial', requireRole('manager'), getFinancialReport);
+router.get('/api/reports/attendance', requireRole('manager'), getAttendanceReport);
+router.get('/api/reports/subscriptions', requireRole('manager'), getSubscriptionsReport);
+router.get('/api/reports/absent', requireRole('manager'), getAbsentReport);
+router.get('/api/reports/employee-sales', requireRole('manager'), getEmployeeSalesReport);
 
 // ====================================================================
 // MANAGER DASHBOARD — "needs your action" feeds (§24, read-only)
@@ -333,6 +402,7 @@ router.get('/api/dashboard/expiring-soon', requireRole('manager'), getExpiringSo
 router.get('/api/dashboard/inactive-members', requireRole('manager'), getInactiveMembers);
 router.get('/api/dashboard/overdue-debts', requireRole('manager'), getOverdueDebts);
 router.get('/api/nav/badges', requireRole('manager', 'receptionist'), getNavBadges); // §35أ
+router.get('/api/notifications/center', requireRole('manager'), getAlertsCenter);
 
 // ====================================================================
 // LOYALTY POINTS & REWARDS
@@ -415,7 +485,10 @@ router.get('/api/finance/cashbox', requireRole('manager'), listCashboxSessions);
 router.post('/api/finance/cashbox/open', requireRole('manager'), validate(openCashboxSchema), openCashbox);
 router.post('/api/finance/cashbox/close', requireRole('manager'), validate(closeCashboxSchema), closeCashbox);
 router.get('/api/finance/cashbox/:id/ledger', requireRole('manager'), listSessionLedger); // §34ث
+router.get('/api/finance/cashbox/:id/report', requireRole('manager'), getShiftReport);
 router.get('/api/finance/cashbook', requireRole('manager'), getCashbook); // §34ث
+router.get('/api/finance/movements', requireRole('manager'), listMovements);
+router.post('/api/finance/refunds', requireRole('manager'), validate(createRefundSchema), createRefund);
 router.get('/api/finance/summary', requireRole('manager'), getFinanceSummary);
 
 // ====================================================================
@@ -434,8 +507,13 @@ router.post('/api/staff', requireRole('manager'), planGuard({ checkStaff: true }
 router.put('/api/staff/:id', requireRole('manager'), validate(updateStaffSchema), updateStaff);
 router.delete('/api/staff/:id', requireRole('manager'), deleteStaff);
 router.get('/api/trainers', requireRole('manager', 'receptionist', 'coach'), listTrainers);
+router.get('/api/staff/coaches/summary', requireRole('manager'), listCoachesSummary);
 router.get('/api/staff/shifts', requireRole('manager'), listShifts);
 router.post('/api/staff/clock-in', requireRole('manager', 'receptionist', 'coach'), clockIn);
+router.post('/api/staff/clock-in-bulk', requireRole('manager'), bulkClockInCoaches);
+router.put('/api/staff/shifts/:id', requireRole('manager'), updateShift);
+router.get('/api/staff/coaches/attendance', requireRole('manager'), listCoachAttendance);
+router.get('/api/staff/coaches/attendance-report', requireRole('manager'), coachAttendanceReport);
 router.post('/api/staff/clock-out', requireRole('manager', 'receptionist', 'coach'), clockOut);
 router.get('/api/hr/payroll', requireRole('manager'), listPayroll);
 router.post('/api/hr/payroll', requireRole('manager'), processPayroll);
@@ -449,6 +527,16 @@ router.post('/api/training/packages', requireRole('manager'), planGuard({ requir
 router.get('/api/training/sessions', requireRole('manager', 'coach'), listPtSessions);
 router.post('/api/training/sessions', requireRole('manager', 'coach'), validate(createPtSessionSchema), createPtSession);
 router.put('/api/training/sessions/:id/complete', requireRole('manager', 'coach'), validate(completePtSessionSchema), completePtSession);
+
+// ====================================================================
+// TRAINER PROGRESS — daily logs (§41, migration 069)
+// coach: own rows only; manager: read anyone in the gym (trainer_id param).
+// ====================================================================
+router.get('/api/trainer-progress/today', requireRole('manager', 'coach'), getTodayProgress);
+router.get('/api/trainer-progress/history', requireRole('manager', 'coach'), getProgressHistory);
+router.post('/api/trainer-progress', requireRole('manager', 'coach'), saveProgressLog);
+router.put('/api/trainer-progress/:id', requireRole('manager', 'coach'), updateProgressLog);
+router.delete('/api/trainer-progress/:id', requireRole('manager', 'coach'), deleteProgressLog);
 
 // ====================================================================
 // GYM — Announcements & Settings

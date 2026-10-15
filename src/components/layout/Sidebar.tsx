@@ -3,6 +3,8 @@ import { formatDate } from '../../utils/date';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/GymBrandContext';
+import { useApiQuery } from '../../hooks/useApiQuery';
+import { getSettings } from '../../services/api';
 import type { NavItem, UserRole } from '../../types';
 import {
   LayoutDashboard, Users, Package, ClipboardCheck, ShoppingCart,
@@ -119,6 +121,11 @@ export default function Sidebar({ items }: SidebarProps) {
   // here in the brand block — the dashboard no longer repeats it. Platform
   // sessions (no gym profile) keep the generic GymCore branding.
   const brandName = gymProfile?.name || 'GymCore';
+  // لون البراند من الإعدادات (بيانات الصالة ← الشعار والهوية)
+  const { data: brandSettings } = useApiQuery(['settings'], getSettings, { staleTime: 5 * 60_000 });
+  const brandColor = String(brandSettings?.data?.gym_brand_color || '#10b981');
+  const brandNameEn = String(brandSettings?.data?.gym_name_en || '').trim();
+  const displayBrand = !rtl && brandNameEn ? brandNameEn : brandName;
   const brandSub = gymProfile?.name
     ? [
         formatDate(new Date()),
@@ -210,11 +217,14 @@ export default function Sidebar({ items }: SidebarProps) {
       >
       <div className="py-4 px-4 flex items-center gap-2.5 border-b border-gray-100 shrink-0">
         <NavLink to={`${ROLE_BASE[role]}/dashboard`} className="flex items-center gap-2.5 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-emerald-500/30 shrink-0">
-            {brandName.charAt(0)}
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shrink-0"
+            style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}99)`, boxShadow: `0 8px 16px -4px ${brandColor}55` }}
+          >
+            {displayBrand.charAt(0)}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">{brandName}</p>
+            <p className="text-sm font-bold text-gray-900 truncate">{displayBrand}</p>
             <p className="text-[10px] text-gray-400 truncate">{brandSub}</p>
           </div>
         </NavLink>

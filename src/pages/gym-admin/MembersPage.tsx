@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { listMembers, getMemberStats, type MemberResponse, type MemberStats } from '../../services/api';
@@ -10,7 +11,6 @@ import { formatDate, daysUntil } from '../../utils/date';
 import { buildExportMatrix, downloadMatrixXlsx } from '../../utils/csv';
 import { Plus } from 'lucide-react';
 import { DashboardPage, PrimaryAction } from '../../components/dashboard';
-import { QuickActionModals, type ActionKey } from '../../components/dashboard/QuickActionCenter';
 import EditMemberModal from './EditMemberModal';
 import ImportMembersModal from './ImportMembersModal';
 
@@ -25,6 +25,8 @@ function subMeta(status: string | undefined, blacklisted: boolean | undefined, r
   if (status === 'active') return { label: rtl ? 'نشط' : 'Active', variant: 'success' };
   if (status === 'expired') return { label: rtl ? 'منتهي' : 'Expired', variant: 'warning' };
   if (status === 'suspended') return { label: rtl ? 'موقوف' : 'Suspended', variant: 'error' };
+  if (status === 'frozen') return { label: rtl ? 'مجمّد' : 'Frozen', variant: 'neutral' };
+  if (status === 'cancelled') return { label: rtl ? 'ملغي' : 'Cancelled', variant: 'neutral' };
   if (status) return { label: status, variant: 'neutral' };
   return { label: rtl ? 'لا اشتراك' : 'No subscription', variant: 'neutral' };
 }
@@ -47,8 +49,6 @@ function calcAge(dob: string): string {
 // (ينتهي في: الأقرب أولاً؛ الزيارات/آخر زيارة: الأعلى/الأحدث أولاً).
 const SORTABLE: Record<string, { labelAr: string; labelEn: string; def: 'asc' | 'desc' }> = {
   member_name: { labelAr: 'المشترك', labelEn: 'MEMBER', def: 'asc' },
-  created_at: { labelAr: 'تاريخ الانضمام', labelEn: 'JOINED', def: 'desc' },
-  end_date: { labelAr: 'ينتهي في', labelEn: 'ENDS IN', def: 'asc' },
   remaining: { labelAr: 'المتبقي', labelEn: 'LEFT', def: 'asc' },
   last_visit: { labelAr: 'آخر زيارة', labelEn: 'LAST VISIT', def: 'desc' },
   visits: { labelAr: 'الزيارات', labelEn: 'VISITS', def: 'desc' },
@@ -57,6 +57,7 @@ const SORTABLE: Record<string, { labelAr: string; labelEn: string; def: 'asc' | 
 export default function MembersPage() {
   const { language } = useApp();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const rtl = language === 'ar';
 
   const [search, setSearch] = useState('');
@@ -68,9 +69,8 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true);
   // §34ح — the five stat cards; every number comes from /api/members/stats.
   const [stats, setStats] = useState<MemberStats | null>(null);
-  // §34د-5 — adding a member starts right here, with the SAME centered modal
-  // the dashboard uses (real offers + PIN shown once), not a page detour.
-  const [action, setAction] = useState<ActionKey | null>(null);
+  // إضافة مشترك = صفحة onboarding الكاملة (/admin/members/add: عضو +
+  // اشتراك أول + دفعة أولى) — لا مودال مختصر هنا.
   const [limit, setLimit] = useState(10);
   // الترتيب: العمود + الاتجاه — الافتراضي الأحدث انضمامًا (نفس ترتيب السيرفر القديم).
   const [sort, setSort] = useState('created_at');
@@ -208,7 +208,7 @@ export default function MembersPage() {
     const cfg = SORTABLE[key];
     const active = sort === key;
     return (
-      <th key={key} className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">
+      <th key={key} className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider" aria-sort={active ? (order === 'asc' ? 'ascending' : 'descending') : undefined}>
         <button
           type="button"
           onClick={() => toggleSort(key)}
@@ -243,7 +243,7 @@ export default function MembersPage() {
     <DashboardPage
       className="bg-gray-50 min-h-screen -m-6 p-6"
       actions={
-        <PrimaryAction onClick={() => setAction('member')}>
+        <PrimaryAction onClick={() => navigate('/admin/members/add')}>
           <Plus size={16} />
           {rtl ? 'إضافة مشترك' : 'Add member'}
         </PrimaryAction>
@@ -253,11 +253,11 @@ export default function MembersPage() {
       {/* §34ح — five live stat cards (big colored number, small caption) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {(statCards || [0, 1, 2, 3, 4].map(() => null)).map((c, i) => (
-          <div key={i} className="bg-white rounded-3xl border border-gray-100 shadow-sm px-4 py-5 text-center">
-            <div className={`text-3xl font-extrabold leading-none ${c ? c.color : 'text-gray-300'}`}>
+          <div key={i} className="bg-white rounded-3xl border border-gray-100 shadow-sm px-4 py-5 text-center [container-type:inline-size]">
+            <div className={`font-extrabold leading-none tabular-nums whitespace-nowrap text-[clamp(20px,10cqw,30px)] ${c ? c.color : 'text-gray-300'}`}>
               {c ? c.value : '—'}
             </div>
-            <div className="mt-2 text-xs text-gray-500 font-medium">
+            <div className="mt-2 text-gray-500 font-medium whitespace-nowrap text-[clamp(10px,4cqw,12px)]">
               {c ? (rtl ? c.labelAr : c.labelEn) : rtl ? 'جارٍ التحميل…' : 'Loading…'}
             </div>
           </div>
@@ -329,8 +329,7 @@ export default function MembersPage() {
 
       {/* §34د-4 — one honest empty state: the three "coming soon" toast cards
           (reception sign-up / Excel import / email invite) were fake options.
-          The only real way to add a member today is the same centered modal
-          the dashboard uses. */}
+          Adding the first member opens the full onboarding page. */}
       {isEmpty && !loading && (
         <Card className="p-12 text-center">
           <span className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4">
@@ -342,7 +341,7 @@ export default function MembersPage() {
           <p className="text-sm text-gray-500 max-w-md mx-auto mb-6">
             {rtl ? 'ابدأ بإضافة أول مشترك — ستظهر قائمتهم هنا مباشرة' : 'Add your first member — the directory will appear here'}
           </p>
-          <PrimaryAction onClick={() => setAction('member')}>
+          <PrimaryAction onClick={() => navigate('/admin/members/add')}>
             <Plus size={16} />
             {rtl ? 'إضافة مشترك' : 'Add member'}
           </PrimaryAction>
@@ -363,7 +362,7 @@ export default function MembersPage() {
       {!loading && members.length > 0 && (
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="members-table">
-            <table className="w-full text-sm text-gray-900">
+            <table className="w-full min-w-[880px] text-sm text-gray-900">
               <thead>
                 <tr className="bg-gray-50">
                   <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider w-10">#</th>
@@ -476,8 +475,6 @@ export default function MembersPage() {
         </div>
       )}
 
-      {/* §33أ/§34د-5 — the same centered member modal the dashboard uses */}
-      <QuickActionModals action={action} onClose={() => setAction(null)} />
       {editing && (
         <EditMemberModal
           member={editing}

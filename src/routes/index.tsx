@@ -68,6 +68,8 @@ export default function AppRouter() {
         <Route path="/super-admin/ota" element={lazyLoad(() => import('../pages/super-admin/OtaUpdateManager'), ['super-admin'])} />
         <Route path="/super-admin/branding" element={lazyLoad(() => import('../pages/super-admin/BrandingTab'), ['super-admin'])} />
         <Route path="/super-admin/developer" element={lazyLoad(() => import('../pages/super-admin/DeveloperPortal'), ['super-admin'])} />
+        {/* §41 — platform marketing restored: real /platform/marketing/* endpoints */}
+        <Route path="/super-admin/marketing" element={lazyLoad(() => import('../pages/super-admin/PlatformMarketing'), ['super-admin'])} />
 
         {/* ============================================
             GYM MANAGER DASHBOARD  (/admin/*)
@@ -82,6 +84,9 @@ export default function AppRouter() {
         {/* §34ي — /admin/subscriptions أصبح دفتر اشتراكات الأعضاء؛ صفحة
             الباقات والعروض (§33ب) انتقلت إلى /admin/plans. */}
         <Route path="/admin/subscriptions" element={lazyLoad(() => import('../pages/gym-admin/SubscriptionsPage'), ['gym-admin'])} />
+        <Route path="/admin/plans/add" element={lazyLoad(() => import('../pages/gym-admin/plans/AddPlanPage'), ['gym-admin'])} />
+        <Route path="/admin/sports" element={lazyLoad(() => import('../pages/gym-admin/SportsPage'), ['gym-admin'])} />
+        <Route path="/admin/quick-session" element={lazyLoad(() => import('../pages/gym-admin/QuickSessionPage'), ['gym-admin', 'reception'])} />
         <Route path="/admin/plans" element={lazyLoad(() => import('../pages/gym-admin/SubscriptionManagement'), ['gym-admin'])} />
         <Route path="/admin/attendance" element={lazyLoad(() => import('../pages/gym-admin/AttendanceRecords'), ['gym-admin'])} />
         {/* Store hub — merged products/purchases/suppliers pages into one tabbed page (§23). */}
@@ -93,6 +98,13 @@ export default function AppRouter() {
         <Route path="/admin/gym" element={lazyLoad(() => import('../pages/gym-admin/GymCalendar'), ['gym-admin'])} />
         <Route path="/admin/shifts" element={<Navigate to="/admin/users?tab=shifts" replace />} />
         <Route path="/admin/reports" element={lazyLoad(() => import('../pages/gym-admin/FinancialReports'), ['gym-admin'])} />
+        <Route path="/admin/reports/members" element={lazyLoad(() => import('../pages/gym-admin/MembersReport'), ['gym-admin'])} />
+        <Route path="/admin/reports/financial" element={lazyLoad(() => import('../pages/gym-admin/FinancialReport'), ['gym-admin'])} />
+        <Route path="/admin/reports/attendance" element={lazyLoad(() => import('../pages/gym-admin/AttendanceReport'), ['gym-admin'])} />
+        <Route path="/admin/reports/subscriptions" element={lazyLoad(() => import('../pages/gym-admin/SubscriptionsReport'), ['gym-admin'])} />
+        <Route path="/admin/reports/absent" element={lazyLoad(() => import('../pages/gym-admin/AbsentMembers'), ['gym-admin'])} />
+        <Route path="/admin/reports/employee-sales" element={lazyLoad(() => import('../pages/gym-admin/EmployeeSales'), ['gym-admin'])} />
+        <Route path="/admin/reports/subscriptions" element={lazyLoad(() => import('../pages/gym-admin/SubscriptionsReport'), ['gym-admin'])} />
         <Route path="/admin/analytics" element={lazyLoad(() => import('../pages/gym-admin/BranchAnalytics'), ['gym-admin'])} />
         <Route path="/admin/hr" element={<Navigate to="/admin/users?tab=hr" replace />} />
         <Route path="/admin/crm" element={lazyLoad(() => import('../pages/gym-admin/CrmPage'), ['gym-admin'])} />
@@ -101,7 +113,8 @@ export default function AppRouter() {
         {/* Settings hub — backup/migration pages merged as tabs (§27). */}
         <Route path="/admin/settings/migration" element={<Navigate to="/admin/settings?tab=migration" replace />} />
         <Route path="/admin/backup" element={<Navigate to="/admin/settings?tab=backup" replace />} />
-        <Route path="/admin/notifications" element={lazyLoad(() => import('../pages/super-admin/BroadcastEngine'), ['gym-admin'])} />
+        {/* مركز الإنذار المبكر — view تجميعية read-only (ديون + مخزون + انتهاء)، بلا إضافة/تعديل */}
+        <Route path="/admin/notifications" element={lazyLoad(() => import('../pages/gym-admin/AlertsCenterPage'), ['gym-admin'])} />
         {/* Sales, Purchases, Suppliers, Expenses, Debts, Cashbox */}
         <Route path="/admin/sales" element={lazyLoad(() => import('../pages/gym-admin/SalesPage'), ['gym-admin'])} />
         <Route path="/admin/purchases" element={<Navigate to="/admin/products?tab=purchases" replace />} />
@@ -109,12 +122,25 @@ export default function AppRouter() {
         <Route path="/admin/expenses" element={lazyLoad(() => import('../pages/gym-admin/ExpensesPage'), ['gym-admin'])} />
         <Route path="/admin/cashbox" element={lazyLoad(() => import('../pages/gym-admin/CashboxPage'), ['gym-admin'])} />
         <Route path="/admin/cashbox/shifts" element={lazyLoad(() => import('../pages/gym-admin/CashboxShiftsPage'), ['gym-admin'])} />
-        {/* Billing hub — DebtsPage merged as the "Debts" tab (§26). */}
-        <Route path="/admin/debts" element={<Navigate to="/admin/billing?tab=Debts" replace />} />
+        {/* §45 — DebtsPage is its own collection screen again (was the billing tab). */}
+        <Route path="/admin/debts" element={lazyLoad(() => import('../pages/gym-admin/DebtsPage'), ['gym-admin'])} />
         {/* Marketing hub — AnnouncementsPage merged as the "Announcements" tab (§26). */}
         <Route path="/admin/announcements" element={<Navigate to="/admin/marketing?tab=Announcements" replace />} />
         {/* Team hub — merged trainers/shifts/hr/users pages into one tabbed page (§22). */}
-        <Route path="/admin/trainers" element={<Navigate to="/admin/users?tab=staff&role=coach" replace />} />
+        {/* المدربون — صفحة كروت مستقلة (الحمل/الحضور/التعاقد من الدفاتر الحية) */}
+        <Route path="/admin/trainers" element={lazyLoad(() => import('../pages/gym-admin/TrainersPage'), ['gym-admin'])} />
+        <Route path="/admin/trainer-attendance" element={lazyLoad(() => import('../pages/gym-admin/TrainerAttendancePage'), ['gym-admin'])} />
+        <Route path="/admin/trainer-attendance/add" element={lazyLoad(() => import('../pages/gym-admin/TrainerCheckInPage'), ['gym-admin'])} />
+        <Route path="/admin/trainer-attendance/report" element={lazyLoad(() => import('../pages/gym-admin/CoachAttendanceReportPage'), ['gym-admin'])} />
+        <Route path="/admin/private-training" element={lazyLoad(() => import('../pages/gym-admin/PrivateTrainingPage'), ['gym-admin'])} />
+        <Route path="/admin/private-training/add" element={lazyLoad(() => import('../pages/gym-admin/AddPrivatePage'), ['gym-admin'])} />
+        <Route path="/admin/hr" element={lazyLoad(() => import('../pages/gym-admin/HrMainPage'), ['gym-admin'])} />
+        <Route path="/admin/hr/add" element={lazyLoad(() => import('../pages/gym-admin/AddEmployeePage'), ['gym-admin'])} />
+        <Route path="/admin/hr/attendance" element={lazyLoad(() => import('../pages/gym-admin/HrAttendancePage'), ['gym-admin'])} />
+        <Route path="/admin/hr/leaves" element={lazyLoad(() => import('../pages/gym-admin/LeavesPage'), ['gym-admin'])} />
+        <Route path="/admin/hr/adjustments" element={lazyLoad(() => import('../pages/gym-admin/AdjustmentsPage'), ['gym-admin'])} />
+        <Route path="/admin/hr/payroll" element={lazyLoad(() => import('../pages/gym-admin/PayrollPage'), ['gym-admin'])} />
+        <Route path="/admin/hr/contracts" element={lazyLoad(() => import('../pages/gym-admin/ContractsPage'), ['gym-admin'])} />
         <Route path="/admin/users" element={lazyLoad(() => import('../pages/gym-admin/team/TeamPage'), ['gym-admin'])} />
         {/* Legacy aliases — one canonical URL per page */}
         {/* §43 — payments got their own full screen (attendance pattern);
@@ -136,6 +162,8 @@ export default function AppRouter() {
         <Route path="/trainer/training/sessions" element={lazyLoad(() => import('../pages/trainer/SessionManagement'), ['trainer'])} />
         <Route path="/trainer/training/pt" element={lazyLoad(() => import('../pages/trainer/PersonalTraining'), ['trainer'])} />
         <Route path="/trainer/training/clients" element={lazyLoad(() => import('../pages/trainer/ClientProgress'), ['trainer'])} />
+        {/* §41 — trainer daily progress log (trainer_progress_logs, migration 069) */}
+        <Route path="/trainer/progress" element={lazyLoad(() => import('../pages/trainer/TrainerProgress'), ['trainer'])} />
         <Route path="/trainer/training/mobile" element={lazyLoad(() => import('../pages/trainer/TrainerMobileDashboard'), ['trainer'])} />
         {/* Legacy alias — ai-coach was a placeholder alias of the manager
             analytics page, not coach content */}

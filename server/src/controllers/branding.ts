@@ -89,6 +89,31 @@ export async function updatePlatformBranding(req: Request, res: Response) {
 }
 
 /**
+ * GET /api/branding-public — intentionally UNAUTHENTICATED: only the three
+ * display fields (app name / logo / footer line). The full branding object
+ * stays behind super-admin auth on /platform/branding. The app footer reads
+ * this so the super-admin «نص التذييل» field actually appears somewhere.
+ */
+export async function getPublicBranding(req: Request, res: Response) {
+  try {
+    const result = await query(
+      `SELECT value FROM platform_settings WHERE key = $1`,
+      [BRANDING_KEY]
+    );
+    const v = result.rows[0]?.value ?? {};
+    res.json({
+      data: {
+        app_name: v.app_name ?? DEFAULT_BRANDING.app_name,
+        logo_url: v.logo_url ?? '',
+        footer_text: v.footer_text ?? DEFAULT_BRANDING.footer_text,
+      },
+    });
+  } catch (err: unknown) {
+    const msg = (err as Error).message;
+    res.status(500).json({ error: msg });
+  }
+}
+/**
  * POST /platform/upload/branding
  * Upload a branding file (logo, favicon, login_bg)
  * Returns the URL of the uploaded file

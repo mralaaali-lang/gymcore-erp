@@ -214,7 +214,11 @@ export const getMemberById = async (req: Request, res: Response): Promise<void> 
 };
 
 export const createMember = async (req: Request, res: Response): Promise<void> => {
-  const { full_name, phone_number, email, birth_date, plan_id, medical_notes, photo_url, gender } = req.body;
+  const {
+    full_name, phone_number, email, birth_date, plan_id, medical_notes, photo_url, gender,
+    card_code, national_id, emergency_phone, address, notes, allowed_days, sales_rep_id,
+    offer_id, coach_id, sport, start_date, discount, amount_paid, payment_method,
+  } = req.body;
   const gym_id = req.staff?.gym_id;
   const staff_user_id = req.staff?.staff_user_id;
 
@@ -229,38 +233,125 @@ export const createMember = async (req: Request, res: Response): Promise<void> =
     const generatedPin = String(Math.floor(1000 + Math.random() * 9000)); // 4 digits
     const pinHash = await bcrypt.hash(generatedPin, 12);
 
-    const memberResult = await client.query(
-      `INSERT INTO members (gym_id, full_name, phone_number, email, birth_date, medical_notes, photo_url, pin_code_hash, gender)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [gym_id, full_name, phone_number, email || null, birth_date || null, medical_notes || null, photo_url || null, pinHash, gender || null]
-    );
-
-    const offerResult = plan_id
-      ? await client.query(
-          `SELECT id, title, duration_days, price FROM membership_offers WHERE id = $1 AND gym_id = $2 AND is_active = true`,
-          [plan_id, gym_id]
-        )
-      : { rows: [] as { id: string; title: string; duration_days: number; price: number }[] };
-
-    if (plan_id && offerResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      res.status(400).json({ error: 'Selected membership plan not found or is inactive.' });
-      return;
+    // كود العضوية: مدخل يدوي أو التالي الرقمي تلقائيًا (100001…)
+    let finalCode: string | null = (card_code || '').trim() || null;
+    if (!finalCode) {
+      const maxRes = await client.query(
+        `SELECT COALESCE(MAX(CASE WHEN card_code ~ '^[0-9]+$' THEN card_code::bigint END), 100000) + 1 AS next_code
+         FROM members WHERE gym_id = $1 AND deleted_at IS NULL`,
+        [gym_id]
+      );
+      finalCode = String(maxRes.rows[0].next_code);
     }
 
-    let offerTitle = 'no plan';
-    if (plan_id) {
-      const offer = offerResult.rows[0];
-      offerTitle = offer.title;
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(startDate.getDate() + offer.duration_days);
-
-      await client.query(
-        `INSERT INTO member_subscriptions (gym_id, member_id, offer_id, price_paid, start_date, end_date, status)
-         VALUES ($1, $2, $3, $4, $5, $6, 'active')`,
-        [gym_id, memberResult.rows[0].id, plan_id, offer.price, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
+    if (sales_rep_id) {
+      const rep = await client.query(
+        `SELECT id FROM staff_users WHERE id = $1 AND gym_id = $2 AND is_active = true AND deleted_at IS NULL`,
+        [sales_rep_id, gym_id]
       );
+      if (rep.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'Sales rep not found or inactive in this gym.' });
+        return;
+      }
+    }
+
+    const cleanDays = Array.isArray(allowed_days)
+      ? [...new Set(allowed_days.filter((d: unknown) => typeof d === 'string' && ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri'].includes(d)))]
+      : null;
+
+    const memberResult = await client.query(
+      `INSERT INTO members (gym_id, full_name, phone_number, email, birth_date, medical_notes, photo_url, pin_code_hash, gender,
+        card_code, national_id, emergency_phone, address, notes, allowed_days, sales_rep_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+      [gym_id, full_name, phone_number, email || null, birth_date || null, medical_notes || null,
+        photo_url || null, pinHash, gender || null, finalCode,
+        (national_id || '').trim() || null, (emergency_phone || '').trim() || null,
+        (address || '').trim() || null, (notes || '').trim() || null,
+        cleanDays && cleanDays.length ? cleanDays : null, sales_rep_id || null]
+    );
+    const member = memberResult.rows[0];
+
+    // الاشتراك الأول الاختياري: نفس قواعد createSubscription المالية
+    // (سعر − خصم = مستحق؛ مدفوع ⇒ سند دفع؛ الباقي ⇒ دين) في نفس الترانزاكشن
+    const useOfferId = offer_id || plan_id || null;
+    let subscription: Record<string, unknown> | null = null;
+    if (useOfferId) {
+      const offerRes = await client.query(
+        `SELECT id, title, duration_days, price, weekly_days FROM membership_offers WHERE id = $1 AND gym_id = $2 AND is_active = true`,
+        [useOfferId, gym_id]
+      );
+      if (offerRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'Selected membership plan not found or is inactive.' });
+        return;
+      }
+      const offer = offerRes.rows[0];
+      if (coach_id) {
+        const coachRes = await client.query(
+          `SELECT id FROM staff_users WHERE id = $1 AND gym_id = $2 AND role = 'coach' AND is_active = true`,
+          [coach_id, gym_id]);
+        if (coachRes.rows.length === 0) {
+          await client.query('ROLLBACK');
+          res.status(400).json({ error: 'Coach not found in this gym' });
+          return;
+        }
+      }
+      if (sport) {
+        const sportRes = await client.query(`SELECT 1 FROM gym_sports WHERE gym_id = $1 AND code = $2`, [gym_id, sport]);
+        if (sportRes.rows.length === 0) {
+          await client.query('ROLLBACK');
+          res.status(400).json({ error: 'Unknown sport for this gym.' });
+          return;
+        }
+      }
+      const price = Number(offer.price);
+      const disc = Math.max(0, Number(discount || 0));
+      if (disc > price) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'Discount cannot exceed the plan price.' });
+        return;
+      }
+      const due = Math.round((price - disc) * 100) / 100;
+      const paid = Number(amount_paid || 0);
+      if (!(paid >= 0) || paid > due) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'Paid amount must be between 0 and the amount due.' });
+        return;
+      }
+      const start = (start_date || new Date().toISOString().split('T')[0]) as string;
+      const end = new Date(`${start}T00:00:00`);
+      end.setDate(end.getDate() + Number(offer.duration_days));
+      const finalEnd = end.toISOString().split('T')[0];
+      if (finalEnd <= start) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'End date must be after the start date.' });
+        return;
+      }
+      const subRes = await client.query(
+        `INSERT INTO member_subscriptions
+          (gym_id, member_id, offer_id, price_paid, start_date, end_date, status, coach_id, sport, weekly_days)
+         VALUES ($1,$2,$3,$4,$5,$6,'active',$7,$8,$9)
+         RETURNING id, start_date, end_date`,
+        [gym_id, member.id, useOfferId, paid, start, finalEnd, coach_id || null, sport || null,
+          offer.weekly_days?.length ? offer.weekly_days : null]
+      );
+      const sub = subRes.rows[0];
+      if (paid > 0) {
+        await client.query(
+          `INSERT INTO financial_transactions (gym_id, type, amount, description, staff_user_id, member_id, payment_method, cash_session_id)
+           VALUES ($1,'payment',$2,$3,$4,$5,$6,
+             (SELECT id FROM cashbox_sessions WHERE gym_id=$1 AND status='open' ORDER BY opened_at DESC LIMIT 1))`,
+          [gym_id, paid, `رسوم اشتراك «${offer.title}» — ${full_name}`, staff_user_id, member.id, payment_method || 'cash']);
+      }
+      const owed = Math.round((due - paid) * 100) / 100;
+      if (owed > 0) {
+        await client.query(
+          `INSERT INTO member_debts (gym_id, member_id, subscription_id, original_amount, remaining_amount, due_date, reason)
+           VALUES ($1,$2,$3,$4,$4,$5,$6)`,
+          [gym_id, member.id, sub.id, owed, finalEnd, `رصيد باقة «${offer.title}» — ${full_name}`]);
+      }
+      subscription = { id: sub.id, offer_title: offer.title, start_date: start, end_date: finalEnd, due, paid, outstanding: owed };
     }
 
     await client.query('COMMIT');
@@ -269,11 +360,11 @@ export const createMember = async (req: Request, res: Response): Promise<void> =
     await query(
       `INSERT INTO activity_logs (gym_id, staff_user_id, action_description, ip_address)
        VALUES ($1, $2, $3, $4)`,
-      [gym_id, staff_user_id, `Created new member: ${full_name} (${maskedPhone}) with plan ${offerTitle}`, req.ip]
+      [gym_id, staff_user_id, `Created new member: ${full_name} (${maskedPhone})${subscription ? ` with plan ${(subscription as { offer_title: string }).offer_title}` : ''}`, req.ip]
     );
 
     const memberData = {
-      ...memberResult.rows[0],
+      ...member,
       phone_number: phone_number || null,
       pin_code_hash: undefined,
       phone_encrypted: undefined,
@@ -284,6 +375,7 @@ export const createMember = async (req: Request, res: Response): Promise<void> =
       success: true,
       data: memberData,
       generated_pin: generatedPin,
+      subscription,
     });
   } catch (error: unknown) {
     await client.query('ROLLBACK');
@@ -381,7 +473,8 @@ export const updateMember = async (req: Request, res: Response): Promise<void> =
   const { id } = req.params;
   const gym_id = req.staff?.gym_id;
   const staff_user_id = req.staff?.staff_user_id;
-  const { full_name, phone_number, email, birth_date, medical_notes, photo_url, gender } = req.body;
+  const { full_name, phone_number, email, birth_date, medical_notes, photo_url, gender,
+    card_code, national_id, emergency_phone, address, notes, allowed_days, sales_rep_id } = req.body;
 
   try {
     // Build dynamic SET clause
@@ -396,6 +489,27 @@ export const updateMember = async (req: Request, res: Response): Promise<void> =
     if (medical_notes !== undefined) { updates.push(`medical_notes = $${idx++}`); params.push(medical_notes || null); }
     if (photo_url !== undefined) { updates.push(`photo_url = $${idx++}`); params.push(photo_url || null); }
     if (gender !== undefined) { updates.push(`gender = $${idx++}`); params.push(gender || null); }
+    if (card_code !== undefined) { updates.push(`card_code = $${idx++}`); params.push((card_code || '').trim() || null); }
+    if (national_id !== undefined) { updates.push(`national_id = $${idx++}`); params.push((national_id || '').trim() || null); }
+    if (emergency_phone !== undefined) { updates.push(`emergency_phone = $${idx++}`); params.push((emergency_phone || '').trim() || null); }
+    if (address !== undefined) { updates.push(`address = $${idx++}`); params.push((address || '').trim() || null); }
+    if (notes !== undefined) { updates.push(`notes = $${idx++}`); params.push((notes || '').trim() || null); }
+    if (allowed_days !== undefined) {
+      const clean = Array.isArray(allowed_days)
+        ? [...new Set(allowed_days.filter((d: unknown) => typeof d === 'string' && ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri'].includes(d)))]
+        : null;
+      updates.push(`allowed_days = $${idx++}`); params.push(clean && clean.length ? clean : null);
+    }
+    if (sales_rep_id !== undefined) {
+      if (sales_rep_id) {
+        const rep = await query(`SELECT id FROM staff_users WHERE id = $1 AND gym_id = $2 AND is_active = true AND deleted_at IS NULL`, [sales_rep_id, gym_id]);
+        if (rep.rows.length === 0) {
+          res.status(400).json({ error: 'Sales rep not found or inactive in this gym.' });
+          return;
+        }
+      }
+      updates.push(`sales_rep_id = $${idx++}`); params.push(sales_rep_id || null);
+    }
 
     if (updates.length === 0) {
       res.status(400).json({ error: 'No fields to update.' });

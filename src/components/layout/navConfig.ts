@@ -36,6 +36,9 @@ export function buildNavItems(base: string, role: UserRole, badges?: NavBadges):
       { label: i18n.t('nav.notifications'), icon: 'notifications', path: `${base}/notifications`, roles: ['super-admin'], section: i18n.t('nav.sectionCommunication') },
       { label: i18n.t('nav.sms'), icon: 'invoices', path: `${base}/sms`, roles: ['super-admin'], section: i18n.t('nav.sectionCommunication') },
       { label: i18n.t('nav.support'), icon: 'messages', path: `${base}/support`, roles: ['super-admin'], section: i18n.t('nav.sectionCommunication') },
+      // §41 — platform marketing (campaigns/referrals/loyalty) is real again:
+      // /platform/marketing/* is proxied and guarded by authenticatePlatformAdmin.
+      { label: i18n.t('nav.marketing'), icon: 'marketing', path: `${base}/marketing`, roles: ['super-admin'], section: i18n.t('nav.sectionCommunication') },
 
       { label: i18n.t('nav.monitor'), icon: 'database', path: `${base}/monitor`, roles: ['super-admin'], section: i18n.t('nav.sectionSystem') },
       { label: i18n.t('nav.security'), icon: 'shield', path: `${base}/security`, roles: ['super-admin'], section: i18n.t('nav.sectionSystem') },
@@ -64,20 +67,20 @@ export function buildNavItems(base: string, role: UserRole, badges?: NavBadges):
       // بوابة الأعضاء = the member-facing login (StaffMemberLoginPage also
       // signs members in) — a real page, not the manager-inaccessible /player.
       { label: i18n.t('sidebar.memberPortal'), icon: 'portal', path: '/team-login', roles: ['gym-admin'], section: i18n.t('sidebar.sectionMembers') },
-      // ── المالية (مدفوعات·مصروفات·ديون·خزنة·شيتات + مبيعات kept per owner) ──
+      // ── المالية (مدفوعات·مصروفات·ديون·خزنة·شيفتات) ──
       // §43 — المدفوعات now opens its own screen (was the /admin/billing hub).
       { label: i18n.t('sidebar.payments'), icon: 'invoices', path: `${base}/payments`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance'), badge: badges?.payments },
       { label: i18n.t('sidebar.expenses'), icon: 'expenses', path: `${base}/expenses`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance') },
-      { label: i18n.t('sidebar.debts'), icon: 'debts', path: `${base}/billing?tab=Debts`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance') },
+      // §45 — الديون now opens its own collection screen (was the billing tab).
+      { label: i18n.t('sidebar.debts'), icon: 'debts', path: `${base}/debts`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance') },
       { label: i18n.t('sidebar.cashbox'), icon: 'cashbox', path: `${base}/cashbox`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance') },
       { label: i18n.t('sidebar.shiftSheets'), icon: 'statements', path: `${base}/cashbox/shifts`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance') },
-      { label: i18n.t('sidebar.sales'), icon: 'sales', path: `${base}/sales`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionFinance'), requiresFeatures: ['products'] },
       // ── التقارير ──
       { label: i18n.t('sidebar.reports'), icon: 'reports', path: `${base}/reports`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionReports'), requiresFeatures: ['daily_reports'] },
-      { label: i18n.t('sidebar.staffSales'), icon: 'sales', path: `${base}/sales?tab=Report`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionReports'), requiresFeatures: ['products'] },
-      // التنبيهات = the real ending-soon view (subscriptions prefiltered via
-      // ?status=ending_soon, same link the dashboard action card uses).
-      { label: i18n.t('sidebar.alerts'), icon: 'alerts', path: `${base}/subscriptions?status=ending_soon`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionReports'), badge: badges?.alerts },
+      { label: i18n.t('sidebar.staffSales'), icon: 'sales', path: `${base}/reports/employee-sales`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionReports'), requiresFeatures: ['products'] },
+      // التنبيهات = مركز الإنذار المبكر (/admin/notifications): 4 كروت
+      // روابط لجداولها (انتهاء اليوم/قريبًا + ديون + مخزون) بنفس مصدر الشارة.
+      { label: i18n.t('sidebar.alerts'), icon: 'alerts', path: `${base}/notifications`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionReports'), badge: badges?.alerts },
       { label: i18n.t('sidebar.announcements'), icon: 'announcements', path: `${base}/marketing?tab=Announcements`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionReports') },
       // ── التشغيل (kept whole per owner) ──
       { label: i18n.t('sidebar.store'), icon: 'products', path: `${base}/products`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionOps'), requiresFeatures: ['products'] },
@@ -87,10 +90,13 @@ export function buildNavItems(base: string, role: UserRole, badges?: NavBadges):
       // strip (its only former entrance) was replaced by stat cards.
       { label: i18n.t('sidebar.growth'), icon: 'analytics', path: `${base}/analytics`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionOps') },
       { label: i18n.t('sidebar.website'), icon: 'website', path: `${base}/website`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionOps'), premium: true },
-      // ── الإعدادات (الباقات·المدربون·المستخدمون·الإعدادات) ──
+      // ── الإعدادات (شئون الموظفين أولًا·الباقات·المدربون·…) ──
+      { label: i18n.t('sidebar.hr'), icon: 'users', path: `${base}/hr`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionSettings') },
       { label: i18n.t('sidebar.plans'), icon: 'package', path: `${base}/plans`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionSettings') },
-      // المدربون = the real coach-filtered staff view inside the Team hub.
-      { label: i18n.t('sidebar.coaches'), icon: 'coaches', path: `${base}/users?tab=staff&role=coach`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionSettings') },
+      // المدربون = صفحة الكروت المستقلة (الحمل والتعاقد والحضور من الدفاتر الحية).
+      { label: i18n.t('sidebar.coaches'), icon: 'coaches', path: `${base}/trainers`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionSettings') },
+      { label: i18n.t('sidebar.trainerAttendance'), icon: 'attendance', path: `${base}/trainer-attendance`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionSettings') },
+      { label: i18n.t('sidebar.privateTraining'), icon: 'coach', path: `${base}/private-training`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionSettings') },
       { label: i18n.t('sidebar.users'), icon: 'team', path: `${base}/users`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionSettings') },
       { label: i18n.t('sidebar.settings'), icon: 'settings', path: `${base}/settings`, roles: ['gym-admin'], section: i18n.t('sidebar.sectionSettings') },
     ];
@@ -108,6 +114,8 @@ export function buildNavItems(base: string, role: UserRole, badges?: NavBadges):
       { label: i18n.t('nav.sessions'), icon: 'shifts', path: `${base}/training/sessions`, roles: ['trainer'], section: i18n.t('nav.sectionTraining') },
       { label: i18n.t('nav.pt'), icon: 'coach', path: `${base}/training/pt`, roles: ['trainer'], section: i18n.t('nav.sectionTraining') },
       { label: i18n.t('nav.clientProgress'), icon: 'reports', path: `${base}/training/clients`, roles: ['trainer'], section: i18n.t('nav.sectionTraining') },
+      // §41 — daily progress log backed by trainer_progress_logs (migration 069).
+      { label: i18n.t('nav.dailyProgress'), icon: 'shifts', path: `${base}/progress`, roles: ['trainer'], section: i18n.t('nav.sectionTraining') },
       { label: i18n.t('nav.trainerApp'), icon: 'leaderboard', path: `${base}/training/mobile`, roles: ['trainer'], section: i18n.t('nav.sectionTraining') },
       { label: i18n.t('nav.settings'), icon: 'settings', path: `${base}/settings`, roles: ['trainer'], section: i18n.t('nav.sectionSettings') },
     ];
@@ -200,9 +208,13 @@ export const PAGE_TITLES: Record<string, PageHeading> = {
     title: { ar: 'المصروفات', en: 'Expenses' },
     subtitle: { ar: 'تتبع مصروفات النادي', en: 'Track club expenses' },
   },
+  '/admin/debts': {
+    title: { ar: 'ديون الأعضاء', en: 'Member Debts' },
+    subtitle: { ar: 'تحصيل الديون: تذكير واتساب ثم سداد كلي أو جزئي', en: 'Collection: WhatsApp reminder, then full or partial payment' },
+  },
   '/admin/cashbox/shifts': {
-    title: { ar: 'تسليم الخزينة', en: 'Shift Handover' },
-    subtitle: { ar: 'تسليم الورديات بين الموظفين', en: 'Shift handover between staff' },
+    title: { ar: 'الشيفتات', en: 'Shifts' },
+    subtitle: { ar: 'سجل الشيفتات وتقرير الإقفال', en: 'Shift log and closing report' },
   },
   '/admin/cashbox': {
     title: { ar: 'الخزينة', en: 'Cashbox' },
@@ -213,8 +225,36 @@ export const PAGE_TITLES: Record<string, PageHeading> = {
     subtitle: { ar: 'المبيعات والمنتجات', en: 'Sales and products' },
   },
   '/admin/reports': {
-    title: { ar: 'التقارير المالية', en: 'Financial Reports' },
-    subtitle: { ar: 'المدفوعات والملخص المالي', en: 'Payments and financial summary' },
+    title: { ar: 'التقارير والإحصائيات', en: 'Reports & Statistics' },
+    subtitle: { ar: 'لوحة مجمّعة — كل رقم مربوط بفترة الفلتر', en: 'Aggregated dashboard — every figure uses the date filter' },
+  },
+  '/admin/notifications': {
+    title: { ar: 'مركز الإنذار المبكر', en: 'Alert Center' },
+    subtitle: { ar: 'انتهاء اليوم وقريبًا والمستحقات والمخزون — view مجمّعة', en: 'Expiring, dues and low stock — aggregated view' },
+  },
+  '/admin/reports/members': {
+    title: { ar: 'تقرير الأعضاء', en: 'Members report' },
+    subtitle: { ar: 'قائمة الأعضاء وحالة الاشتراك', en: 'Member list and subscription status' },
+  },
+  '/admin/reports/financial': {
+    title: { ar: 'التقرير المالي', en: 'Financial report' },
+    subtitle: { ar: 'إجمالي/مصروف/صافي + طرق الدفع + أحدث الحركات', en: 'Totals, methods and latest movements' },
+  },
+  '/admin/reports/attendance': {
+    title: { ar: 'تقرير الحضور', en: 'Attendance report' },
+    subtitle: { ar: 'كروت وترند وذروة وساعات وسجل', en: 'Cards, trend, peaks, hours and log' },
+  },
+  '/admin/reports/subscriptions': {
+    title: { ar: 'تقرير الاشتراكات', en: 'Subscriptions report' },
+    subtitle: { ar: 'قائمة الاشتراكات وحالة الدفع', en: 'Subscription list and payment status' },
+  },
+  '/admin/reports/absent': {
+    title: { ar: 'الأعضاء الغائبون', en: 'Absent members' },
+    subtitle: { ar: 'قائمة إنقاذ مرتبة بالأخطر أولًا', en: 'Rescue list, most critical first' },
+  },
+  '/admin/reports/employee-sales': {
+    title: { ar: 'مبيعات الموظفين', en: 'Employee sales' },
+    subtitle: { ar: 'جديد/تجديد وقيمة ومحصّل وعمولة', en: 'New/renewal, value, collected and commission' },
   },
   '/admin/products': {
     title: { ar: 'المتجر', en: 'Store' },
@@ -223,6 +263,14 @@ export const PAGE_TITLES: Record<string, PageHeading> = {
   '/admin/marketing': {
     title: { ar: 'التسويق', en: 'Marketing' },
     subtitle: { ar: 'أتمتة وإدارة الحملات التسويقية', en: 'Marketing campaign automation and management' },
+  },
+  '/super-admin/marketing': {
+    title: { ar: 'تسويق المنصة', en: 'Platform Marketing' },
+    subtitle: { ar: 'الحملات والإحالات وبرنامج الولاء عبر كل الصالات', en: 'Campaigns, referrals and loyalty across all gyms' },
+  },
+  '/trainer/progress': {
+    title: { ar: 'التقدم اليومي', en: 'Daily Progress' },
+    subtitle: { ar: 'سجل عملك اليومي: عملاء وجلسات ودقائق', en: 'Your daily log: clients, sessions and minutes' },
   },
   '/admin/crm': {
     title: { ar: 'إدارة العملاء المحتملين', en: 'Leads' },
@@ -240,9 +288,73 @@ export const PAGE_TITLES: Record<string, PageHeading> = {
     title: { ar: 'الباقات والعروض', en: 'Plans & Offers' },
     subtitle: { ar: 'مصدر واحد للباقات — يُستخدم في إضافة الأعضاء وفي حساب الإيراد المتكرر', en: 'One source of plans — used by member signup and recurring revenue' },
   },
+  '/admin/plans/add': {
+    title: { ar: 'إضافة باقة', en: 'New plan' },
+    subtitle: { ar: 'هوية الباقة وقواعدها وأيام الحضور', en: 'Plan identity, rules and attendance days' },
+  },
+  '/admin/sports': {
+    title: { ar: 'الرياضات', en: 'Sports' },
+    subtitle: { ar: 'كتالوج رياضات الصالة — تصنيف الباقات والاشتراكات', en: 'Gym sports catalog — plans and subscriptions classification' },
+  },
+  '/admin/quick-session': {
+    title: { ar: 'حصة سريعة', en: 'Quick session' },
+    subtitle: { ar: 'بيع حصة لعضو أو عابر — بلا اشتراك', en: 'Sell a session to a member or walk-in — no subscription' },
+  },
   '/admin/users': {
     title: { ar: 'الفريق', en: 'Team' },
     subtitle: { ar: 'الموظفون والدوام والموارد البشرية في مكان واحد', en: 'Staff, shifts and HR in one place' },
+  },
+  '/admin/trainers': {
+    title: { ar: 'المدربون', en: 'Coaches' },
+    subtitle: { ar: 'الحمل والتعاقد والحضور — كروت من الدفاتر الحية', en: 'Load, contracts and presence — live cards' },
+  },
+  '/admin/trainer-attendance': {
+    title: { ar: 'حضور المدربين', en: 'Coach attendance' },
+    subtitle: { ar: 'تسجيل يدوي وسجل يومي وتقرير شهري — بلا كاميرا', en: 'Manual log, daily record and monthly report — no camera' },
+  },
+  '/admin/trainer-attendance/add': {
+    title: { ar: 'تسجيل حضور مدرب', en: 'Clock in a coach' },
+    subtitle: { ar: 'ضغطة واحدة للحالة الشائعة وفورم للحالات الخاصة', en: 'One tap for the common case, a form for exceptions' },
+  },
+  '/admin/trainer-attendance/report': {
+    title: { ar: 'تقرير حضور المدربين', en: 'Coach attendance report' },
+    subtitle: { ar: 'ملخص شهري: أيام وساعات ونسب — المقام أيام العمل', en: 'Monthly summary: days, hours and rates — working-day base' },
+  },
+  '/admin/private-training': {
+    title: { ar: 'البرايفت (التدريب الخاص)', en: 'Private training' },
+    subtitle: { ar: 'حصص وفلوس معًا — منتج مستقل عن الباقات', en: 'Sessions and money together — independent of plans' },
+  },
+  '/admin/private-training/add': {
+    title: { ar: 'تسجيل برايفت جديد', en: 'New private training' },
+    subtitle: { ar: 'عضو + مدرب + حصص + دفع في حفظ واحد', en: 'Member + coach + sessions + payment in one save' },
+  },
+  '/admin/hr': {
+    title: { ar: 'شئون الموظفين', en: 'HR' },
+    subtitle: { ar: 'الموظفون والحضور والإجازات والرواتب والعقود', en: 'Staff, attendance, leaves, payroll and contracts' },
+  },
+  '/admin/hr/add': {
+    title: { ar: 'إضافة موظف جديد', en: 'New staff' },
+    subtitle: { ar: 'شخصية + وظيفية + راتب + أرصدة', en: 'Personal, job, salary and balances' },
+  },
+  '/admin/hr/attendance': {
+    title: { ar: 'حضور وانصراف الموظفين', en: 'Staff attendance' },
+    subtitle: { ar: 'تحضير يومي بـradio — أسرع من الفورم', en: 'Daily radio register — faster than forms' },
+  },
+  '/admin/hr/leaves': {
+    title: { ar: 'إدارة الإجازات', en: 'Leaves' },
+    subtitle: { ar: 'أرصدة شهرية متجددة وطلبات تُخصم عند الاعتماد', en: 'Renewing balances, deducted on approval' },
+  },
+  '/admin/hr/adjustments': {
+    title: { ar: 'المكافآت والخصومات', en: 'Adjustments' },
+    subtitle: { ar: 'مكافأة وخصم وسلفة تُقفل مع المسير', en: 'Bonuses, deductions and advances closed with payroll' },
+  },
+  '/admin/hr/payroll': {
+    title: { ar: 'إدارة الرواتب', en: 'Payroll' },
+    subtitle: { ar: 'مسودة ← معتمد ← مصروف بحركة خزنة', en: 'Draft, approved, paid with a cashbox entry' },
+  },
+  '/admin/hr/contracts': {
+    title: { ar: 'العقود الوظيفية', en: 'Contracts' },
+    subtitle: { ar: 'أرقام CON- متسلسلة تنتهي تلقائيًا', en: 'Sequential CON- numbers with auto-expiry' },
   },
   '/admin/settings': {
     title: { ar: 'الإعدادات', en: 'Settings' },

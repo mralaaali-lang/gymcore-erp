@@ -25,6 +25,12 @@ export const executeDailySubscriptionCleanupAndAlerts = async (): Promise<void> 
        WHERE status = 'frozen' AND freeze_end_date < CURRENT_DATE`
     );
 
+    // عقود HR المنتهية تُقلب تلقائيًا (الحالة لا تتحدث بانتهاء التاريخ وحدها)
+    const expiredContracts = await client.query(
+      `UPDATE hr_contracts SET status = 'expired'
+       WHERE status = 'active' AND end_date IS NOT NULL AND end_date < CURRENT_DATE`
+    );
+
     if (unfrozenResult.rowCount !== null && unfrozenResult.rowCount > 0) {
       logger.info(`Auto-unfrozen ${unfrozenResult.rowCount} subscriptions`, { count: unfrozenResult.rowCount });
     }

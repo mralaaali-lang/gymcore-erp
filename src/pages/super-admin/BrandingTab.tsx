@@ -54,6 +54,7 @@ export default function BrandingTab() {
     mutationFn: (branding: Partial<PlatformBranding>) => updatePlatformBranding(branding),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform', 'branding'] });
+      queryClient.invalidateQueries({ queryKey: ['branding', 'public'] });
       showToast(isRtl ? 'تم حفظ العلامة التجارية بنجاح' : 'Branding saved successfully', 'success');
     },
     onError: () => {

@@ -56,6 +56,7 @@ export default function StaffDirectory() {
   const [role, setRole] = useState('manager');
   const [phone, setPhone] = useState('');
   const [salary, setSalary] = useState('');
+  const [commission, setCommission] = useState('');
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['staff'],
@@ -74,6 +75,8 @@ export default function StaffDirectory() {
       role,
       phone: phone || undefined,
       salary: salary ? Number(salary) : undefined,
+      // العمولة تُضبط من أول يوم — إنشاؤها صفرًا دائمًا كان يطفئ الفيتشر
+      commission_pct: commission === '' ? 0 : Math.min(100, Math.max(0, Number(commission))),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff'] });
@@ -88,6 +91,7 @@ export default function StaffDirectory() {
       role,
       phone: phone || undefined,
       salary: salary ? Number(salary) : undefined,
+      commission_pct: commission === '' ? undefined : Math.min(100, Math.max(0, Number(commission))),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff'] });
@@ -109,6 +113,7 @@ export default function StaffDirectory() {
     setRole('manager');
     setPhone('');
     setSalary('');
+    setCommission('');
   };
 
   const openEdit = (user: StaffData) => {
@@ -118,6 +123,7 @@ export default function StaffDirectory() {
     setRole(user.role);
     setPhone(user.phone || '');
     setSalary(user.salary?.toString() || '');
+    setCommission(user.commission_pct != null && user.commission_pct !== '' ? String(Number(user.commission_pct)) : '');
     setPassword('');
     setShowForm(true);
   };
@@ -130,6 +136,7 @@ export default function StaffDirectory() {
     setRole('manager');
     setPhone('');
     setSalary('');
+    setCommission('');
     setShowForm(true);
   };
 
@@ -191,6 +198,7 @@ export default function StaffDirectory() {
                 <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الدور' : 'Role'}</th>
                 <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الجوال' : 'Phone'}</th>
                 <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الراتب' : 'Salary'}</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'العمولة %' : 'Commission %'}</th>
                 <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الحالة' : 'Status'}</th>
                 <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الإجراءات' : 'Actions'}</th>
               </tr>
@@ -198,7 +206,7 @@ export default function StaffDirectory() {
             <tbody>
               {staff.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-12 text-center">
+                  <td colSpan={9} className="p-12 text-center">
                     <span className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
                       <span className="material-symbols-outlined text-3xl text-gray-400">group</span>
                     </span>
@@ -223,6 +231,7 @@ export default function StaffDirectory() {
                   </td>
                   <td className="p-4 text-gray-500" dir="ltr">{u.phone || '—'}</td>
                   <td className="p-4 font-medium text-gray-900">{u.salary ? money(u.salary) : '—'}</td>
+                  <td className="p-4 text-gray-600 tabular-nums">{u.commission_pct != null && Number(u.commission_pct) > 0 ? `${Number(u.commission_pct)}%` : '—'}</td>
                   <td className="p-4">
                     <StatusBadge status={u.is_active ? (rtl ? 'نشط' : 'Active') : (rtl ? 'غير نشط' : 'Inactive')} variant={u.is_active ? 'success' : 'error'} />
                   </td>
@@ -286,6 +295,11 @@ export default function StaffDirectory() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الراتب' : 'Salary'}</label>
                 <input type="number" value={salary} onChange={(e) => setSalary(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'نسبة العمولة %' : 'Commission %'}</label>
+                <input type="number" min={0} max={100} step="0.5" value={commission} onChange={(e) => setCommission(e.target.value)}
+                  placeholder="0" className={inputCls} />
               </div>
             </div>
             <div className="flex gap-3 mt-6">

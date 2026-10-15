@@ -99,7 +99,7 @@ async function performCheckIn(
   res: Response
 ): Promise<void> {
   const statusCheck = await query(
-    `SELECT m.id, m.full_name, decrypt_sensitive(m.phone_encrypted) as phone_number, m.is_blacklisted, s.status, s.end_date
+    `SELECT m.id, m.full_name, decrypt_sensitive(m.phone_encrypted) as phone_number, m.is_blacklisted, m.allowed_days, s.status, s.end_date
      FROM members m
      LEFT JOIN LATERAL (
        SELECT status, end_date FROM member_subscriptions
@@ -122,10 +122,85 @@ async function performCheckIn(
     return;
   }
 
+  // سياسة الدخول من الإعدادات (grid واحد): سماح بعد الانتهاء + دخول بلا
+  // اشتراك + مواعيد العمل + أيام التشغيل. الفارغ = بلا قيد.
+  let graceDays = 0;
+  let allowNoSub = false;
+  let workOpen: string | null = null;
+  let workClose: string | null = null;
+  let workDays: string[] | null = null;
+  try {
+    const pol = await query(
+      `SELECT setting_key, setting_value FROM gym_settings
+       WHERE gym_id = $1 AND setting_key IN
+         ('sub_grace_days', 'allow_no_sub', 'work_open', 'work_close', 'work_days')`,
+      [gym_id]
+    );
+    for (const row of pol.rows) {
+      const v = String(row.setting_value ?? '').trim();
+      if (row.setting_key === 'sub_grace_days') {
+        const n = parseInt(v, 10);
+        if (Number.isFinite(n) && n > 0) graceDays = Math.min(n, 90);
+      }
+      if (row.setting_key === 'allow_no_sub') allowNoSub = v === 'true';
+      if (row.setting_key === 'work_open' && /^\d{2}:\d{2}/.test(v)) workOpen = v.slice(0, 5);
+      if (row.setting_key === 'work_close' && /^\d{2}:\d{2}/.test(v)) workClose = v.slice(0, 5);
+      if (row.setting_key === 'work_days' && v) {
+        const list = v.split(',').map((d) => d.trim()).filter(Boolean);
+        if (list.length > 0 && list.length < 7) workDays = list;
+      }
+    }
+  } catch { /* permissive defaults stand */ }
+
+  if (workOpen && workClose) {
+    const nowRes = await query(`SELECT now()::time AS t, EXTRACT(DOW FROM CURRENT_DATE)::int AS dow`);
+    const now = String(nowRes.rows[0]?.t ?? '').slice(0, 5);
+    const inHours = workOpen <= workClose
+      ? (now >= workOpen && now <= workClose)
+      : (now >= workOpen || now <= workClose);
+    if (!inHours) {
+      res.status(403).json({ error: `Access Denied. خارج مواعيد العمل (${workOpen}–${workClose}).` });
+      return;
+    }
+    if (workDays) {
+      const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      if (!workDays.includes(dayMap[Number(nowRes.rows[0]?.dow ?? -1)] ?? '')) {
+        res.status(403).json({ error: 'Access Denied. الصالة مغلقة اليوم.' });
+        return;
+      }
+    }
+  }
+
   if (!member.status || member.status !== 'active') {
-    const reason = !member.status ? 'no active subscription found' : `subscription is ${member.status}`;
-    res.status(403).json({ error: `Access Denied. ${reason}.` });
-    return;
+    if (member.status === 'frozen' || member.status === 'cancelled') {
+      res.status(403).json({ error: `Access Denied. subscription is ${member.status}.` });
+      return;
+    }
+    const endLeft = member.end_date ? member.end_date : null;
+    let graced = false;
+    if (graceDays > 0 && endLeft) {
+      const g = await query(`SELECT $1::date >= CURRENT_DATE - ($2 || ' days')::interval AS ok`, [endLeft, graceDays]);
+      graced = g.rows[0]?.ok === true;
+    }
+    if (!graced && !(allowNoSub && !member.status)) {
+      const reason = !member.status ? 'no active subscription found' : `subscription is ${member.status}`;
+      res.status(403).json({ error: `Access Denied. ${reason}.` });
+      return;
+    }
+  }
+
+  // أيام الحضور المسموحة للعضو (فارغ = كل الأيام) — تمنع بصمة/يدوي معًا
+  // لأن كل المسارات تمر هنا. اليوم بتوقيت قاعدة البيانات (نفس عرف
+  // «حضر اليوم» الحالي في هذه الشاشة).
+  const allowedDays = member.allowed_days as string[] | null;
+  if (allowedDays && allowedDays.length > 0) {
+    const dowRes = await query(`SELECT EXTRACT(DOW FROM CURRENT_DATE)::int AS dow`);
+    const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const today = dayMap[Number(dowRes.rows[0]?.dow ?? -1)] ?? '';
+    if (!allowedDays.includes(today)) {
+      res.status(403).json({ error: 'Access Denied. اليوم خارج أيام الحضور المسموحة لهذا العضو.' });
+      return;
+    }
   }
 
   const todayCheck = await query(
@@ -282,7 +357,7 @@ export const getTodayAttendance = async (req: Request, res: Response): Promise<v
        FROM attendance_logs al
        JOIN members m ON al.member_id = m.id
        LEFT JOIN staff_users su ON al.verified_by_staff_id = su.id
-       WHERE al.gym_id = $1 AND al.check_in_time::date = COALESCE($2::date, CURRENT_DATE)
+       WHERE al.gym_id = $1 AND al.deleted_at IS NULL AND al.check_in_time::date = COALESCE($2::date, CURRENT_DATE)
        ORDER BY al.check_in_time DESC`,
       [gym_id, dateFilter]
     );

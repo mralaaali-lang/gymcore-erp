@@ -12,6 +12,74 @@ if (!fs.existsSync(BACKUPS_DATA_DIR)) {
 
 // ─── Tenant Data Backup (SQL/JSON dump) ────────────────────
 
+// النواة القابلة لإعادة الاستخدام: نسخة صالة برقمها — تُستدعى من الـendpoint
+// ومن cron النسخ التلقائي اليومي (backup_auto_daily) بنفس المنطق.
+export async function runTenantBackup(gymId: string, actor: string | null): Promise<{ folder: string; records: number; summary: Record<string, number> }> {
+  const gymResult = await query(`SELECT id, name FROM gyms WHERE id = $1`, [gymId]);
+  if (gymResult.rows.length === 0) throw new Error('Gym not found.');
+  const gymName = gymResult.rows[0].name;
+  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  const folderName = `${gymName.replace(/\s+/g, '_')}_${ts}`;
+  const dumpDir = path.join(BACKUPS_DATA_DIR, folderName);
+  fs.mkdirSync(dumpDir, { recursive: true });
+
+  // Tables to export (gym-scoped). pos_order_items has no gym_id —
+  // it is scoped through its parent pos_orders.
+  const tables = [
+    'members', 'member_subscriptions', 'membership_offers', 'attendance_logs',
+    'products', 'pos_orders', 'pos_order_items', 'expense_categories',
+    'financial_transactions', 'staff_shifts', 'payroll_ledger',
+    'fitness_classes', 'class_bookings', 'pending_actions', 'activity_logs',
+  ];
+
+  // created_at is not present on every table — order by it only when it exists.
+  const colsRes = await query(
+    `SELECT table_name FROM information_schema.columns
+     WHERE table_schema = 'public' AND column_name = 'created_at' AND table_name = ANY($1)`,
+    [tables]
+  );
+  const withCreated = new Set(colsRes.rows.map((r: any) => r.table_name));
+
+  for (const table of tables) {
+    const orderBy = withCreated.has(table) ? 'ORDER BY created_at' : 'ORDER BY id';
+    const result = table === 'pos_order_items'
+      ? await query(
+          `SELECT poi.* FROM pos_order_items poi
+           JOIN pos_orders po ON po.id = poi.order_id
+           WHERE po.gym_id = $1 ${orderBy.replace('created_at', 'poi.created_at').replace('id', 'poi.id')}`,
+          [gymId]
+        )
+      : await query(`SELECT * FROM ${table} WHERE gym_id = $1 ${orderBy}`, [gymId]);
+    const filePath = path.join(dumpDir, `${table}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(result.rows, null, 2), 'utf-8');
+  }
+
+  // Write metadata (includes gym_id for ownership verification)
+  const meta = { gym_id: gymId, gym_name: gymName, created_at: new Date().toISOString() };
+  fs.writeFileSync(path.join(dumpDir, '_meta.json'), JSON.stringify(meta, null, 2), 'utf-8');
+
+  // Generate aggregate summary
+  const summary: Record<string, number> = {};
+  for (const table of tables) {
+    const filePath = path.join(dumpDir, `${table}.json`);
+    const rows = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    summary[table] = rows.length;
+  }
+
+  fs.writeFileSync(path.join(dumpDir, '_summary.json'), JSON.stringify(summary, null, 2), 'utf-8');
+
+  // Log backup activity
+  await query(
+    `INSERT INTO activity_logs (gym_id, staff_user_id, action_description, ip_address)
+     VALUES ($1, $2, $3, $4)`,
+    [gymId, null, `Tenant data backup: ${folderName} (auto=${actor === 'cron'})`, actor === 'cron' ? 'system' : null],
+  );
+
+  logger.info(`Tenant backup created`, { gymId, folder: folderName });
+  const records = Object.values(summary).reduce((a, b) => a + b, 0);
+  return { folder: folderName, records, summary };
+}
+
 export const createTenantBackup = async (req: Request, res: Response): Promise<void> => {
   const gym_id = req.staff?.gym_id;
 
@@ -30,79 +98,12 @@ export const createTenantBackup = async (req: Request, res: Response): Promise<v
   }
 
   try {
-    // Verify the gym exists
-    const gymResult = await query(`SELECT id, name FROM gyms WHERE id = $1`, [targetGymId]);
-    if (gymResult.rows.length === 0) {
-      res.status(404).json({ error: 'Gym not found.' });
-      return;
-    }
-
-    const gymName = gymResult.rows[0].name;
-    const ts = new Date().toISOString().replace(/[:.]/g, '-');
-    const folderName = `${gymName.replace(/\s+/g, '_')}_${ts}`;
-    const dumpDir = path.join(BACKUPS_DATA_DIR, folderName);
-    fs.mkdirSync(dumpDir, { recursive: true });
-
-    // Tables to export (gym-scoped). pos_order_items has no gym_id —
-    // it is scoped through its parent pos_orders.
-    const tables = [
-      'members', 'member_subscriptions', 'membership_offers', 'attendance_logs',
-      'products', 'pos_orders', 'pos_order_items', 'expense_categories',
-      'financial_transactions', 'staff_shifts', 'payroll_ledger',
-      'fitness_classes', 'class_bookings', 'pending_actions', 'activity_logs',
-    ];
-
-    // created_at is not present on every table — order by it only when it exists.
-    const colsRes = await query(
-      `SELECT table_name FROM information_schema.columns
-       WHERE table_schema = 'public' AND column_name = 'created_at' AND table_name = ANY($1)`,
-      [tables]
-    );
-    const withCreated = new Set(colsRes.rows.map((r: any) => r.table_name));
-
-    for (const table of tables) {
-      const orderBy = withCreated.has(table) ? 'ORDER BY created_at' : 'ORDER BY id';
-      const result = table === 'pos_order_items'
-        ? await query(
-            `SELECT poi.* FROM pos_order_items poi
-             JOIN pos_orders po ON po.id = poi.order_id
-             WHERE po.gym_id = $1 ${orderBy.replace('created_at', 'poi.created_at').replace('id', 'poi.id')}`,
-            [targetGymId]
-          )
-        : await query(`SELECT * FROM ${table} WHERE gym_id = $1 ${orderBy}`, [targetGymId]);
-      const filePath = path.join(dumpDir, `${table}.json`);
-      fs.writeFileSync(filePath, JSON.stringify(result.rows, null, 2), 'utf-8');
-    }
-
-    // Write metadata (includes gym_id for ownership verification)
-    const meta = { gym_id: targetGymId, gym_name: gymName, created_at: new Date().toISOString() };
-    fs.writeFileSync(path.join(dumpDir, '_meta.json'), JSON.stringify(meta, null, 2), 'utf-8');
-
-    // Generate aggregate summary
-    const summary: Record<string, number> = {};
-    for (const table of tables) {
-      const filePath = path.join(dumpDir, `${table}.json`);
-      const rows = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-      summary[table] = rows.length;
-    }
-
-    fs.writeFileSync(path.join(dumpDir, '_summary.json'), JSON.stringify(summary, null, 2), 'utf-8');
-
-    // Log backup activity
-    await query(
-      `INSERT INTO activity_logs (gym_id, staff_user_id, action_description, ip_address)
-       VALUES ($1, $2, $3, $4)`,
-      [targetGymId, req.staff?.staff_user_id, `Created tenant data backup: ${folderName}`, req.ip],
-    );
-
-    logger.info(`Tenant backup created`, { gymId: targetGymId, folder: folderName });
-
+    const { folder, records, summary } = await runTenantBackup(targetGymId, req.staff?.staff_user_id ?? null);
     res.status(201).json({
       success: true,
-      folder: folderName,
-      path: dumpDir,
+      folder,
       summary,
-      message: `Backup created for ${gymName} (${Object.values(summary).reduce((a, b) => a + b, 0)} records across ${tables.length} tables).`,
+      message: `Backup created (${folder}, ${records} records).`,
     });
   } catch (error) {
     logger.error('Failed to create tenant backup', { error: (error as Error).message });

@@ -145,8 +145,30 @@ export const toggleMobileSubscriptionFreeze = async (req: Request, res: Response
   const member_id = req.staff?.member_id;
   const gym_id = req.staff?.gym_id;
 
-  if (!subscription_id || !freeze_days || freeze_days <= 0 || freeze_days > 30) {
-    res.status(400).json({ error: 'Valid Subscription ID and freeze days (1-30) are required.' });
+  if (!subscription_id || !freeze_days || freeze_days <= 0) {
+    res.status(400).json({ error: 'Valid Subscription ID and freeze days are required.' });
+    return;
+  }
+
+  // سياسة التجميد من الإعدادات: حد أقصى + هل يمدد تاريخ الانتهاء
+  let freezeMax = 30;
+  let freezeExtends = true;
+  try {
+    const s = await query(
+      `SELECT setting_key, setting_value FROM gym_settings
+       WHERE gym_id = $1 AND setting_key IN ('member_freeze_days_max', 'freeze_extend_end')`,
+      [gym_id]
+    );
+    for (const row of s.rows) {
+      if (row.setting_key === 'member_freeze_days_max') {
+        const v = parseInt(String(row.setting_value), 10);
+        if (Number.isFinite(v) && v >= 0) freezeMax = Math.min(v, 365);
+      }
+      if (row.setting_key === 'freeze_extend_end') freezeExtends = String(row.setting_value) !== 'false';
+    }
+  } catch { /* defaults stand */ }
+  if (freeze_days > freezeMax) {
+    res.status(400).json({ error: `Freeze days exceed the gym limit (${freezeMax}).` });
     return;
   }
 
@@ -181,10 +203,12 @@ export const toggleMobileSubscriptionFreeze = async (req: Request, res: Response
 
     const result = await query(
       `UPDATE member_subscriptions
-       SET status = 'frozen', is_frozen = true, freeze_start_date = $1, freeze_end_date = $2,
-           end_date = end_date + ($3::integer * INTERVAL '1 day')
+       SET status = 'frozen', is_frozen = true, freeze_start_date = $1, freeze_end_date = $2
+           ${freezeExtends ? `, end_date = end_date + ($3::integer * INTERVAL '1 day')` : ''}
        WHERE id = $4 RETURNING id, status, end_date`,
-      [freeze_start_date.toISOString().split('T')[0], freeze_end_date.toISOString().split('T')[0], freeze_days, subscription_id]
+      freezeExtends
+        ? [freeze_start_date.toISOString().split('T')[0], freeze_end_date.toISOString().split('T')[0], freeze_days, subscription_id]
+        : [freeze_start_date.toISOString().split('T')[0], freeze_end_date.toISOString().split('T')[0], subscription_id]
     );
 
     res.status(200).json({

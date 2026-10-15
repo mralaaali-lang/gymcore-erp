@@ -1,3 +1,8 @@
+import { useApiQuery } from '../../../hooks/useApiQuery';
+import { listSports, type GymSport } from '../../../services/api';
+
+export type { GymSport };
+
 /**
  * §34ي — صفحة الاشتراكات: قوائم ثابتة واحدة يقرأ منها السيرفر نفس القيم
  * (SPORTS/WEEK_DAYS تطابق enums في createSubscriptionSchema). هذه تسميات
@@ -39,6 +44,46 @@ export function sportLabel(code?: string | null, rtl = true): string {
   if (!s) return '—';
   return rtl ? s.ar : s.en;
 }
+
+/** شبكة الأيقونات الـ12 لصفحة الرياضات (Material Symbols — تُخزَّن بالاسم). */
+export const SPORT_ICONS = [
+  { name: 'fitness_center', ar: 'دمبل' },
+  { name: 'favorite', ar: 'قلب' },
+  { name: 'sports_mma', ar: 'قبضة' },
+  { name: 'pool', ar: 'سباحة' },
+  { name: 'directions_bike', ar: 'دراجة' },
+  { name: 'sports_soccer', ar: 'كورة' },
+  { name: 'emoji_events', ar: 'ميدالية' },
+  { name: 'music_note', ar: 'موسيقى' },
+  { name: 'self_improvement', ar: 'تأمل' },
+  { name: 'directions_run', ar: 'جري' },
+  { name: 'sports_tennis', ar: 'تنس' },
+  { name: 'sports_basketball', ar: 'سلة' },
+] as const;
+
+/** اسم الرياضة من الكتالوج الحي — fallback للثابت القديم ثم الكود نفسه. */
+export function sportName(code?: string | null, catalog?: GymSport[], rtl = true): string {
+  const hit = catalog?.find((s) => s.code === code);
+  if (hit) {
+    if (rtl) return hit.name_ar;
+    return SPORTS.find((x) => x.code === code)?.en ?? hit.name_ar;
+  }
+  return sportLabel(code, rtl);
+}
+
+/** الكتالوج الحي للرياضات — query key واحد يشترك فيه كل المستهلكين. */
+export function useSportsCatalog() {
+  const { data, isLoading } = useApiQuery(['sports'], listSports, { staleTime: 60_000 });
+  const sports = data?.data ?? [];
+  return { sports, isLoading, active: sports.filter((s) => s.is_active) };
+}
+
+/** دوائر الألوان لصفحة الرياضات (صف أول 10 + رمادي/تركواز). */
+export const SPORT_COLORS = [
+  '#0284c7', '#f97316', '#ef4444', '#8b5cf6', '#22c55e',
+  '#eab308', '#ec4899', '#14b8a6', '#6366f1', '#84cc16',
+  '#6b7280', '#06b6d4',
+] as const;
 
 export function paymentMethodLabel(code?: string | null): string {
   const m = PAYMENT_METHODS.find((x) => x.code === code);

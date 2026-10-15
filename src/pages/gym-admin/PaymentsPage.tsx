@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
@@ -8,10 +7,10 @@ import { createPayment, listMembers, listPayments } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
 import { formatDate, fmtNum, formatTime } from '../../utils/date';
 import { escapeHtml, printDocument } from '../../utils/print';
-import { PrimaryAction, SecondaryAction, StatCard, Panel, EmptyState } from '../../components/dashboard';
+import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
 import {
-  Plus, ShoppingCart, CalendarPlus, FileText, X,
+  Plus, FileText, X,
   Wallet, Banknote, HandCoins, Smartphone, Receipt,
 } from 'lucide-react';
 
@@ -62,7 +61,6 @@ const PAGE_LIMIT = 100;
 export default function PaymentsPage() {
   const { language, role, gymProfile } = useApp();
   const { showToast } = useToast();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const rtl = language === 'ar';
 
@@ -147,25 +145,9 @@ export default function PaymentsPage() {
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6 bg-gray-50 min-h-screen -m-6 p-6">
-      {/* §35ث — title/subtitle live in the top bar; actions stay here (§43):
-          quick actions + orange «تسجيل دفعة» + PDF. */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          {role === 'gym-admin' && (
-            <>
-              <PrimaryAction onClick={() => navigate('/admin/members/add')}>
-                <Plus size={16} /> {rtl ? 'مشترك' : 'Member'}
-              </PrimaryAction>
-              <SecondaryAction onClick={() => navigate('/admin/sales')}>
-                <ShoppingCart size={16} /> {rtl ? 'بيع' : 'Sell'}
-              </SecondaryAction>
-              <SecondaryAction onClick={() => navigate('/admin/gym')}>
-                <CalendarPlus size={16} /> {rtl ? 'حصة' : 'Class'}
-              </SecondaryAction>
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* §35ث — title/subtitle live in the top bar; the quick actions
+          (مشترك/بيع/حصة) were removed by owner request — PDF + record remain. */}
+      <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={exportPdf}
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl px-3.5 py-2 hover:bg-gray-50 transition min-h-[44px]"
@@ -183,7 +165,6 @@ export default function PaymentsPage() {
             </button>
           )}
         </div>
-      </div>
 
       {/* Four summary cards — RTL start at the right, computed over the
           applied DATE RANGE (the method filter never changes them). */}

@@ -9,14 +9,15 @@ import { useApiQuery } from '../../hooks/useApiQuery';
 import { getEnrollmentTrend, getPeakHours, getRevenueBreakdown, getBusinessMetrics } from '../../services/analytics';
 import {
   listMembers, getFinanceSummary, listLeads,
-  getExpiringSoon, getInactiveMembers, getOverdueDebts,
+  getExpiringSoon, getInactiveMembers, getOverdueDebts, getSettings,
 } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
 import {
-  Gift, TrendingUp, Users, DollarSign, Clock, AlertTriangle, UserX, UserPlus,
-  ChevronLeft, CreditCard, Wallet, ShoppingCart, BarChart3, Banknote, DoorOpen,
+  TrendingUp, Users, DollarSign, Clock, AlertTriangle, UserX, UserPlus,
+  ChevronLeft, CreditCard, Wallet, ShoppingCart, BarChart3, Banknote, Dumbbell,
 } from 'lucide-react';
 import { StatCard, Panel, Banner, DashboardPage } from '../../components/dashboard';
+import MarketingCards from '../../components/marketing/MarketingCards';
 import { QuickActionModals, type ActionKey } from '../../components/dashboard/QuickActionCenter';
 import CheckInCard from '../../components/attendance/CheckInCard';
 
@@ -55,12 +56,12 @@ function QuickCard({
   return (
     <button
       onClick={onClick}
-      className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4 flex flex-col items-center justify-center gap-2 min-h-[96px] hover:shadow-md hover:border-gray-200 transition-all active:scale-[0.98] cursor-pointer"
+      className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4 flex flex-col items-center justify-center gap-2 min-h-[96px] hover:shadow-md hover:border-gray-200 transition-all active:scale-[0.98] cursor-pointer [container-type:inline-size]"
     >
       <span className={`w-11 h-11 rounded-2xl flex items-center justify-center ${soft[accent]}`}>
         <Icon size={22} strokeWidth={1.75} />
       </span>
-      <span className="text-sm font-bold text-gray-900 text-center leading-tight">{label}</span>
+      <span className="font-bold text-gray-900 text-center leading-tight whitespace-nowrap text-[clamp(11px,4cqw,14px)]">{label}</span>
     </button>
   );
 }
@@ -130,7 +131,7 @@ function ActionCard({
 }
 
 export default function GymAdminDashboard() {
-  const { isZeroState, gymProfile, account, language } = useApp();
+  const { isZeroState, gymProfile, language } = useApp();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const currency = gymProfile?.currency;
@@ -196,6 +197,9 @@ export default function GymAdminDashboard() {
     () => listLeads({ status: 'new', limit: 5 }),
     { staleTime: 60_000 }
   );
+  // مفتاح تنبيه الغياب: الكارت المطفأ يختفي من مهام اليوم
+  const { data: settingsRes } = useApiQuery(['settings'], getSettings, { staleTime: 5 * 60_000 });
+  const showInactive = (settingsRes?.data?.notify_absence ?? 'true') === 'true';
 
   const totalMembers = membersRes?.total ?? 0;
   const fin = financeRes?.data;
@@ -252,6 +256,7 @@ export default function GymAdminDashboard() {
             label={t('dashboard.subscriptions', 'الاشتراكات')}
             value={biz ? String(biz.active_members) : '—'}
             sub={`${expiring?.total ?? 0} ${t('dashboard.expiring7d', 'تنتهي')}`}
+            subTone="red"
             accent="violet"
             onClick={() => navigate('/admin/subscriptions')}
           />
@@ -274,13 +279,20 @@ export default function GymAdminDashboard() {
           )}
         </div>
 
-        {/* §35ت — the six daily actions, real endpoints/modals only (replaces QuickActionBar) */}
+        {/* §35ت — the six daily actions, real endpoints/modals only (replaces QuickActionBar).
+            «حصة» أول كارت بطلب صاحب المشروع (جدول الحصص اليومي). */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-5">
+          <QuickCard
+            icon={Dumbbell}
+            label={t('dashboard.quickClass', 'حصة سريعة')}
+            accent="rose"
+            onClick={() => navigate('/admin/quick-session')}
+          />
           <QuickCard
             icon={UserPlus}
             label={t('dashboard.newMember', 'مشترك جديد')}
             accent="emerald"
-            onClick={() => setAction('member')}
+            onClick={() => navigate('/admin/members/add')}
           />
           <QuickCard
             icon={CreditCard}
@@ -301,12 +313,6 @@ export default function GymAdminDashboard() {
             label={t('dashboard.payment', 'دفعة')}
             accent="amber"
             onClick={() => setAction('payment')}
-          />
-          <QuickCard
-            icon={DoorOpen}
-            label={t('dashboard.attendance', 'الحضور')}
-            accent="rose"
-            onClick={() => navigate('/admin/attendance')}
           />
           <QuickCard
             icon={BarChart3}
@@ -386,7 +392,7 @@ export default function GymAdminDashboard() {
               subtitle={overdue && overdue.total_amount > 0 ? formatMoney(Number(overdue.total_amount), currency) : undefined}
               count={overdue?.data.length ?? 0}
               accent="rose"
-              to="/admin/billing?tab=Debts"
+              to="/admin/debts"
               rows={(overdue?.data ?? []).slice(0, 4).map((r) => ({
                 key: r.id,
                 primary: r.member_name,
@@ -394,6 +400,7 @@ export default function GymAdminDashboard() {
               }))}
               emptyText={t('dashboard.noOverduePayments')}
             />
+            {showInactive && (
             <ActionCard
               icon={UserX}
               title={t('dashboard.inactiveMembers', 'أعضاء غائبون 14+ يوم')}
@@ -409,6 +416,7 @@ export default function GymAdminDashboard() {
               }))}
               emptyText={t('dashboard.allClearInactive', 'كل الأعضاء النشطين يحضرون بانتظام')}
             />
+            )}
             <ActionCard
               icon={UserPlus}
               title={t('dashboard.newLeads', 'عملاء محتملون بحاجة لمتابعة')}
@@ -424,6 +432,10 @@ export default function GymAdminDashboard() {
             />
           </div>
         </div>
+
+        {/* الكروت الثلاثة من تاب التسويق — بعد كارت العملاء المحتملين مباشرة
+            (نفس المكوّن ونفس endpoint التسويق، بلا ازدواج). */}
+        <MarketingCards />
 
         {/* ── Row 3: analytics (only cards with real data) ── */}
         <div>
@@ -466,13 +478,7 @@ export default function GymAdminDashboard() {
           </div>
         </div>
 
-        {/* Account footer — who is logged in (from /auth/me, no platform call) */}
-        {account?.full_name && (
-          <p className="text-xs text-gray-400 flex items-center gap-1.5">
-            <Gift size={13} />
-            {account.full_name}{account.email ? ` · ${account.email}` : ''}
-          </p>
-        )}
+        {/* Account footer removed by owner request (was mistaken for vendor credit) */}
       </DashboardPage>
 
       {/* Centered popups for every quick action (member/staff/check-in/today/payment/expense) */}

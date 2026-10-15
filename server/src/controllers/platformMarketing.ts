@@ -10,6 +10,12 @@ function getErrorMessage(error: unknown): string {
 // ====================================================================
 // MARKETING CAMPAIGNS
 // ====================================================================
+// Columns validated against marketing_campaigns (migration 045): the old
+// insert used description/scheduled_at which do not exist — the real
+// schedule fields are start_date/end_date.
+const CAMPAIGN_TYPES = ['email', 'sms', 'whatsapp', 'referral', 'social'];
+const CAMPAIGN_STATUSES = ['draft', 'scheduled', 'active', 'paused', 'completed', 'cancelled'];
+
 export const listCampaigns = async (_req: Request, res: Response): Promise<void> => {
   const client = await getAdminClient();
   try {
@@ -29,14 +35,15 @@ export const listCampaigns = async (_req: Request, res: Response): Promise<void>
 };
 
 export const createCampaign = async (req: Request, res: Response): Promise<void> => {
-  const { name, name_ar, type, description, budget, scheduled_at, target_audience, gym_id } = req.body;
+  const { name, name_ar, type, budget, start_date, end_date, target_audience, gym_id } = req.body;
   if (!name || !type) { res.status(400).json({ error: 'name and type are required' }); return; }
+  if (!CAMPAIGN_TYPES.includes(type)) { res.status(400).json({ error: `type must be one of: ${CAMPAIGN_TYPES.join(', ')}` }); return; }
   const client = await getAdminClient();
   try {
     const result = await client.query(
-      `INSERT INTO marketing_campaigns (name, name_ar, type, description, budget, scheduled_at, target_audience, gym_id, status)
+      `INSERT INTO marketing_campaigns (name, name_ar, type, budget, start_date, end_date, target_audience, gym_id, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'draft') RETURNING *`,
-      [name, name_ar || null, type, description || null, budget || 0, scheduled_at || null, JSON.stringify(target_audience || {}), gym_id || null]
+      [name, name_ar || null, type, budget || 0, start_date || null, end_date || null, JSON.stringify(target_audience || {}), gym_id || null]
     );
     await client.query('COMMIT');
     res.status(201).json({ data: result.rows[0] });
@@ -51,6 +58,7 @@ export const createCampaign = async (req: Request, res: Response): Promise<void>
 export const updateCampaignStatus = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
   const { status } = req.body;
+  if (!CAMPAIGN_STATUSES.includes(status)) { res.status(400).json({ error: `status must be one of: ${CAMPAIGN_STATUSES.join(', ')}` }); return; }
   const client = await getAdminClient();
   try {
     const result = await client.query(
@@ -102,14 +110,16 @@ export const listEmailTemplates = async (_req: Request, res: Response): Promise<
 };
 
 export const createEmailTemplate = async (req: Request, res: Response): Promise<void> => {
-  const { name, name_ar, subject, subject_ar, body_html, type, variables } = req.body;
+  // marketing_email_templates (045) has no name_ar column — subject_ar/body_text
+  // are the real localized fields; the old insert 500'd on name_ar.
+  const { name, subject, subject_ar, body_html, body_text, type, variables } = req.body;
   if (!name || !subject || !body_html) { res.status(400).json({ error: 'name, subject and body_html are required' }); return; }
   const client = await getAdminClient();
   try {
     const result = await client.query(
-      `INSERT INTO marketing_email_templates (name, name_ar, subject, subject_ar, body_html, type, variables)
+      `INSERT INTO marketing_email_templates (name, subject, subject_ar, body_html, body_text, type, variables)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [name, name_ar || null, subject, subject_ar || null, body_html, type || 'custom', JSON.stringify(variables || [])]
+      [name, subject, subject_ar || null, body_html, body_text || null, type || 'custom', JSON.stringify(variables || [])]
     );
     await client.query('COMMIT');
     res.status(201).json({ data: result.rows[0] });
@@ -143,11 +153,15 @@ export const deleteEmailTemplate = async (req: Request, res: Response): Promise<
 export const listReferrals = async (_req: Request, res: Response): Promise<void> => {
   const client = await getAdminClient();
   try {
+    // member_profiles was dropped by migration 044 — names resolve on members.
     const result = await client.query(
-      `SELECT r.*, g.name AS gym_name, mp.full_name AS referred_member_name
+      `SELECT r.*, g.name AS gym_name,
+              mem.full_name AS referred_member_name,
+              ref_m.full_name AS referrer_name
        FROM marketing_referrals r
        LEFT JOIN gyms g ON g.id = r.referrer_gym_id
-       LEFT JOIN member_profiles mp ON mp.id = r.referred_member_id
+       LEFT JOIN members mem ON mem.id = r.referred_member_id
+       LEFT JOIN members ref_m ON ref_m.id = r.referrer_member_id
        ORDER BY r.created_at DESC LIMIT 100`
     );
     await client.query('COMMIT');

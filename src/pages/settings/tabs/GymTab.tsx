@@ -3,42 +3,55 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../../context/GymBrandContext';
 import { getSettings, updateSettings, uploadGymLogo } from '../../../services/api';
 import { useToast } from '../../../context/ToastContext';
-import { Building2, MapPin, Phone, Globe, Clock, Palette, Ruler, Database, Image } from 'lucide-react';
+import { Building2, MapPin, Phone, Globe, Clock, Palette } from 'lucide-react';
 import Button from '../../../components/ui/Button';
 import PageLoader from '../../../components/shared/PageLoader';
-import UnifiedTabs from '../../../components/shared/UnifiedTabs';
+import { WEEK_DAYS } from '../../gym-admin/subscriptions/shared';
+import { SPORT_COLORS } from '../../gym-admin/subscriptions/shared';
 
 const TIMEZONES = ['Africa/Cairo', 'Asia/Riyadh', 'Asia/Dubai', 'Asia/Kuwait', 'Asia/Baghdad', 'America/New_York', 'Europe/London'];
-const DATE_FORMATS = ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'];
-const TIME_FORMATS = ['12h', '24h'];
-const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const CURRENCIES = ['EGP', 'SAR', 'AED', 'KWD', 'QAR', 'BHD', 'OMR', 'JOD', 'USD', 'EUR', 'GBP'];
 
-
+// بيانات الصالة: بطاقتان جنب بعض (أساسية يمين + شعار وهوية شمال) وتحتهما
+// مواعيد العمل — كل حقل يُستهلك فعليًا: الاسم/الهاتف/العملة/المنطقة من
+// البروفايل، لون البراند في شريط السايدبار، وأيام/ساعات التشغيل بوابة
+// دخول في تسجيل الحضور (الفارغ = بلا قيد).
 export default function GymTab() {
-  const { language, setLanguage } = useApp();
+  const { language } = useApp();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const rtl = language === 'ar';
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeSection, setActiveSection] = useState<string>('general');
 
   const { data, isLoading } = useQuery({ queryKey: ['settings'], queryFn: getSettings });
   const mutation = useMutation({
     mutationFn: updateSettings,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['settings'] }); showToast(rtl ? 'تم حفظ الإعدادات' : 'Settings saved', 'success'); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      queryClient.invalidateQueries({ queryKey: ['gym', 'info'] });
+      showToast(rtl ? 'تم حفظ الإعدادات' : 'Settings saved', 'success');
+    },
     onError: () => showToast(rtl ? 'فشل الحفظ' : 'Save failed', 'error'),
   });
 
   const [form, setForm] = useState<Record<string, string>>({});
+  const [workDays, setWorkDays] = useState<string[]>([]);
   useEffect(() => {
-    if (data?.data) setForm(data.data);
+    if (data?.data) {
+      setForm(data.data);
+      const wd = String(data.data.work_days || '').split(',').map((d) => d.trim()).filter(Boolean);
+      setWorkDays(wd);
+    }
   }, [data]);
 
   const setField = (k: string, v: string) => setForm((prev) => ({ ...prev, [k]: v }));
+  const toggleDay = (c: string) =>
+    setWorkDays((prev) => (prev.includes(c) ? prev.filter((d) => d !== c) : [...prev, c]));
 
   const handleSave = () => {
-    const payload: Record<string, string> = {
+    mutation.mutate({
       gym_name: form.gym_name || '',
+      gym_name_en: form.gym_name_en || '',
       gym_phone: form.gym_phone || '',
       gym_email: form.gym_email || '',
       gym_address: form.gym_address || '',
@@ -47,14 +60,13 @@ export default function GymTab() {
       gym_zip: form.gym_zip || '',
       gym_country: form.gym_country || 'Egypt',
       gym_timezone: form.gym_timezone || 'Africa/Cairo',
-      date_format: form.date_format || 'DD/MM/YYYY',
-      time_format: form.time_format || '12h',
-      first_day_of_week: form.first_day_of_week || 'Sunday',
-      language_setting: form.language_setting || 'ar',
-      units_system: form.units_system || 'metric',
+      currency: form.currency || 'EGP',
       logo_url: form.logo_url || '',
-    };
-    mutation.mutate(payload);
+      gym_brand_color: form.gym_brand_color || '#f97316',
+      work_open: form.work_open || '',
+      work_close: form.work_close || '',
+      work_days: workDays.join(','),
+    });
   };
 
   const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,171 +85,149 @@ export default function GymTab() {
     }
   };
 
-  const sections = [
-    { id: 'general', icon: 'store', labelEn: 'General Information', labelAr: 'المعلومات العامة' },
-    { id: 'language', icon: 'language', labelEn: 'Language, Units, Date & Time', labelAr: 'اللغة والوحدات والتاريخ والوقت' },
-    { id: 'logo', icon: 'image', labelEn: 'Change Logo', labelAr: 'تغيير الشعار' },
-  ];
-
-  const inputCls = 'w-full px-4 py-2.5 bg-white border border-gray-200 rounded-2xl text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400 transition';
-  const selectCls = inputCls;
+  const inputCls = 'w-full px-4 py-2.5 bg-white border border-gray-200 rounded-2xl text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder:text-gray-400 transition';
 
   if (isLoading) {
     return <PageLoader variant="skeleton" rows={6} />;
   }
 
   return (
-    <div className="space-y-6">
-      <UnifiedTabs
-        variant="pills"
-        tabs={sections.map((sec) => ({ key: sec.id, labelAr: sec.labelAr, labelEn: sec.labelEn, icon: sec.icon }))}
-        activeKey={activeSection}
-        onChange={setActiveSection}
-        className="mb-4"
-      />
-
-      {activeSection === 'general' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <Building2 size={18} className="text-emerald-600" /> {rtl ? 'اسم الصالة' : 'Gym Name'}
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* يمين — البيانات الأساسية */}
+        <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5 space-y-4">
+          <h3 className="font-bold text-gray-900">{rtl ? 'البيانات الأساسية' : 'Basic info'}</h3>
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-2">
+              <Building2 size={16} className="text-orange-500" /> {rtl ? 'اسم الصالة (عربي)' : 'Gym name (AR)'}
             </label>
-            <input type="text" value={form.gym_name || ''} onChange={(e) => setField('gym_name', e.target.value)} className={inputCls} dir="ltr" />
+            <input type="text" value={form.gym_name || ''} onChange={(e) => setField('gym_name', e.target.value)} className={inputCls} />
           </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <Phone size={18} className="text-emerald-600" /> {rtl ? 'رقم الهاتف' : 'Phone'}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-2">
+              <Building2 size={16} className="text-orange-500" /> {rtl ? 'اسم الصالة (إنجليزي)' : 'Gym name (EN)'}
+            </label>
+            <input type="text" value={form.gym_name_en || ''} onChange={(e) => setField('gym_name_en', e.target.value)} className={inputCls} dir="ltr" />
+          </div>
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-2">
+              <Phone size={16} className="text-orange-500" /> {rtl ? 'رقم الهاتف' : 'Phone'}
             </label>
             <input type="text" value={form.gym_phone || ''} onChange={(e) => setField('gym_phone', e.target.value)} className={inputCls} dir="ltr" />
           </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <Globe size={18} className="text-emerald-600" /> {rtl ? 'البريد الإلكتروني' : 'Email'}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-2">
+              <MapPin size={16} className="text-orange-500" /> {rtl ? 'العنوان' : 'Address'}
             </label>
-            <input type="email" value={form.gym_email || ''} onChange={(e) => setField('gym_email', e.target.value)} className={inputCls} dir="ltr" />
+            <textarea value={form.gym_address || ''} onChange={(e) => setField('gym_address', e.target.value)} rows={2} className={inputCls} />
           </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <MapPin size={18} className="text-emerald-600" /> {rtl ? 'العنوان' : 'Address'}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-gray-500 mb-2">{rtl ? 'العملة' : 'Currency'}</label>
+              <select value={form.currency || 'EGP'} onChange={(e) => setField('currency', e.target.value)} className={inputCls}>
+                {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="flex items-center gap-1 text-sm font-semibold text-gray-500 mb-2">
+                <Clock size={16} className="text-orange-500" /> {rtl ? 'المنطقة الزمنية' : 'Timezone'}
+              </label>
+              <select value={form.gym_timezone || 'Africa/Cairo'} onChange={(e) => setField('gym_timezone', e.target.value)} className={inputCls}>
+                {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* شمال — الشعار والهوية */}
+        <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5 space-y-4">
+          <h3 className="font-bold text-gray-900">{rtl ? 'الشعار والهوية' : 'Logo & identity'}</h3>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              title={rtl ? 'رفع شعار' : 'Upload logo'}
+              className="w-24 h-24 rounded-full bg-white border-2 border-dashed border-gray-300 hover:border-orange-500 flex items-center justify-center overflow-hidden transition shrink-0"
+            >
+              {form.logo_url ? (
+                <img src={form.logo_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-3xl text-gray-400">add_a_photo</span>
+              )}
+            </button>
+            <div className="text-sm text-gray-500">
+              <p className="font-semibold text-gray-700">{rtl ? 'شعار الصالة' : 'Gym logo'}</p>
+              <p className="text-xs mt-0.5">{rtl ? 'انقر للدائرة للرفع — معاينة فورية (حتى 2 ميجا)' : 'Click the circle to upload — instant preview (max 2 MB)'}</p>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoSelect} />
+            </div>
+          </div>
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-2">
+              <Palette size={16} className="text-orange-500" /> {rtl ? 'لون البراند' : 'Brand color'}
             </label>
-            <textarea value={form.gym_address || ''} onChange={(e) => setField('gym_address', e.target.value)} rows={2} className={inputCls} dir="ltr" />
+            <div className="flex flex-wrap gap-2">
+              {SPORT_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setField('gym_brand_color', c)}
+                  aria-label={c}
+                  className={`w-9 h-9 rounded-full transition-all active:scale-95 ${
+                    (form.gym_brand_color || '#f97316') === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'hover:scale-110'
+                  }`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-gray-400">{rtl ? 'يُطبَّق على شارة الصالة في السايدبار.' : 'Applied to the gym badge in the sidebar.'}</p>
           </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <MapPin size={18} className="text-emerald-600" /> {rtl ? 'المدينة' : 'City'}
-            </label>
-            <input type="text" value={form.gym_city || ''} onChange={(e) => setField('gym_city', e.target.value)} className={inputCls} dir="ltr" />
-          </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <MapPin size={18} className="text-emerald-600" /> {rtl ? 'المنطقة' : 'State'}
-            </label>
-            <input type="text" value={form.gym_state || ''} onChange={(e) => setField('gym_state', e.target.value)} className={inputCls} dir="ltr" />
-          </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <Database size={18} className="text-emerald-600" /> {rtl ? 'الرمز البريدي' : 'Postal Code'}
-            </label>
-            <input type="text" value={form.gym_zip || ''} onChange={(e) => setField('gym_zip', e.target.value)} className={inputCls} dir="ltr" />
-          </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <Globe size={18} className="text-emerald-600" /> {rtl ? 'الدولة' : 'Country'}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-2">
+              <Globe size={16} className="text-orange-500" /> {rtl ? 'الدولة' : 'Country'}
             </label>
             <input type="text" value={form.gym_country || 'Egypt'} onChange={(e) => setField('gym_country', e.target.value)} className={inputCls} dir="ltr" />
           </div>
         </div>
-      )}
+      </div>
 
-      {activeSection === 'language' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <Clock size={18} className="text-emerald-600" /> {rtl ? 'المنطقة الزمنية' : 'Timezone'}
-            </label>
-            <select value={form.gym_timezone || 'Africa/Cairo'} onChange={(e) => setField('gym_timezone', e.target.value)} className={selectCls}>
-              {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
-            </select>
+      {/* مواعيد العمل */}
+      <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
+        <h3 className="font-bold text-gray-900 mb-3">{rtl ? 'مواعيد العمل' : 'Working hours'}</h3>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'من' : 'From'}</label>
+            <input type="time" value={form.work_open || ''} onChange={(e) => setField('work_open', e.target.value)} className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm" dir="ltr" />
           </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <Palette size={18} className="text-emerald-600" /> {rtl ? 'صيغة التاريخ' : 'Date Format'}
-            </label>
-            <select value={form.date_format || 'DD/MM/YYYY'} onChange={(e) => setField('date_format', e.target.value)} className={selectCls}>
-              {DATE_FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
-            </select>
+          <div>
+            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'إلى' : 'To'}</label>
+            <input type="time" value={form.work_close || ''} onChange={(e) => setField('work_close', e.target.value)} className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm" dir="ltr" />
           </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <Clock size={18} className="text-emerald-600" /> {rtl ? 'صيغة الوقت' : 'Time Format'}
-            </label>
-            <select value={form.time_format || '12h'} onChange={(e) => setField('time_format', e.target.value)} className={selectCls}>
-              {TIME_FORMATS.map((f) => <option key={f} value={f}>{f} ({f === '12h' ? 'AM/PM' : '00:00–23:59'})</option>)}
-            </select>
-          </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <Database size={18} className="text-emerald-600" /> {rtl ? 'أول أيام الأسبوع' : 'First Day of Week'}
-            </label>
-            <select value={form.first_day_of_week || 'Sunday'} onChange={(e) => setField('first_day_of_week', e.target.value)} className={selectCls}>
-              {DAYS_OF_WEEK.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <Globe size={18} className="text-emerald-600" /> {rtl ? 'اللغة الافتراضية' : 'Default Language'}
-            </label>
-            <select value={form.language_setting || 'ar'} onChange={(e) => { setField('language_setting', e.target.value); setLanguage(e.target.value as 'ar' | 'en'); }} className={selectCls}>
-              <option value="ar">العربية</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-              <Ruler size={18} className="text-emerald-600" /> {rtl ? 'نظام الوحدات' : 'Units System'}
-            </label>
-            <select value={form.units_system || 'metric'} onChange={(e) => setField('units_system', e.target.value)} className={selectCls}>
-              <option value="metric">{rtl ? 'متري' : 'Metric'} (kg, cm)</option>
-              <option value="imperial">{rtl ? 'إمبراطوري' : 'Imperial'} (lb, ft)</option>
-            </select>
-          </div>
-        </div>
-      )}
-
-      {activeSection === 'logo' && (
-        <div className="bg-gray-50 border border-gray-100 rounded-3xl p-4 md:p-5">
-          <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-3">
-            <Image size={18} className="text-emerald-600" /> {rtl ? 'شعار الصالة' : 'Gym Logo'}
-          </label>
-          <div className="flex items-center gap-4">
-            <div className="w-28 h-28 rounded-2xl bg-gray-100 border border-gray-100 flex items-center justify-center overflow-hidden">
-              {form.logo_url ? (
-                <img src={form.logo_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span className="material-symbols-outlined text-4xl text-gray-500">image</span>
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 transition cursor-pointer flex items-center gap-2">
-                <span className="material-symbols-outlined text-lg">upload</span>
-                {rtl ? 'رفع شعار جديد' : 'Upload New Logo'}
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoSelect} />
-              </label>
-              {form.logo_url && (
-                <button onClick={() => setField('logo_url', '')} className="px-4 py-2 border border-error/30 text-error rounded-xl text-sm font-medium hover:bg-error/5 transition">
-                  {rtl ? 'إزالة الشعار' : 'Remove Logo'}
+          <div className="flex flex-wrap gap-1.5">
+            {WEEK_DAYS.map((d) => {
+              const on = workDays.length === 0 || workDays.includes(d.code);
+              return (
+                <button
+                  key={d.code}
+                  type="button"
+                  onClick={() => toggleDay(d.code)}
+                  title={workDays.length === 0 ? (rtl ? 'الكل مفعّل — اضغط للتخصيص' : 'All on — tap to customize') : undefined}
+                  className={`min-h-[40px] px-3 rounded-xl text-xs font-bold transition-all ${
+                    on ? 'bg-sky-500 text-white' : 'bg-white border border-gray-200 text-gray-500'
+                  }`}
+                >
+                  {d.ar}
                 </button>
-              )}
-              <p className="text-xs text-gray-500">
-                {rtl ? 'يُسمح بصور JPG و PNG و GIF و SVG و WEBP. أقصى حجم 2 ميجا.' : 'JPG, PNG, GIF, SVG, WEBP allowed. Max 2 MB.'}
-              </p>
-            </div>
+              );
+            })}
           </div>
         </div>
-      )}
+        <p className="mt-2 text-xs text-gray-400">
+          {rtl ? 'الفارغ = مفتوح دائمًا. خارج المواعيد يُرفض تسجيل الحضور.' : 'Empty = always open. Check-ins outside hours are refused.'}
+        </p>
+      </div>
 
-      <div className="flex justify-end pt-4">
-        <Button variant="primary" onClick={handleSave} disabled={mutation.isPending}>
+      <div className="flex justify-start pt-1">
+        <Button variant="primary" onClick={handleSave} disabled={mutation.isPending} className="!bg-orange-500 hover:!bg-orange-600">
           <span className="material-symbols-outlined text-lg">{mutation.isPending ? 'sync' : 'save'}</span>
           {rtl ? 'حفظ' : 'Save'}
         </Button>

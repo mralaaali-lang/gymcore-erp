@@ -26,20 +26,20 @@ export const getProduct = async (req: Request, res: Response) => {
 };
 
 export const createProduct = async (req: Request, res: Response) => {
-  const { name, barcode, stock_quantity, purchase_price, selling_price } = req.body;
+  const { name, barcode, stock_quantity, purchase_price, selling_price, min_stock } = req.body;
   const gym_id = req.staff?.gym_id;
   try {
-    const r = await query(`INSERT INTO products (gym_id, name, barcode, stock_quantity, purchase_price, selling_price) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`, [gym_id, name, barcode || null, stock_quantity || 0, purchase_price, selling_price]);
+    const r = await query(`INSERT INTO products (gym_id, name, barcode, stock_quantity, purchase_price, selling_price, min_stock) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [gym_id, name, barcode || null, stock_quantity || 0, purchase_price, selling_price, min_stock ?? 5]);
     res.status(201).json({ data: r.rows[0] });
   } catch (e: any) { logger.error('createProduct failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };
 
 export const updateProduct = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, barcode, stock_quantity, purchase_price, selling_price } = req.body;
+  const { name, barcode, stock_quantity, purchase_price, selling_price, min_stock } = req.body;
   const gym_id = req.staff?.gym_id;
   try {
-    const r = await query(`UPDATE products SET name=COALESCE($1,name), barcode=COALESCE($2,barcode), stock_quantity=COALESCE($3,stock_quantity), purchase_price=COALESCE($4,purchase_price), selling_price=COALESCE($5,selling_price) WHERE id=$6 AND gym_id=$7 RETURNING *`, [name, barcode, stock_quantity, purchase_price, selling_price, id, gym_id]);
+    const r = await query(`UPDATE products SET name=COALESCE($1,name), barcode=COALESCE($2,barcode), stock_quantity=COALESCE($3,stock_quantity), purchase_price=COALESCE($4,purchase_price), selling_price=COALESCE($5,selling_price), min_stock=COALESCE($6,min_stock) WHERE id=$7 AND gym_id=$8 RETURNING *`, [name, barcode, stock_quantity, purchase_price, selling_price, min_stock ?? null, id, gym_id]);
     if (r.rows.length === 0) { res.status(404).json({ error: 'Product not found' }); return; }
     res.json({ data: r.rows[0] });
   } catch (e: any) { logger.error('updateProduct failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }

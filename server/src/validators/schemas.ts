@@ -4,19 +4,27 @@ function sanitizedString(opts?: { min?: number; max?: number }) {
   let s = z.string();
   if (opts?.min !== undefined) s = s.min(opts.min);
   if (opts?.max !== undefined) s = s.max(opts.max);
-  return s.transform((val) =>
-    val
-      .replace(/<[^>]*>/g, '')
-      .replace(/[<>]/g, '')
-      .trim()
-  );
+  return s
+    .transform((val) =>
+      val
+        .replace(/<[^>]*>/g, '')
+        .replace(/[<>]/g, '')
+        .trim()
+    )
+    // U+FFFD = بايتات ضائعة وقت الإدخال (ترميز خاطئ) — الاسم التالف
+    // لا يُصلَّح لاحقًا، فيُرفض من البداية بدل تخزين «����».
+    .refine((val) => !val.includes('�'), {
+      message: 'Text contains corrupted characters — retype it',
+    });
 }
 
 export const loginSchema = z.object({
   email: z.string().email('Invalid email format').optional().or(z.literal('')),
   phone_number: z.string().min(7).max(50).regex(/^\+?[\d\s\-()]+$/, 'Invalid phone number format').optional().or(z.literal('')),
   phone: z.string().min(7).max(50).regex(/^\+?[\d\s\-()]+$/, 'Invalid phone number format').optional().or(z.literal('')),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(128),
+  // قوة كلمة المرور تُفرض وقت الإنشاء (createStaff ≥6) لا وقت الدخول —
+  // حد min(8) هنا كان يرفض 400 حساباتٍ أنشئت بكلمات أقصر فلا تدخل أبدًا.
+  password: z.string().min(1, 'Password is required').max(128),
 }).refine(data => data.email || data.phone_number || data.phone, {
   message: 'Email or phone number is required',
 });
@@ -50,6 +58,21 @@ export const createMemberSchema = z.object({
   medical_notes: sanitizedString({ max: 2000 }).optional(),
   photo_url: memberPhotoUrl,
   gender: z.enum(['male', 'female']).optional(),
+  card_code: sanitizedString({ max: 30 }).optional().or(z.literal('')),
+  national_id: sanitizedString({ max: 30 }).optional().or(z.literal('')),
+  emergency_phone: z.string().min(7).max(50).regex(/^\+?[\d\s\-()]+$/, 'Invalid phone number format').optional().or(z.literal('')),
+  address: sanitizedString({ max: 500 }).optional().or(z.literal('')),
+  notes: sanitizedString({ max: 2000 }).optional().or(z.literal('')),
+  allowed_days: z.array(z.string().min(1).max(10)).max(7).optional(),
+  sales_rep_id: z.string().uuid('Invalid staff ID').optional().nullable(),
+  // اشتراك أول اختياري في نفس الحفظ (عضو + اشتراك + دفعة واحدة)
+  offer_id: z.string().uuid('Invalid plan ID').optional(),
+  coach_id: z.string().uuid().optional().nullable(),
+  sport: z.string().min(1).max(30).optional().nullable(),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').optional(),
+  discount: z.number().min(0).optional(),
+  amount_paid: z.number().min(0).optional(),
+  payment_method: z.enum(['cash', 'card', 'vodafone_cash', 'instapay', 'bank']).optional(),
 });
 
 export const qrAttendanceSchema = z.object({
@@ -129,6 +152,13 @@ export const updateMemberSchema = z.object({
   medical_notes: sanitizedString({ max: 2000 }).optional(),
   photo_url: memberPhotoUrl,
   gender: z.enum(['male', 'female']).optional().nullable(),
+  card_code: sanitizedString({ max: 30 }).optional().or(z.literal('')).nullable(),
+  national_id: sanitizedString({ max: 30 }).optional().or(z.literal('')).nullable(),
+  emergency_phone: z.string().min(7).max(50).regex(/^\+?[\d\s\-()]+$/, 'Invalid phone number format').optional().or(z.literal('')).nullable(),
+  address: sanitizedString({ max: 500 }).optional().or(z.literal('')).nullable(),
+  notes: sanitizedString({ max: 2000 }).optional().or(z.literal('')).nullable(),
+  allowed_days: z.array(z.string().min(1).max(10)).max(7).optional().nullable(),
+  sales_rep_id: z.string().uuid('Invalid staff ID').optional().nullable(),
 });
 
 export const paginationSchema = z.object({
@@ -188,6 +218,7 @@ export const createProductSchema = z.object({
   stock_quantity: z.number().int().min(0).default(0),
   purchase_price: z.number().min(0),
   selling_price: z.number().min(0),
+  min_stock: z.number().int().min(0).optional(),
 });
 
 export const createPaymentSchema = z.object({
@@ -199,8 +230,7 @@ export const createPaymentSchema = z.object({
   payment_method: z.enum(['cash', 'card', 'bank', 'wallet', 'vodafone_cash', 'instapay', 'visa']).default('cash'),
 });
 
-export const createExpenseSchema = z.object({
-  amount: z.number().min(0),
+export const createExpenseSchema = z.object({  amount: z.number().min(0),
   // §44: description is now optional — the screen's quick-add records
   // category+amount in seconds; the drawer reconciles on those alone.
   description: sanitizedString({ max: 500 }).optional().or(z.literal('')),
@@ -213,6 +243,18 @@ export const createExpenseSchema = z.object({
   payment_method: z.enum(['cash', 'card', 'bank', 'wallet', 'vodafone_cash', 'instapay', 'visa']).optional(),
 });
 
+// المرتجعات (068): رد مبلغ — السبب إجباري (لا أموال مجهولة في الدفتر).
+export const createRefundSchema = z.object({
+  member_id: z.string().uuid().optional().nullable(),
+  amount: z.number().positive(),
+  description: sanitizedString({ min: 3, max: 500 }),
+  payment_method: z.enum(['cash', 'card', 'bank', 'wallet', 'vodafone_cash', 'instapay', 'visa']).default('cash'),
+});
+
+// الملف الوظيفي — ثوابت الأنماط قبل الاستخدام (تفادي TDZ عند تحميل الموديول)
+const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 export const createStaffSchemaV2 = z.object({
   full_name: sanitizedString({ min: 2, max: 255 }),
   email: z.string().email(),
@@ -220,6 +262,8 @@ export const createStaffSchemaV2 = z.object({
   role: z.enum(['manager', 'coach', 'receptionist']),
   phone: sanitizedString({ max: 50 }).optional().or(z.literal('')),
   salary: z.number().min(0).optional(),
+  commission_pct: z.number().min(0).max(100).optional(),
+  ...staffProfileFields({ pin: true }),
 });
 
 // ====================================================================
@@ -333,6 +377,7 @@ export const updateProductSchema = z.object({
   stock_quantity: z.number().int().min(0).optional(),
   purchase_price: z.number().min(0).optional(),
   selling_price: z.number().min(0).optional(),
+  min_stock: z.number().int().min(0).optional(),
 });
 
 export const updateStaffSchema = z.object({
@@ -342,7 +387,35 @@ export const updateStaffSchema = z.object({
   phone: sanitizedString({ max: 50 }).optional().or(z.literal('')),
   salary: z.number().min(0).optional(),
   is_active: z.boolean().optional(),
+  commission_pct: z.number().min(0).max(100).optional(),
+  ...staffProfileFields({ pin: true }),
 });
+
+// الملف الوظيفي للموظف (إضافة/تعديل) — الأقسام/المسميات نص حر باقتراحات
+// في الواجهة (لا enum مغلق). PIN اختياري 4-8 أرقام للحضور الذاتي.
+
+function staffProfileFields(opts: { pin: boolean }) {
+  return {
+    department: sanitizedString({ max: 100 }).optional().or(z.literal('')).nullable(),
+    job_title: sanitizedString({ max: 100 }).optional().or(z.literal('')).nullable(),
+    national_id: sanitizedString({ max: 30 }).optional().or(z.literal('')).nullable(),
+    birth_date: sanitizedString().optional().nullable(),
+    gender: z.enum(['male', 'female']).optional().nullable(),
+    address: sanitizedString({ max: 500 }).optional().or(z.literal('')).nullable(),
+    hire_date: z.string().regex(ISO_DATE_ONLY, 'Date must be YYYY-MM-DD').optional().nullable(),
+    shift_start: z.string().regex(HH_MM, 'Time must be HH:MM').optional().nullable(),
+    shift_end: z.string().regex(HH_MM, 'Time must be HH:MM').optional().nullable(),
+    late_allowance_min: z.number().int().min(0).max(600).optional(),
+    weekly_off: z.array(z.string().min(1).max(10)).max(7).optional().nullable(),
+    ...(opts.pin ? { pin: z.string().regex(/^\d{4,8}$/, 'PIN must be 4-8 digits').optional().or(z.literal('')) } : {}),
+    housing_allowance: z.number().min(0).optional(),
+    transport_allowance: z.number().min(0).optional(),
+    other_allowance: z.number().min(0).optional(),
+    annual_leave_days: z.number().min(0).optional(),
+    sick_leave_days: z.number().min(0).optional(),
+    monthly_leave_days: z.number().min(0).optional(),
+  };
+}
 
 export const closeCashboxSchema = z.object({
   id: z.string().uuid(),
@@ -350,8 +423,11 @@ export const closeCashboxSchema = z.object({
   notes: sanitizedString({ max: 500 }).optional().nullable(),
 });
 
+// §45 — the settle modal carries an optional note; amount stays clamped
+// server-side against the real remaining (over-payment cannot leak into the ledger).
 export const payDebtSchema = z.object({
   amount: z.number().min(0),
+  note: sanitizedString({ max: 500 }).optional().or(z.literal('')),
 });
 
 export const completePtSessionSchema = z.object({
@@ -600,16 +676,128 @@ export const createSubscriptionPaymentSchema = z.object({
 });
 
 // §33ب — membership offers (single source of truth for gym plans)
+// الرياضات ثابتة هنا قبل الاستخدام (كانت تُعرَّف بعد السكيما — TDZ).
+// SUBSCRIPTION_SPORTS = البذرة الافتراضية + fallback للعرض؛ الكتالوج
+// الحي gym_sports هو المرجع (يتحقق في الكنترولر ليدعم الأكواد المخصصة).
+export const SUBSCRIPTION_SPORTS = ['gym', 'cardio', 'boxing', 'kickboxing', 'swimming', 'crossfit', 'yoga'] as const;
+
+const sportCode = z.string().min(1).max(30);
+
+const offerDetails = {
+  sport: sportCode.optional().nullable(),
+  total_sessions: z.number().int().min(1).optional().nullable(),
+  freeze_days_max: z.number().int().min(0).max(365).optional(),
+  weekly_days: z.array(z.string().min(1).max(10)).max(7).optional().nullable(),
+  description: sanitizedString({ max: 2000 }).optional().nullable(),
+};
+
 export const createOfferSchema = z.object({
   title: sanitizedString({ min: 1, max: 255 }),
   duration_days: z.number().int().min(1).max(3650),
   price: z.number().min(0),
+  // الإجبار: باقة جديدة بلا رياضة مرفوضة — لا «بدون تصنيف» جديدة
+  sport: z.string().min(1).max(30),
+  total_sessions: offerDetails.total_sessions,
+  freeze_days_max: offerDetails.freeze_days_max,
+  weekly_days: offerDetails.weekly_days,
+  description: offerDetails.description,
 });
 
 export const updateOfferSchema = z.object({
   title: sanitizedString({ min: 1, max: 255 }).optional(),
   duration_days: z.number().int().min(1).max(3650).optional(),
   price: z.number().min(0).optional(),
+  is_active: z.boolean().optional(),
+  ...offerDetails,
+});
+
+// ====================================================================
+// البرايفت (pt_enrollments) — منتج مستقل بعضو ومدرب وحصص وفلوس
+// ====================================================================
+export const createPtEnrollmentSchema = z.object({
+  member_id: z.string().uuid(),
+  coach_id: z.string().uuid(),
+  total_sessions: z.number().int().min(1).max(1000),
+  session_price: z.number().min(0),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').optional(),
+  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').optional(),
+  amount_paid: z.number().min(0).optional(),
+  payment_method: z.enum(['cash', 'card', 'vodafone_cash', 'instapay', 'bank']).optional(),
+  notes: sanitizedString({ max: 2000 }).optional().or(z.literal('')),
+});
+
+// ====================================================================
+// شئون الموظفين (HR): إجازات/حركات/مسير/عقود/تحضير/حضور ذاتي
+// ====================================================================
+export const createLeaveSchema = z.object({
+  staff_user_id: z.string().uuid(),
+  leave_type: z.enum(['annual', 'sick', 'unpaid']),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
+  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
+  notes: sanitizedString({ max: 1000 }).optional().or(z.literal('')),
+});
+
+export const decideLeaveSchema = z.object({
+  approve: z.boolean(),
+});
+
+export const createAdjustmentSchema = z.object({
+  staff_user_id: z.string().uuid(),
+  kind: z.enum(['bonus', 'deduction', 'advance']),
+  amount: z.number().min(0),
+  installment: z.number().min(0).optional().nullable(),
+  month: z.string().regex(/^\d{4}-\d{2}$/, 'Month must be YYYY-MM'),
+  reason: sanitizedString({ max: 500 }).optional().or(z.literal('')),
+});
+
+export const repayAdvanceSchema = z.object({
+  amount: z.number().min(0),
+});
+
+export const generatePayrollSchema = z.object({
+  month: z.string().regex(/^\d{4}-\d{2}$/, 'Month must be YYYY-MM'),
+});
+
+export const createHrContractSchema = z.object({
+  staff_user_id: z.string().uuid(),
+  contract_type: sanitizedString({ min: 1, max: 30 }).default('دائم'),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
+  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').optional().nullable(),
+  salary: z.number().min(0),
+  notes: sanitizedString({ max: 2000 }).optional().or(z.literal('')),
+});
+
+export const saveAttendanceSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
+  rows: z.array(z.object({
+    staff_user_id: z.string().uuid(),
+    status: z.enum(['present', 'late', 'absent', 'leave', 'sick']),
+    note: sanitizedString({ max: 500 }).optional().or(z.literal('')),
+  })).min(1).max(500),
+});
+
+export const selfCheckinSchema = z.object({
+  staff_id: z.string().uuid(),
+  pin: z.string().regex(/^\d{4,8}$/, 'Invalid PIN'),
+});
+
+// ====================================================================
+// كتالوج الرياضات (gym_sports) — code ثابت بعد الإنشاء
+// ====================================================================
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+export const createSportSchema = z.object({
+  name_ar: sanitizedString({ min: 1, max: 100 }),
+  icon: z.string().min(1).max(60).default('fitness_center'),
+  color: z.string().regex(HEX_COLOR, 'Color must be #rrggbb').default('#0284c7'),
+  sort_order: z.number().int().min(0).max(10000).optional(),
+});
+
+export const updateSportSchema = z.object({
+  name_ar: sanitizedString({ min: 1, max: 100 }).optional(),
+  icon: z.string().min(1).max(60).optional(),
+  color: z.string().regex(HEX_COLOR, 'Color must be #rrggbb').optional(),
+  sort_order: z.number().int().min(0).max(10000).optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -618,7 +806,6 @@ export const updateOfferSchema = z.object({
 // الرياضات وأيام الأسبوع قوائم ثابتة لأنها أعمدة تصنيف في قاعدة البيانات؛
 // قيمها ترمّز بالأ الإنجليزية والعرض العربي يقرر في الفرونت.
 // ====================================================================
-export const SUBSCRIPTION_SPORTS = ['gym', 'cardio', 'boxing', 'kickboxing', 'swimming', 'crossfit', 'yoga'] as const;
 export const WEEK_DAY_CODES = ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri'] as const;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -626,7 +813,7 @@ export const createSubscriptionSchema = z.object({
   member_id: z.string().uuid(),
   offer_id: z.string().uuid(),
   coach_id: z.string().uuid().optional().nullable(),
-  sport: z.enum(SUBSCRIPTION_SPORTS).optional().nullable(),
+  sport: sportCode.optional().nullable(),
   start_date: z.string().regex(ISO_DATE, 'Date must be YYYY-MM-DD'),
   end_date: z.string().regex(ISO_DATE, 'Date must be YYYY-MM-DD').optional(),
   weekly_days: z.array(z.enum(WEEK_DAY_CODES)).max(7).optional(),
@@ -639,7 +826,7 @@ export const createSubscriptionSchema = z.object({
 // والتجميد لهما مساران منفصلان. اشتراك ملغي نهائي لا يُعدَّل.
 export const updateSubscriptionSchema = z.object({
   coach_id: z.string().uuid().optional().nullable(),
-  sport: z.enum(SUBSCRIPTION_SPORTS).optional().nullable(),
+  sport: sportCode.optional().nullable(),
   weekly_days: z.array(z.enum(WEEK_DAY_CODES)).max(7).optional().nullable(),
 });
 

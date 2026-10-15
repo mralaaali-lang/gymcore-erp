@@ -4,7 +4,7 @@ import Sidebar from './Sidebar';
 import TopNav from './TopNav';
 import TrialBanner from './TrialBanner';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { getNavBadges } from '../../services/api';
+import { getNavBadges, getPublicBranding } from '../../services/api';
 import { ROLE_BASE, buildNavItems } from './navConfig';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -29,6 +29,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     [role, language, badges]
   );
 
+  // سطر الحقوق العام من هوية المنصة (يُحرَّر من السوبر أدمن ← الهوية).
+  const { data: branding } = useApiQuery(
+    ['branding', 'public'],
+    () => getPublicBranding(),
+    { staleTime: 10 * 60_000, retry: false }
+  );
+  const footerText = branding?.data?.footer_text?.trim() || '';
+
   return (
     // dir changes based on language:
     // - Arabic (RTL) → sidebar appears on the RIGHT side
@@ -47,6 +55,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {children}
           </div>
         </main>
+        {footerText !== '' && (
+          <footer className="border-t border-gray-200/70 px-4 py-3 text-center no-print">
+            <p className="text-xs text-gray-400">{footerText}</p>
+          </footer>
+        )}
       </div>
     </div>
   );

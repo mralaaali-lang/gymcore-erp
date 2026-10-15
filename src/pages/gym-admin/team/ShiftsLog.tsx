@@ -21,7 +21,7 @@ export default function ShiftsLog() {
   });
 
   const clockInMut = useMutation({
-    mutationFn: clockIn,
+    mutationFn: () => clockIn(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['shifts'] }),
   });
 

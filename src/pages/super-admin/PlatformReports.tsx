@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../../context/GymBrandContext';
 import { useQuery } from '@tanstack/react-query';
-import { getReportsOverview, listPlatformGyms, getRevenueTrend, getOverduePayments } from '../../services/api';
+import { getPlatformReportsOverview, listPlatformGyms, getRevenueTrend, getOverduePayments } from '../../services/api';
 import Chart from '../../components/charts/Chart';
 import RevenueReport from './reports/RevenueReport';
 import {
@@ -60,7 +60,7 @@ export default function PlatformReports() {
 
   const { data: overviewData, isLoading: overviewLoading, refetch: refetchOverview } = useQuery({
     queryKey: ['reports-overview'],
-    queryFn: getReportsOverview,
+    queryFn: getPlatformReportsOverview,
     refetchInterval: 120000,
   });
 

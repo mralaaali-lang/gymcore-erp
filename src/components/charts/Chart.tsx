@@ -94,6 +94,9 @@ export default function Chart({
         },
       },
     };
+    if (isPie && categories && categories.length > 0) {
+      base.labels = categories;
+    }
     if (!isPie) {
       base.grid = { borderColor: '#f0f0f0', strokeDashArray: 3 };
       base.plotOptions = { bar: { borderRadius: barRadius, columnWidth: '60%', distributed: false } };

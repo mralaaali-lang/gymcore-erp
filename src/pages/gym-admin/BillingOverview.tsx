@@ -10,29 +10,26 @@ import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
 import Card from '../../components/ui/Card';
 import StatusBadge from '../../components/ui/StatusBadge';
-import DebtsPanel from './billing/DebtsPanel';
 
-// §26: DebtsPage merged in as the "Debts" tab; ?tab= deep links keep the old
-// /admin/debts URL working through a redirect.
 // §34ج — Discounts/Payment Forms/Growth/Settings removed: they only rendered
 // a "قيد التطوير" card; they return when real screens exist.
 // §43 — the Payments tab was removed: المدفوعات now has its own full screen
 // at /admin/payments (PaymentsPage) with filters + summary cards + PDF.
-const BILLING_TABS = ['Overview', 'Recurring', 'Accounting', 'Debts'] as const;
+// §45 — the Debts tab was removed the same way: الديون now lives at
+// /admin/debts (DebtsPage) with cards + filters + settle + WhatsApp reminder.
+const BILLING_TABS = ['Overview', 'Recurring', 'Accounting'] as const;
 type BillingTab = typeof BILLING_TABS[number];
 
 const TAB_LABELS: Record<BillingTab, { en: string; ar: string }> = {
   Overview: { en: 'Overview', ar: 'نظرة عامة' },
   Recurring: { en: 'Recurring', ar: 'المتكررة' },
   Accounting: { en: 'Accounting', ar: 'المحاسبة' },
-  Debts: { en: 'Debts', ar: 'الديون' },
 };
 
 const TAB_ICONS: Record<BillingTab, string> = {
   Overview: 'dashboard',
   Recurring: 'autorenew',
   Accounting: 'account_balance',
-  Debts: 'account_balance_wallet',
 };
 
 // §34هـ: month labels are ISO (2026-10), never names, in both languages.
@@ -302,7 +299,6 @@ export default function BillingOverview() {
       {activeTab === 'Overview' && renderOverview()}
       {activeTab === 'Recurring' && renderRecurring()}
       {activeTab === 'Accounting' && renderAccounting()}
-      {activeTab === 'Debts' && <DebtsPanel />}
     </div>
   );
 }

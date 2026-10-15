@@ -3,9 +3,11 @@ import { formatDateTime } from '../../../utils/date';
 import { useApp } from '../../../context/GymBrandContext';
 import PageLoader from '../../../components/shared/PageLoader';
 import Button from '../../../components/ui/Button';
+import Toggle from '../../../components/ui/Toggle';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { useApiQuery } from '../../../hooks/useApiQuery';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getSettings, updateSettings } from '../../../services/api';
 import api from '../../../services/api';
 
 interface BackupEntry {
@@ -36,13 +38,23 @@ export default function BackupTab() {
     { staleTime: 60_000 }
   );
 
-  async function handleCreateBackup() {
+  // نسخة تلقائية يومية (cron 03:30 للصالات المفعّلة)
+  const { data: settingsRes } = useQuery({ queryKey: ['settings'], queryFn: getSettings });
+  const autoOn = (settingsRes?.data?.backup_auto_daily ?? 'false') === 'true';
+  const autoMut = useMutation({
+    mutationFn: (v: boolean) => updateSettings({ backup_auto_daily: v ? 'true' : 'false' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
+  });
+
+  async function handleDownloadNow() {
     setCreating(true);
     setActionMsg('');
     try {
       const res = await api.post('/api/v1/admin/backup/create');
+      const folder = res.data.folder || res.data.data?.folder;
       setActionMsg(res.data.message || 'Backup created');
       queryClient.invalidateQueries({ queryKey: ['backups'] });
+      if (folder) handleDownload(folder);
     } catch (err: any) {
       setActionMsg(`Error: ${err.response?.data?.error || err.message}`);
     } finally {
@@ -87,16 +99,22 @@ export default function BackupTab() {
 
   return (
     <div className="space-y-4" dir={isRtl ? 'rtl' : 'ltr'}>
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <p className="text-sm text-gray-500">
           {isRtl ? 'نسخ احتياطية معزولة لبيانات الصالة' : 'Isolated tenant data backups'}
         </p>
-        <Button variant="primary" onClick={handleCreateBackup} disabled={creating}>
-          <span className="material-symbols-outlined text-lg">{creating ? 'progress_activity' : 'add'}</span>
-          {creating
-            ? (isRtl ? 'جارٍ الإنشاء...' : 'Creating...')
-            : (isRtl ? 'إنشاء نسخة احتياطية' : 'Create Backup')}
-        </Button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+            {isRtl ? 'نسخة تلقائية يومية' : 'Daily auto backup'}
+            <Toggle checked={autoOn} onChange={(v) => autoMut.mutate(v)} />
+          </label>
+          <Button variant="primary" onClick={handleDownloadNow} disabled={creating} className="!bg-orange-500 hover:!bg-orange-600">
+            <span className="material-symbols-outlined text-lg">{creating ? 'progress_activity' : 'download'}</span>
+            {creating
+              ? (isRtl ? 'جارٍ التجهيز...' : 'Preparing...')
+              : (isRtl ? 'تحميل نسخة الآن' : 'Download backup now')}
+          </Button>
+        </div>
       </div>
 
       {actionMsg && (

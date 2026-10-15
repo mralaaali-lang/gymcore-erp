@@ -734,7 +734,7 @@ export async function getMember(id: string) {
   return res.data.data || res.data;
 }
 
-export async function createMember(data: {
+export interface NewMemberInput {
   full_name: string;
   phone_number: string;
   email?: string;
@@ -743,9 +743,30 @@ export async function createMember(data: {
   photo_url?: string;
   medical_notes?: string;
   gender?: string;
-}) {
+  card_code?: string;
+  national_id?: string;
+  emergency_phone?: string;
+  address?: string;
+  notes?: string;
+  allowed_days?: string[];
+  sales_rep_id?: string | null;
+  offer_id?: string;
+  coach_id?: string | null;
+  sport?: string | null;
+  start_date?: string;
+  discount?: number;
+  amount_paid?: number;
+  payment_method?: string;
+}
+
+export async function createMember(data: NewMemberInput) {
   const res = await api.post('/api/members', data);
-  return res.data;
+  return res.data as {
+    success: boolean;
+    data: any;
+    generated_pin?: string;
+    subscription?: { id: string; offer_title: string; start_date: string; end_date: string; due: number; paid: number; outstanding: number } | null;
+  };
 }
 
 export async function blacklistMember(id: string, reason: string) {
@@ -769,6 +790,13 @@ export async function updateMember(id: string, data: {
   photo_url?: string;
   medical_notes?: string;
   gender?: string | null;
+  card_code?: string | null;
+  national_id?: string | null;
+  emergency_phone?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  allowed_days?: string[] | null;
+  sales_rep_id?: string | null;
 }) {
   const res = await api.put(`/api/members/${id}`, data);
   return res.data;
@@ -950,6 +978,30 @@ export interface MembershipOffer {
   price: number | string;
   is_active: boolean;
   subscription_count?: number;
+  /** اشتراكات نشطة على الباقة (status='active'). */
+  active_count?: number;
+  /** إجمالي المحصّل من اشتراكات الباقة (SUM price_paid). */
+  revenue?: number | string;
+  /** الرياضة الغالبة بين اشتراكات الباقة — null = بدون تصنيف. */
+  sport_mode?: string | null;
+  /** تصنيف الباقة نفسها (يُدخَل من صفحة إضافة باقة) — null = بدون تصنيف. */
+  sport?: string | null;
+  /** الحصص — null = تلقائي (يساوي عدد الأيام، حصة/يوم). */
+  total_sessions?: number | null;
+  freeze_days_max?: number | null;
+  weekly_days?: string[] | null;
+  description?: string | null;
+}
+
+export interface OfferInput {
+  title: string;
+  duration_days: number;
+  price: number;
+  sport?: string | null;
+  total_sessions?: number | null;
+  freeze_days_max?: number;
+  weekly_days?: string[] | null;
+  description?: string | null;
 }
 
 export async function listOffersManage(): Promise<{ data: MembershipOffer[] }> {
@@ -957,13 +1009,168 @@ export async function listOffersManage(): Promise<{ data: MembershipOffer[] }> {
   return res.data;
 }
 
-export async function createOffer(input: { title: string; duration_days: number; price: number }): Promise<{ data: MembershipOffer }> {
+export async function createOffer(input: OfferInput): Promise<{ data: MembershipOffer }> {
   const res = await api.post('/api/membership-offers', input);
   return res.data;
 }
 
-export async function updateOffer(id: string, input: Partial<{ title: string; duration_days: number; price: number; is_active: boolean }>): Promise<{ data: MembershipOffer }> {
+export async function updateOffer(id: string, input: Partial<OfferInput & { is_active: boolean }>): Promise<{ data: MembershipOffer }> {
   const res = await api.put(`/api/membership-offers/${id}`, input);
+  return res.data;
+}
+
+// حذف الباقة مسموح فقط بلا اشتراكات مرتبطة — السيرفر يرد 409 ومعه العدد.
+export async function deleteOffer(id: string): Promise<{ data: { id: string; deleted: boolean } }> {
+  const res = await api.delete(`/api/membership-offers/${id}`);
+  return res.data;
+}
+
+// ====================================================================
+// كتالوج الرياضات (gym_sports) — المرجع الحي بدل الـenum الثابت
+// ====================================================================
+export interface GymSport {
+  id: string;
+  code: string;
+  name_ar: string;
+  icon: string;
+  color: string;
+  sort_order: number;
+  is_active: boolean;
+  plan_count?: number;
+  active_sub_count?: number;
+}
+
+export async function listSports(): Promise<{ data: GymSport[] }> {
+  const res = await api.get('/api/sports');
+  return res.data;
+}
+
+export async function createSport(input: { name_ar: string; icon?: string; color?: string; sort_order?: number }): Promise<{ data: GymSport }> {
+  const res = await api.post('/api/sports', input);
+  return res.data;
+}
+
+export async function updateSport(id: string, input: Partial<{ name_ar: string; icon: string; color: string; sort_order: number; is_active: boolean }>): Promise<{ data: GymSport }> {
+  const res = await api.put(`/api/sports/${id}`, input);
+  return res.data;
+}
+
+export async function deleteSport(id: string): Promise<{ data: { id: string; deleted: boolean } }> {
+  const res = await api.delete(`/api/sports/${id}`);
+  return res.data;
+}
+
+// ====================================================================
+// الحصة السريعة (quick_sessions) — SKU مستقل بسعر ثابت، بلا اشتراك
+// ====================================================================
+export interface QuickSessionRow {
+  id: string;
+  client_name: string;
+  member_name: string | null;
+  session_name: string;
+  price: number;
+  paid: number;
+  remaining: number;
+  payment_method: string | null;
+  session_time: string;
+  attendance_logged: boolean;
+  created_at: string;
+  coach_name: string | null;
+}
+
+export interface QuickSessionStats {
+  today_collected: number;
+  today_remaining: number;
+  month_collected: number;
+}
+
+export async function listQuickSessions(date?: string): Promise<{
+  data: QuickSessionRow[];
+  stats: QuickSessionStats;
+  date: string;
+  default_price: number;
+}> {
+  const res = await api.get('/api/quick-sessions', { params: date ? { date } : undefined });
+  return res.data;
+}
+
+export async function createQuickSession(input: {
+  member_id?: string | null;
+  client_name?: string;
+  session_name?: string;
+  price: number;
+  paid?: number;
+  payment_method?: string;
+  coach_id?: string | null;
+  session_time?: string;
+  with_attendance?: boolean;
+}): Promise<{ data: QuickSessionRow & { coach_name: string | null } }> {
+  const res = await api.post('/api/quick-sessions', input);
+  return res.data;
+}
+
+// ====================================================================
+// البرايفت (pt_enrollments) — منتج مستقل: عضو + مدرب + حصص + فلوس
+// ====================================================================
+export interface PtEnrollmentRow {
+  id: string;
+  member_id: string | null;
+  coach_id: string | null;
+  member_name: string | null;
+  member_phone: string | null;
+  coach_name: string | null;
+  total_sessions: number;
+  sessions_used: number;
+  session_price: number | string;
+  total_amount: number;
+  paid_amount: number;
+  remaining: number;
+  start_date: string;
+  end_date: string;
+  status: string;
+  derived_status: 'active' | 'completed' | 'cancelled';
+  notes: string | null;
+  created_at: string;
+}
+
+export async function listPtEnrollments(status?: string): Promise<{
+  data: PtEnrollmentRow[];
+  stats: { active_count: number; total_paid: number; total_debt: number; total_sessions: number };
+  status: string;
+}> {
+  const res = await api.get('/api/pt-enrollments', { params: status ? { status } : undefined });
+  return res.data;
+}
+
+export async function createPtEnrollment(input: {
+  member_id: string;
+  coach_id: string;
+  total_sessions: number;
+  session_price: number;
+  start_date?: string;
+  end_date?: string;
+  amount_paid?: number;
+  payment_method?: string;
+  notes?: string;
+}): Promise<{ data: { id: string; total: number; paid: number; remaining: number } }> {
+  const res = await api.post('/api/pt-enrollments', input);
+  return res.data;
+}
+
+export async function consumePtSession(id: string): Promise<{ data: { id: string; sessions_used: number; total_sessions: number; status: string } }> {
+  const res = await api.post(`/api/pt-enrollments/${id}/consume`);
+  return res.data;
+}
+
+export async function cancelPtEnrollment(id: string): Promise<{ data: { id: string; cancelled: boolean } }> {
+  const res = await api.post(`/api/pt-enrollments/${id}/cancel`);
+  return res.data;
+}
+
+export async function ptReport(): Promise<{
+  data: { month: string; enrollments: number; collected: number; outstanding: number }[];
+}> {
+  const res = await api.get('/api/pt-enrollments/report');
   return res.data;
 }
 
@@ -1216,7 +1423,7 @@ export async function deleteGymClass(id: string) {
 export interface ProductData {
   id: string;
   name: string; barcode?: string;
-  stock_quantity: number; purchase_price: number; selling_price: number;
+  stock_quantity: number; min_stock?: number; purchase_price: number; selling_price: number;
 }
 export async function listProducts(search?: string) {
   const res = await api.get('/api/products', { params: { search } });
@@ -1226,7 +1433,7 @@ export async function getProduct(id: string) {
   const res = await api.get(`/api/products/${id}`);
   return res.data as { data: ProductData };
 }
-export async function createProduct(data: { name: string; barcode?: string; stock_quantity?: number; purchase_price: number; selling_price: number }) {
+export async function createProduct(data: { name: string; barcode?: string; stock_quantity?: number; min_stock?: number; purchase_price: number; selling_price: number }) {
   const res = await api.post('/api/products', data);
   return res.data as { data: ProductData };
 }
@@ -1293,23 +1500,42 @@ export async function createSupplier(data: { name: string; phone?: string; email
   const res = await api.post('/api/finance/suppliers', data);
   return res.data as { data: any };
 }
-export async function listDebts() {
-  const res = await api.get('/api/finance/debts');
-  return res.data as { data: any[] };
+// §45 — debts screen: q/kind/status/page go to the server (search matches
+// decrypted phone); response carries derived debt_kind/payment_status,
+// per-row paid_amount and the four honest card aggregates.
+export async function listDebts(opts?: { q?: string; kind?: string; status?: string; page?: number; limit?: number }) {
+  const res = await api.get('/api/finance/debts', {
+    params: {
+      q: opts?.q || undefined,
+      kind: opts?.kind && opts.kind !== 'all' ? opts.kind : undefined,
+      status: opts?.status && opts.status !== 'all' ? opts.status : undefined,
+      page: opts?.page,
+      limit: opts?.limit,
+    },
+  });
+  return res.data as {
+    data: any[];
+    pagination?: any;
+    stats?: { total_due: string | number; subscription_due: string | number; sale_due: string | number; debt_count: number };
+  };
 }
 export async function createDebt(data: { member_id: string; amount: number; due_date: string; reason?: string }) {
   const res = await api.post('/api/finance/debts', data);
   return res.data as { data: any };
 }
-export async function payDebt(id: string, amount: number) {
-  const res = await api.post(`/api/finance/debts/${id}/pay`, { amount });
-  return res.data as { success: boolean; remaining: number };
+// §45 — partial payment is official: amount may be less than the remaining;
+// the server books a real payment row and returns the new remaining.
+export async function payDebt(id: string, amount: number, note?: string) {
+  const res = await api.post(`/api/finance/debts/${id}/pay`, { amount, note });
+  return res.data as { success: boolean; paid: number; remaining: number; status: string };
 }
 // §34ث — shift rows now include reconciliation figures computed server-side
 // from the ledger (cash attributed to the OPEN shift while it runs).
+// + shift_no (historical serial), income/expense totals and per-method buckets.
 export interface CashboxSessionRow {
   id: string;
-  staff_user_id: string | null;
+  staff_user_id?: string | null;
+  shift_no?: number;
   staff_name?: string | null;
   opened_at: string;
   closed_at: string | null;
@@ -1319,16 +1545,37 @@ export interface CashboxSessionRow {
   notes?: string | null;
   cash_in: string | number;
   cash_out: string | number;
+  refunds?: string | number;
+  income_total?: string | number;
+  m_cash?: string | number;
+  m_visa?: string | number;
+  m_wallet?: string | number;
+  m_instapay?: string | number;
+  expense_total?: string | number;
   expected_balance: string | number;
   difference: string | number | null;
 }
-export async function listCashboxSessions() {
-  const res = await api.get('/api/finance/cashbox');
+export async function listCashboxSessions(params?: { from?: string; to?: string; staff_id?: string }) {
+  const res = await api.get('/api/finance/cashbox', { params });
   return res.data as { data: CashboxSessionRow[] };
+}
+export interface ShiftReport {
+  session: CashboxSessionRow;
+  ops: {
+    subs_count: number; subs_sum: string | number;
+    sales_count: number; sales_sum: string | number;
+    gen_exp_count: number; gen_exp_sum: string | number;
+    refund_count: number; refund_sum: string | number;
+  };
+  salaries: { pay_count: number; pay_sum: string | number };
+}
+export async function getShiftReport(id: string): Promise<{ data: ShiftReport }> {
+  const res = await api.get(`/api/finance/cashbox/${id}/report`);
+  return res.data;
 }
 export interface CashLedgerRow {
   id: string;
-  type: 'payment' | 'expense';
+  type: 'payment' | 'expense' | 'refund';
   amount: string | number;
   description: string | null;
   payment_method: string | null;
@@ -1343,11 +1590,12 @@ export interface CashbookDay {
   date: string;
   cash_in: string | number;
   cash_out: string | number;
+  refunds: string | number;
   net: string | number;
 }
 export async function getCashbook(days: number) {
   const res = await api.get('/api/finance/cashbook', { params: { days } });
-  return res.data as { data: { days: number; timezone: string; rows: CashbookDay[]; totals: { cash_in: string | number; cash_out: string | number; net: string | number } } };
+  return res.data as { data: { days: number; timezone: string; rows: CashbookDay[]; totals: { cash_in: string | number; cash_out: string | number; refunds: string | number; net: string | number } } };
 }
 export async function openCashbox(opening_balance?: number, notes?: string) {
   const res = await api.post('/api/finance/cashbox/open', { opening_balance, notes });
@@ -1359,9 +1607,263 @@ export async function closeCashbox(id: string, closing_balance: number, notes?: 
 }
 // §34ث — monthly_sales (an order COUNT shown as money) is gone: sum and count
 // travel separately, plus net_month and the gym timezone for honest labels.
+export interface ReportsOverview {
+  from: string;
+  to: string;
+  timezone: string;
+  days: number;
+  kpis: {
+    active_members: number;
+    new_members: number;
+    active_subscriptions: number;
+    attendance_total: number;
+    attendance_daily_avg: number;
+    unpaid_period: number;
+    outstanding_total: number;
+    revenue: number;
+    expenses: number;
+    net_profit: number;
+  };
+  daily_revenue: { date: string; amount: number }[];
+  packages: { key: string; count: number }[];
+  top_attendance: { member_id: string; full_name: string; card_code: string | null; visits: number }[];
+}
+
+/** Aggregated reports dashboard — every figure uses the same gym-local from/to. */
+export async function getReportsOverview(from: string, to: string) {
+  const res = await api.get('/api/reports/overview', { params: { from, to } });
+  return res.data as { data: ReportsOverview };
+}
+
+export interface MembersReportRow {
+  id: string;
+  full_name: string;
+  card_code: string | null;
+  phone_number: string | null;
+  gender: string | null;
+  subs_count: number;
+  visits: number;
+  active_end_date: string | null;
+  is_blacklisted: boolean;
+}
+
+export interface MembersReportStats {
+  total: number;
+  males: number;
+  females: number;
+  with_active: number;
+}
+
+/** Members report — strict filters (status/gender/subscription), rejected when unknown. */
+export async function getMembersReport(params?: {
+  status?: string; gender?: string; subscription?: string;
+  page?: number; limit?: number; sort?: string; order?: string;
+}): Promise<{
+  data: MembersReportRow[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+  stats: MembersReportStats;
+}> {
+  const res = await api.get('/api/reports/members', { params });
+  return res.data;
+}
+
+export interface FinancialReport {
+  from: string;
+  to: string;
+  timezone: string;
+  totals: {
+    revenue: number; revenue_count: number;
+    expenses: number; expenses_count: number;
+    net: number;
+  };
+  daily: { date: string; revenue: number; expenses: number }[];
+  methods: { method: string; count: number; total: number }[];
+  recent_income: { amount: number; payment_method: string | null; member_name: string | null; created_at: string }[];
+  recent_expenses: { amount: number; description: string | null; created_at: string }[];
+}
+
+/** Financial report — same ledger as the cashbox, accounting view. */
+export async function getFinancialReport(from: string, to: string): Promise<{ data: FinancialReport }> {
+  const res = await api.get('/api/reports/financial', { params: { from, to } });
+  return res.data;
+}
+
+export interface AttendanceLogRow {
+  check_in_time: string;
+  check_out_time: string | null;
+  full_name: string;
+  card_code: string | null;
+  duration_min: number | null;
+}
+
+export interface AttendanceReport {
+  from: string;
+  to: string;
+  timezone: string;
+  days: number;
+  kpis: {
+    total: number;
+    unique_members: number;
+    daily_avg: number;
+    present_now: number;
+  };
+  daily: { date: string; count: number }[];
+  hours: { hour: number; count: number }[];
+  log: {
+    rows: AttendanceLogRow[];
+    pagination: { page: number; limit: number; total: number; total_pages: number };
+  };
+}
+
+/** Attendance report — 4 layers from the same attendance_logs as the day log. */
+export async function getAttendanceReport(params: {
+  from: string; to: string; page?: number; limit?: number; sort?: string; order?: string;
+}): Promise<{ data: AttendanceReport }> {
+  const res = await api.get('/api/reports/attendance', { params });
+  return res.data;
+}
+
+export interface SubscriptionsReportRow {
+  id: string;
+  member_name: string;
+  card_code: string | null;
+  phone_number: string | null;
+  offer_title: string;
+  start_date: string;
+  end_date: string;
+  price: number;
+  price_paid: number;
+  status: string;
+}
+
+export interface SubscriptionsReportStats {
+  total: number;
+  full_paid: number;
+  partial: number;
+  remaining: number;
+}
+
+/** Subscriptions report — same status definitions as the subscriptions page. */
+export async function getSubscriptionsReport(params?: {
+  status?: string; offer_id?: string; date_field?: string; from?: string; to?: string;
+  page?: number; limit?: number; sort?: string; order?: string;
+}): Promise<{
+  data: SubscriptionsReportRow[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+  stats: SubscriptionsReportStats;
+}> {
+  const res = await api.get('/api/reports/subscriptions', { params });
+  return res.data;
+}
+
+export interface AbsentMemberRow {
+  id: string;
+  full_name: string;
+  card_code: string | null;
+  phone_number: string | null;
+  plan_name: string | null;
+  sub_end: string | null;
+  last_visit: string | null;
+  days_absent: number;
+  has_active: boolean;
+}
+
+export interface AbsentReportStats {
+  total: number;
+  week_or_less: number;
+  mid: number;
+  over_month: number;
+}
+
+/** Absent members — rescue list ordered by longest absence. */
+export async function getAbsentReport(params?: {
+  days_min?: number; page?: number; limit?: number; sort?: string; order?: string;
+}): Promise<{
+  data: AbsentMemberRow[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+  stats: AbsentReportStats;
+}> {
+  const res = await api.get('/api/reports/absent', { params });
+  return res.data;
+}
+
+export interface EmployeeSaleRow {
+  staff_id: string | null;
+  staff_name: string | null;
+  rate: number;
+  new_count: number;
+  renew_count: number;
+  total_count: number;
+  sale_value: number;
+  collected: number;
+  commission: number;
+}
+
+export interface EmployeeSalesTotals {
+  total_count: number;
+  new_count: number;
+  renew_count: number;
+  sale_value: number;
+  collected: number;
+  commission: number;
+}
+
+/** Employee sales — new/renewal split, value vs collected, commission at current rate. */
+export async function getEmployeeSalesReport(from: string, to: string): Promise<{
+  data: { from: string; to: string; timezone: string; staff: EmployeeSaleRow[]; totals: EmployeeSalesTotals };
+}> {
+  const res = await api.get('/api/reports/employee-sales', { params: { from, to } });
+  return res.data;
+}
+
+export interface AlertsCenter {
+  expiring_days: number;
+  counts: { today: number; soon: number; unpaid: number; low_stock: number; total: number };
+  expiring_today: { member_id: string; member_name: string; phone_number: string | null; end_date: string }[];
+  expiring_soon: { member_id: string; member_name: string; phone_number: string | null; end_date: string; days_left: number }[];
+  unpaid: {
+    id: string; member_id: string; member_name: string; phone_number: string | null;
+    original_amount: number; paid_amount: number; remaining_amount: number;
+  }[];
+  low_stock: { id: string; name: string; stock_quantity: number; min_stock: number }[];
+}
+
+/** Alerts center — same count source as the sidebar badge. */
+export async function getAlertsCenter(): Promise<{ data: AlertsCenter }> {
+  const res = await api.get('/api/notifications/center');
+  return res.data;
+}
+
 export async function getFinanceSummary() {
   const res = await api.get('/api/finance/summary');
-  return res.data as { data: { monthly_revenue: string | number; monthly_expenses: string | number; outstanding_debts: string | number; monthly_sales_sum: string | number; monthly_sales_count: number; net_month: number; today_revenue: string | number; yesterday_revenue: string | number; today_sales_sum?: string | number; today_sales_count?: number; timezone?: string } };
+  return res.data as { data: { monthly_revenue: string | number; monthly_expenses: string | number; monthly_refunds?: string | number; outstanding_debts: string | number; monthly_sales_sum: string | number; monthly_sales_count: number; net_month: number; today_revenue: string | number; yesterday_revenue: string | number; today_sales_sum?: string | number; today_sales_count?: number; today_payment_count?: number; today_expense_sum?: string | number; today_expense_count?: number; today_refund_sum?: string | number; today_refund_count?: number; timezone?: string } };
+}
+
+export interface CashMovement {
+  id: string;
+  type: 'payment' | 'expense' | 'refund';
+  amount: string | number;
+  description: string | null;
+  payment_method: string | null;
+  member_name: string | null;
+  created_at: string;
+}
+
+export async function listMovements(params?: {
+  from?: string; to?: string; search?: string; type?: string; limit?: number;
+}): Promise<{
+  data: CashMovement[];
+  stats: { count: number; in_sum: number; out_sum: number; refund_sum: number };
+}> {
+  const res = await api.get('/api/finance/movements', { params });
+  return res.data;
+}
+
+export async function createRefund(input: {
+  member_id?: string | null; amount: number; description: string; payment_method?: string;
+}): Promise<{ data: CashMovement }> {
+  const res = await api.post('/api/finance/refunds', input);
+  return res.data;
 }
 
 // ====================================================================
@@ -1420,7 +1922,26 @@ export async function getNavBadges(): Promise<NavBadges> {
 // ====================================================================
 export interface StaffData {
   id: string; full_name: string; email: string; role: string;
-  phone?: string; salary?: number; is_active: boolean; created_at: string;
+  phone?: string; salary?: number; commission_pct?: number | string | null;
+  is_active: boolean; created_at: string;
+  employee_code?: string | null;
+  department?: string | null;
+  job_title?: string | null;
+  national_id?: string | null;
+  birth_date?: string | null;
+  gender?: string | null;
+  address?: string | null;
+  hire_date?: string | null;
+  shift_start?: string | null;
+  shift_end?: string | null;
+  late_allowance_min?: number | null;
+  weekly_off?: string[] | null;
+  housing_allowance?: number | string | null;
+  transport_allowance?: number | string | null;
+  other_allowance?: number | string | null;
+  annual_leave_days?: number | string | null;
+  sick_leave_days?: number | string | null;
+  monthly_leave_days?: number | string | null;
 }
 export async function listStaff() {
   const res = await api.get('/api/staff');
@@ -1430,17 +1951,230 @@ export async function getStaff(id: string) {
   const res = await api.get(`/api/staff/${id}`);
   return res.data as { data: StaffData };
 }
-export async function createStaff(data: { full_name: string; email: string; password: string; role: string; phone?: string; salary?: number }) {
+export async function createStaff(data: { full_name: string; email: string; password: string; role: string; phone?: string; salary?: number; commission_pct?: number; pin?: string; department?: string | null; job_title?: string | null; national_id?: string | null; birth_date?: string | null; gender?: string | null; address?: string | null; hire_date?: string | null; shift_start?: string | null; shift_end?: string | null; late_allowance_min?: number; weekly_off?: string[] | null; housing_allowance?: number; transport_allowance?: number; other_allowance?: number; annual_leave_days?: number; sick_leave_days?: number; monthly_leave_days?: number }) {
   const res = await api.post('/api/staff', data);
   return res.data as { data: StaffData };
 }
-export async function updateStaff(id: string, data: Partial<StaffData>) {
+export async function updateStaff(id: string, data: Partial<StaffData> & { pin?: string }) {
   const res = await api.put(`/api/staff/${id}`, data);
   return res.data as { data: StaffData };
+}
+export async function deleteStaff(id: string): Promise<{ data: { id: string; deleted: boolean } }> {
+  const res = await api.delete(`/api/staff/${id}`);
+  return res.data;
 }
 export async function listTrainers() {
   const res = await api.get('/api/trainers');
   return res.data as { data: StaffData[] };
+}
+
+// ملخص المدربين لصفحة /admin/trainers: حمل الاشتراكات النشطة + متواجد
+// الآن (شيفت مفتوح) + الرياضة الغالبة — من نفس الدفاتر الحية.
+export interface CoachSummary {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  salary: number | string | null;
+  commission_pct: number | string;
+  is_active: boolean;
+  created_at: string;
+  sub_count: number;
+  on_shift: boolean;
+  sport_mode: string | null;
+}
+
+export async function listCoachesSummary(): Promise<{ data: CoachSummary[] }> {
+  const res = await api.get('/api/staff/coaches/summary');
+  return res.data;
+}
+
+// ====================================================================
+// شئون الموظفين (HR)
+// ====================================================================
+export interface LeaveRow {
+  id: string;
+  staff_user_id: string | null;
+  staff_name: string | null;
+  employee_code: string | null;
+  leave_type: 'annual' | 'sick' | 'unpaid';
+  start_date: string;
+  end_date: string;
+  days: number;
+  status: 'pending' | 'approved' | 'rejected';
+  notes: string | null;
+  created_at: string;
+}
+
+export async function listLeaves(params?: { status?: string; q?: string }): Promise<{ data: LeaveRow[] }> {
+  const res = await api.get('/api/hr/leaves', { params });
+  return res.data;
+}
+
+export async function requestLeave(input: { staff_user_id: string; leave_type: string; start_date: string; end_date: string; notes?: string }): Promise<{ data: LeaveRow }> {
+  const res = await api.post('/api/hr/leaves', input);
+  return res.data;
+}
+
+export async function decideLeave(id: string, approve: boolean): Promise<{ data: { id: string; status: string } }> {
+  const res = await api.post(`/api/hr/leaves/${id}/decision`, { approve });
+  return res.data;
+}
+
+export async function leaveBalances(month?: string): Promise<{
+  data: { staff_id: string; full_name: string; employee_code: string | null; monthly_allowance: number; monthly_used: number; monthly_left: number; annual_left: number; sick_left: number }[];
+  month: string;
+}> {
+  const res = await api.get('/api/hr/leave-balances', { params: month ? { month } : undefined });
+  return res.data;
+}
+
+export interface AdjustmentRow {
+  id: string;
+  staff_user_id: string | null;
+  staff_name: string | null;
+  employee_code: string | null;
+  kind: 'bonus' | 'deduction' | 'advance';
+  amount: number;
+  repaid: number;
+  outstanding: number;
+  installment: number | null;
+  month: string;
+  reason: string | null;
+  created_at: string;
+}
+
+export async function listAdjustments(params?: { month?: string; kind?: string; q?: string }): Promise<{
+  data: AdjustmentRow[];
+  stats: { bonus: number; deductions: number; advances: number };
+  month: string;
+}> {
+  const res = await api.get('/api/hr/adjustments', { params });
+  return res.data;
+}
+
+export async function createAdjustment(input: { staff_user_id: string; kind: string; amount: number; installment?: number | null; month: string; reason?: string }): Promise<{ data: AdjustmentRow }> {
+  const res = await api.post('/api/hr/adjustments', input);
+  return res.data;
+}
+
+export async function deleteAdjustment(id: string): Promise<{ data: { id: string; deleted: boolean } }> {
+  const res = await api.delete(`/api/hr/adjustments/${id}`);
+  return res.data;
+}
+
+export async function repayAdvance(id: string, amount: number): Promise<{ data: any }> {
+  const res = await api.post(`/api/hr/adjustments/${id}/repay`, { amount });
+  return res.data;
+}
+
+export interface PayrollItem {
+  id: string;
+  staff_user_id: string | null;
+  staff_name: string;
+  base: number;
+  allowances: number;
+  bonus: number;
+  deductions: number;
+  advance_deduction: number;
+  net: number;
+  status: string;
+}
+
+export async function generatePayroll(month: string): Promise<{ data: { id: string; month: string; total_net: number } }> {
+  const res = await api.post('/api/hr/payroll/generate', { month });
+  return res.data;
+}
+
+export async function getPayroll(month?: string): Promise<{
+  data: null | {
+    id: string; month: string; status: string; total_net: number;
+    items: PayrollItem[]; paid_sum: number; paid_count: number;
+    approved_at: string | null; paid_at: string | null;
+  };
+  month: string;
+}> {
+  const res = await api.get('/api/hr/payroll', { params: month ? { month } : undefined });
+  return res.data;
+}
+
+export async function approvePayroll(id: string): Promise<{ data: { id: string; status: string } }> {
+  const res = await api.post(`/api/hr/payroll/${id}/approve`);
+  return res.data;
+}
+
+export async function payPayroll(id: string, paymentMethod?: string): Promise<{ data: { id: string; status: string; total: number } }> {
+  const res = await api.post(`/api/hr/payroll/${id}/pay`, paymentMethod ? { payment_method: paymentMethod } : {});
+  return res.data;
+}
+
+export async function deletePayrollRun(id: string): Promise<{ data: { id: string; deleted: boolean } }> {
+  const res = await api.delete(`/api/hr/payroll/${id}`);
+  return res.data;
+}
+
+export interface StaffContract {
+  id: string;
+  staff_user_id: string | null;
+  staff_name: string | null;
+  employee_code: string | null;
+  contract_no: string;
+  contract_type: string;
+  start_date: string;
+  end_date: string | null;
+  salary: number;
+  status: 'active' | 'expired';
+  notes: string | null;
+  created_at: string;
+}
+
+export async function listHrContracts(params?: { q?: string; status?: string; expiring?: boolean }): Promise<{ data: StaffContract[] }> {
+  const res = await api.get('/api/hr/contracts', { params });
+  return res.data;
+}
+
+export async function createHrContract(input: { staff_user_id: string; contract_type?: string; start_date: string; end_date?: string | null; salary: number; notes?: string }): Promise<{ data: StaffContract }> {
+  const res = await api.post('/api/hr/contracts', input);
+  return res.data;
+}
+
+export async function deleteHrContract(id: string): Promise<{ data: { id: string; deleted: boolean } }> {
+  const res = await api.delete(`/api/hr/contracts/${id}`);
+  return res.data;
+}
+
+export interface HrAttendanceRow {
+  staff_id: string;
+  full_name: string;
+  employee_code: string | null;
+  job_title: string | null;
+  department: string | null;
+  shift_start: string | null;
+  late_allowance_min: number | null;
+  saved_status: string | null;
+  saved_note: string | null;
+  clock_in: string | null;
+  clock_out: string | null;
+  suggested: string | null;
+}
+
+export async function getHrAttendance(date?: string): Promise<{
+  data: HrAttendanceRow[];
+  stats: { total: number; present: number; late: number; absent: number };
+  date: string;
+}> {
+  const res = await api.get('/api/hr/attendance', { params: date ? { date } : undefined });
+  return res.data;
+}
+
+export async function saveHrAttendance(date: string, rows: { staff_user_id: string; status: string; note?: string }[]): Promise<{ data: { date: string; saved: number } }> {
+  const res = await api.post('/api/hr/attendance', { date, rows });
+  return res.data;
+}
+
+export async function selfCheckin(staffId: string, pin: string): Promise<{ data: any }> {
+  const res = await api.post('/api/staff/self-checkin', { staff_id: staffId, pin });
+  return res.data;
 }
 
 // ====================================================================
@@ -1450,9 +2184,49 @@ export async function listShifts() {
   const res = await api.get('/api/staff/shifts');
   return res.data as { data: any[] };
 }
-export async function clockIn() {
-  const res = await api.post('/api/staff/clock-in');
+export async function clockIn(staffId?: string, opts?: { clock_in?: string | null; note?: string }) {
+  const res = await api.post('/api/staff/clock-in', { ...(staffId ? { staff_user_id: staffId } : {}), ...(opts ?? {}) });
   return res.data as { data: any };
+}
+export async function bulkClockInCoaches(coachIds?: string[]): Promise<{ data: { count: number; coaches: string[] } }> {
+  const res = await api.post('/api/staff/clock-in-bulk', coachIds?.length ? { coach_ids: coachIds } : {});
+  return res.data;
+}
+export async function updateShift(id: string, input: { clock_in?: string | null; clock_out?: string | null }) {
+  const res = await api.put(`/api/staff/shifts/${id}`, input);
+  return res.data as { data: any };
+}
+
+export interface CoachAttendanceRow {
+  shift_id: string;
+  staff_id: string;
+  full_name: string;
+  phone: string | null;
+  is_active: boolean;
+  clock_in: string;
+  clock_out: string | null;
+  duration_min: number | null;
+  sport_mode: string | null;
+}
+
+export async function listCoachAttendance(params?: { date?: string; coach_id?: string }): Promise<{
+  data: CoachAttendanceRow[];
+  stats: { total: number; present: number; now_present: number; absent: number };
+  date: string;
+}> {
+  const res = await api.get('/api/staff/coaches/attendance', { params });
+  return res.data;
+}
+
+export async function coachAttendanceReport(month?: string, coachId?: string): Promise<{
+  data: { id: string; full_name: string; days_present: number; total_min: number; earliest_in: string | null; latest_out: string | null; sport_mode: string | null; attendance_pct: number }[];
+  month: string;
+  working_days: number;
+}> {
+  const res = await api.get('/api/staff/coaches/attendance-report', {
+    params: { ...(month ? { month } : {}), ...(coachId ? { coach_id: coachId } : {}) },
+  });
+  return res.data;
 }
 export async function clockOut() {
   const res = await api.post('/api/staff/clock-out');
@@ -2303,6 +3077,18 @@ export async function getPlatformBranding(): Promise<{ data: PlatformBranding }>
   return res.data;
 }
 
+export interface PublicBranding {
+  app_name: string;
+  logo_url: string;
+  footer_text: string;
+}
+
+// الفوتر العام يقرأ الهوية العامة (بلا توثيق — حقول عرض فقط).
+export async function getPublicBranding(): Promise<{ data: PublicBranding }> {
+  const res = await api.get('/api/branding-public');
+  return res.data;
+}
+
 export async function updatePlatformBranding(branding: Partial<PlatformBranding>): Promise<{ data: PlatformBranding }> {
   const res = await api.put('/platform/branding', branding);
   return res.data;
@@ -2354,7 +3140,7 @@ export interface PlatformReportOverview {
   gyms_by_currency: { currency: string; count: number }[];
 }
 
-export async function getReportsOverview(): Promise<{ data: PlatformReportOverview }> {
+export async function getPlatformReportsOverview(): Promise<{ data: PlatformReportOverview }> {
   const res = await api.get('/platform/reports/overview');
   return res.data;
 }
@@ -2678,13 +3464,9 @@ export async function getAIRevenueForecast(months: number = 3): Promise<{ data: 
 }
 
 // ===== GYM REFERRALS (§40-M5) =====
-// The old Phase-5 marketing family (listCampaigns / email templates /
-// getLoyaltySummary / listReferrals) called bare '/marketing/*' paths that the
-// nginx proxy never forwards to the backend — every consumer got index.html
-// served as "JSON". Those functions and their orphan pages were removed.
-// What remains is the one live consumer: the gym marketing page's Referrals
-// tab, now backed by the real staff endpoint GET /api/marketing/referrals
-// (analytics.getGymReferrals, scoped to the tenant via referrer_gym_id).
+// The staff-side referrals endpoint: GET /api/marketing/referrals
+// (analytics.getGymReferrals, scoped to the tenant via referrer_gym_id)
+// feeds the gym marketing page's Referrals tab.
 
 export interface ReferralData {
   id: string;
@@ -2692,6 +3474,7 @@ export interface ReferralData {
   referrer_name?: string;
   referred_name?: string;
   referred_member_name?: string;
+  gym_name?: string;
   reward_amount: number;
   reward_status: string;
   status: string;
@@ -2700,6 +3483,93 @@ export interface ReferralData {
 
 export async function listGymReferrals(): Promise<{ data: ReferralData[] }> {
   const res = await api.get('/api/marketing/referrals');
+  return res.data;
+}
+
+// ===== PLATFORM MARKETING (§41) =====
+// The Phase-5 family that used to call bare '/marketing/*' paths was
+// repointed (not deleted) onto the real platform endpoints —
+// /platform/marketing/* is nginx-proxied and mounted by
+// server/src/routes/platform.ts under authenticatePlatformAdmin + CSRF.
+// Shapes match marketing_campaigns / marketing_email_templates (migration 045).
+
+export interface MarketingCampaign {
+  id: string;
+  name: string;
+  name_ar?: string;
+  type: string;
+  status: string;
+  gym_id?: string | null;
+  gym_name?: string;
+  platform_wide?: boolean;
+  budget: number;
+  spent_amount?: number;
+  start_date?: string | null;
+  end_date?: string | null;
+  metrics?: { views: number; clicks: number; conversions: number; cost_per_conversion: number };
+  created_at: string;
+}
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  subject_ar?: string;
+  body_html?: string;
+  type: string;
+  is_default?: boolean;
+  is_active?: boolean;
+  created_at: string;
+}
+
+export interface LoyaltySummary {
+  total_points: number;
+  active_members: number;
+  total_redeemed: number;
+  by_plan?: { plan_name: string; members: number }[];
+}
+
+export async function listCampaigns(): Promise<{ data: MarketingCampaign[] }> {
+  const res = await api.get('/platform/marketing/campaigns');
+  return res.data;
+}
+
+export async function createCampaign(payload: {
+  name: string;
+  name_ar?: string;
+  type: string;
+  budget?: number;
+  start_date?: string;
+  end_date?: string;
+  target_audience?: Record<string, unknown>;
+  gym_id?: string;
+}): Promise<{ data: MarketingCampaign }> {
+  const res = await api.post('/platform/marketing/campaigns', payload);
+  return res.data;
+}
+
+export async function updateCampaignStatus(id: string, status: string): Promise<{ data: MarketingCampaign }> {
+  const res = await api.patch(`/platform/marketing/campaigns/${id}/status`, { status });
+  return res.data;
+}
+
+export async function deleteCampaign(id: string): Promise<{ data: { id: string; deleted: boolean } }> {
+  const res = await api.delete(`/platform/marketing/campaigns/${id}`);
+  return res.data;
+}
+
+export async function listEmailTemplates(): Promise<{ data: EmailTemplate[] }> {
+  const res = await api.get('/platform/marketing/email-templates');
+  return res.data;
+}
+
+export async function listPlatformReferrals(): Promise<{ data: ReferralData[] }> {
+  const res = await api.get('/platform/marketing/referrals');
+  return res.data;
+}
+
+export async function getLoyaltySummary(): Promise<{ data: LoyaltySummary }> {
+  const res = await api.get('/platform/marketing/loyalty-summary');
   return res.data;
 }
 
@@ -2761,11 +3631,58 @@ export async function getApiUsage(gym_id?: string, days?: number): Promise<{ dat
   return res.data;
 }
 
-// ===== TRAINER PROGRESS =====
-// §40-M5: removed. The five trainer-progress functions called bare
-// '/trainer/*/progress/*' paths that exist on neither the nginx proxy nor any
-// backend route, and had zero page consumers (the trainerProgressContext that
-// wrapped them was itself never mounted). Deleted with the context file.
+// ===== TRAINER PROGRESS (§41) =====
+// Real staff endpoints backed by trainer_progress_logs (migration 069) and
+// server/src/controllers/trainerProgress.ts. Rows are unique per
+// (gym, trainer, day); a coach only reads/writes their own, a manager may
+// pass trainer_id. Repointed from the dead bare '/trainer/*/progress/*'
+// family removed in §40-M5 onto proxied '/api/trainer-progress/*'.
+
+export interface TrainerProgressLog {
+  id: string;
+  gym_id: string;
+  trainer_id: string;
+  log_date: string; // YYYY-MM-DD
+  client_count: number;
+  session_count: number;
+  duration_minutes: number;
+  notes?: string | null;
+  trainer_name?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getTrainerProgressToday(trainerId?: string): Promise<{ data: TrainerProgressLog | null }> {
+  const res = await api.get('/api/trainer-progress/today', { params: trainerId ? { trainer_id: trainerId } : {} });
+  return res.data;
+}
+
+export async function getTrainerProgressHistory(days = 30, trainerId?: string): Promise<{ data: TrainerProgressLog[] }> {
+  const res = await api.get('/api/trainer-progress/history', { params: { days, ...(trainerId ? { trainer_id: trainerId } : {}) } });
+  return res.data;
+}
+
+export async function saveTrainerProgress(payload: {
+  log_date?: string;
+  client_count: number;
+  session_count: number;
+  duration_minutes: number;
+  notes?: string | null;
+  trainer_id?: string;
+}): Promise<{ data: TrainerProgressLog }> {
+  const res = await api.post('/api/trainer-progress', payload);
+  return res.data;
+}
+
+export async function updateTrainerProgress(id: string, data: Partial<TrainerProgressLog>): Promise<{ data: TrainerProgressLog }> {
+  const res = await api.put(`/api/trainer-progress/${id}`, data);
+  return res.data;
+}
+
+export async function deleteTrainerProgress(id: string): Promise<{ data: { id: string; deleted: boolean } }> {
+  const res = await api.delete(`/api/trainer-progress/${id}`);
+  return res.data;
+}
 
 export default api;
 

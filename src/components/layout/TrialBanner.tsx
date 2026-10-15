@@ -17,7 +17,7 @@ export default function TrialBanner() {
   const roleBase = role === 'super-admin' ? '/super-admin' : '/admin';
 
   return (
-    <div className="bg-[#0a0a0f] text-white/85 text-caption md:text-label-md px-4 py-1.5 flex items-center justify-center gap-3 shrink-0 z-50">
+    <div className="bg-[#0a0a0f] text-white/85 text-caption md:text-label-md px-4 py-1.5 flex items-center justify-center gap-3 shrink-0 z-50 no-print">
       <span className="flex items-center gap-1.5">
         <span className="w-1.5 h-1.5 rounded-full bg-[#4ade80] inline-block animate-pulse shrink-0" />
         {language === 'ar'
@@ -25,7 +25,7 @@ export default function TrialBanner() {
           : `${days} days left on your free trial — `}
         <button
           type="button"
-          onClick={() => navigate(`${roleBase}/settings?tab=billing`)}
+          onClick={() => navigate(`${roleBase}/settings?tab=subscriptions`)}
           className="text-[#4ade80] hover:text-[#86efac] underline underline-offset-2 font-semibold transition-colors"
         >
           {language === 'ar' ? 'ترقية الآن' : 'Upgrade now'}

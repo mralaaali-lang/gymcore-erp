@@ -6,7 +6,7 @@ import { useToast } from '../../../context/ToastContext';
 import { useApiQuery } from '../../../hooks/useApiQuery';
 import { listTrainers, updateSubscription, type SubscriptionRow } from '../../../services/api';
 import { formatDate } from '../../../utils/date';
-import { SPORTS, WEEK_DAYS, sportLabel } from './shared';
+import { SPORTS, WEEK_DAYS, sportName, useSportsCatalog } from './shared';
 import { printSubscriptionInvoice } from './invoice';
 
 const inputCls =
@@ -37,6 +37,7 @@ export default function EditSubscription({
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const rtl = language === 'ar';
+  const { sports: catalogSports } = useSportsCatalog();
   const currency = gymProfile?.currency;
   const gymName = gymProfile?.name || branding?.name;
 
@@ -172,7 +173,7 @@ export default function EditSubscription({
           <button
             type="button"
             onClick={() => {
-              const ok = printSubscriptionInvoice(gymName, currency, { ...sub, sport_label: sportLabel(sub.sport) });
+              const ok = printSubscriptionInvoice(gymName, currency, { ...sub, sport_label: sportName(sub.sport, catalogSports, rtl) });
               if (!ok) showToast(rtl ? 'المتصفح منع نافذة الطباعة' : 'Print popup blocked', 'error');
             }}
             className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"

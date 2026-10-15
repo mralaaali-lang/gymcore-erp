@@ -9,8 +9,12 @@ interface StatCardProps {
   value: string | number;
   trend?: string;
   trendPositive?: boolean;
+  /** Icon-only (or icon + trend text) up/down pill — used by the reports money row. */
+  arrow?: 'up' | 'down';
   /** §35ت — small muted caption line under the value (e.g. monthly revenue under today's). */
   sub?: string;
+  /** Red pill for warning subs (e.g. «5 تنتهي») — green stays for «+N جديد». */
+  subTone?: 'red';
   sparkData?: number[];
   accent?: AccentName;
   onClick?: () => void;
@@ -23,7 +27,9 @@ export default function StatCard({
   value,
   trend,
   trendPositive,
+  arrow,
   sub,
+  subTone,
   sparkData,
   accent = 'emerald',
   onClick,
@@ -32,11 +38,13 @@ export default function StatCard({
   const Tag = onClick ? 'button' : 'div';
   // الزيادة (‎+2 جديد‎) pill أخضر تحت خالص — باقي الـ sub نص رمادي صغير
   const subIsHighlight = !!sub && /^\+/.test(sub.trim());
+  const arrowDir = arrow ?? (trend ? (trendPositive ? 'up' : 'down') : undefined);
+  const arrowPositive = arrowDir === 'up';
   return (
     <Tag
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`${CARD_HOVER_CLASS} text-start w-full ${onClick ? 'cursor-pointer' : ''}`}
+      className={`${CARD_HOVER_CLASS} text-start w-full [container-type:inline-size] ${onClick ? 'cursor-pointer' : ''}`}
     >
       {/* الأيقونة يمين في المنتصف (أول عنصر = يمين في RTL) والنص جنبها */}
       <div className="flex items-center gap-3">
@@ -47,21 +55,25 @@ export default function StatCard({
           <Icon size={22} strokeWidth={1.75} style={{ color: a.solid }} />
         </div>
         <div className="min-w-0">
-          <p className="text-lg md:text-xl font-extrabold text-gray-900 tracking-tight tabular-nums leading-tight">
+          <p className="font-extrabold text-gray-900 tracking-tight tabular-nums leading-tight whitespace-nowrap text-[clamp(15px,8cqw,20px)]">
             {value}
           </p>
-          <p className="text-sm font-medium text-gray-500 mt-0.5">{label}</p>
-          {trend ? (
+          <p className="font-medium text-gray-500 mt-0.5 truncate whitespace-nowrap text-[clamp(11px,4.5cqw,14px)]">{label}</p>
+          {arrowDir ? (
             <span
-              className={`mt-1.5 inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${
-                trendPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+              className={`mt-1.5 inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${
+                arrowPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
               }`}
             >
-              {trendPositive ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+              {arrowPositive ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
               {trend}
             </span>
           ) : subIsHighlight ? (
-            <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600">
+            <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap bg-emerald-50 text-emerald-600">
+              {sub}
+            </span>
+          ) : subTone === 'red' && sub ? (
+            <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap bg-red-50 text-red-600">
               {sub}
             </span>
           ) : sub ? (

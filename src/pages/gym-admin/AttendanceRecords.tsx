@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatTime } from '../../utils/date';
-import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
@@ -9,10 +8,10 @@ import { useApiQuery } from '../../hooks/useApiQuery';
 import { useMutation } from '@tanstack/react-query';
 import Spinner from '../../components/ui/Spinner';
 import CheckInCard from '../../components/attendance/CheckInCard';
-import { PrimaryAction, SecondaryAction, StatCard, Panel, EmptyState } from '../../components/dashboard';
+import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import { escapeHtml, printDocument } from '../../utils/print';
 import {
-  DoorOpen, LogOut, Plus, ShoppingCart, CalendarPlus,
+  DoorOpen, LogOut,
   FileText, Users, Clock, Calendar, Activity,
 } from 'lucide-react';
 
@@ -59,7 +58,6 @@ function clock12(d: Date, rtl: boolean): { time: string; suffix: string } {
 export default function AttendanceRecords() {
   const { language, role } = useApp();
   const { showToast } = useToast();
-  const navigate = useNavigate();
   const rtl = language === 'ar';
   const queryClient = useQueryClient();
 
@@ -147,22 +145,7 @@ export default function AttendanceRecords() {
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6 bg-gray-50 min-h-screen -m-6 p-6">
-      {/* §35ث — title/subtitle moved to the top bar; quick actions kept here */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        {role === 'gym-admin' && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <PrimaryAction onClick={() => navigate('/admin/members/add')}>
-              <Plus size={16} /> {rtl ? 'مشترك' : 'Member'}
-            </PrimaryAction>
-            <SecondaryAction onClick={() => navigate('/admin/sales')}>
-              <ShoppingCart size={16} /> {rtl ? 'بيع' : 'Sell'}
-            </SecondaryAction>
-            <SecondaryAction onClick={() => navigate('/admin/gym')}>
-              <CalendarPlus size={16} /> {rtl ? 'حصة' : 'Class'}
-            </SecondaryAction>
-          </div>
-        )}
-      </div>
+      {/* الأزرار السريعة (مشترك/بيع/حصة) حُذفت بطلب صاحب المشروع */}
 
       {/* §35ب — PDF export sits under the quick-action buttons */}
       <div className="flex">

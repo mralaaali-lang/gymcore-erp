@@ -10,7 +10,8 @@ import {
   listMembers, listOffers, listSubscriptions, listTrainers, createSubscription,
   type MembershipOffer,
 } from '../../../services/api';
-import { PAYMENT_METHODS, SPORTS, WEEK_DAYS, durationLabelAr, sportLabel } from './shared';
+import { PAYMENT_METHODS, WEEK_DAYS, durationLabelAr, sportName, useSportsCatalog } from './shared';
+import SportSelect from './SportSelect';
 import { printSubscriptionInvoice } from './invoice';
 
 /** Extract the server's own error text so the UI never hides a real rejection. */
@@ -33,7 +34,9 @@ const labelCls = 'block text-sm font-semibold text-gray-700 mb-1';
  * طابور بعد الحالي)، أيام حضور، دفع كامل/جزئي/آجل (يولّد دينًا في
  * member_debts على السيرفر) وطباعة الفاتورة فورًا.
  */
-export default function AddSubscription({ onClose }: { onClose: () => void }) {
+export default function AddSubscription({ onClose, initialOfferId, initialSport, initialWeekly }: {
+  onClose: () => void; initialOfferId?: string | null; initialSport?: string | null; initialWeekly?: string | null;
+}) {
   const { language, gymProfile, branding } = useApp();
   const rtl = language === 'ar';
   const currency = gymProfile?.currency;
@@ -44,13 +47,16 @@ export default function AddSubscription({ onClose }: { onClose: () => void }) {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [member, setMember] = useState<{ id: string; full_name: string; phone_number?: string | null } | null>(null);
 
-  const [offerId, setOfferId] = useState('');
+  const [offerId, setOfferId] = useState(initialOfferId ?? '');
   const [coachId, setCoachId] = useState('');
-  const [sport, setSport] = useState('');
+  // قيم الباقة المنقولة تلقائيًا (رياضة/أيام) — ابتدائية قابلة للتعديل
+  const [sport, setSport] = useState(initialSport ?? '');
   const [startMode, setStartMode] = useState<'now' | 'queue'>('now');
   const [startDate, setStartDate] = useState(todayIso());
   const [endDate, setEndDate] = useState('');
-  const [weekly, setWeekly] = useState<string[]>([]);
+  const [weekly, setWeekly] = useState<string[]>(
+    (initialWeekly ?? '').split(',').map((d) => d.trim()).filter((d) => WEEK_DAYS.some((w) => w.code === d)),
+  );
 
   const [payKind, setPayKind] = useState<'full' | 'partial' | 'debt'>('full');
   const [amountStr, setAmountStr] = useState('');
@@ -115,6 +121,7 @@ export default function AddSubscription({ onClose }: { onClose: () => void }) {
   }, [offer, payKind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const price = offer ? Number(offer.price) : 0;
+  const { sports: catalogSports } = useSportsCatalog();
   const paidAmount = Math.max(0, Number(amountStr || 0));
   const outstanding = offer ? Math.max(0, Math.round((price - paidAmount) * 100) / 100) : 0;
 
@@ -142,7 +149,7 @@ export default function AddSubscription({ onClose }: { onClose: () => void }) {
       const ok = printSubscriptionInvoice(gymProfile?.name || branding?.name, currency, {
         ...created,
         member_phone: member?.phone_number,
-        sport_label: sportLabel(sport || created.sport),
+        sport_label: sportName(sport || created.sport, catalogSports, rtl),
       });
       showToast(rtl ? 'تم حفظ الاشتراك' : 'Subscription saved', 'success');
       if (!ok) showToast(rtl ? 'المتصفح منع نافذة الطباعة — فعّلها للطباعة' : 'Print popup blocked', 'error');
@@ -243,10 +250,7 @@ export default function AddSubscription({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <label className={labelCls}>{rtl ? 'الرياضة' : 'Sport'}</label>
-              <select className={inputCls} value={sport} onChange={(e) => setSport(e.target.value)}>
-                <option value="">{rtl ? 'بدون تحديد' : 'Not set'}</option>
-                {SPORTS.map((s) => <option key={s.code} value={s.code}>{rtl ? s.ar : s.en}</option>)}
-              </select>
+              <SportSelect value={sport} onChange={setSport} rtl={rtl} allowEmpty className={inputCls} />
             </div>
           </div>
 

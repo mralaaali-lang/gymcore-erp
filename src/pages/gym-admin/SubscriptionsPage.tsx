@@ -13,11 +13,10 @@ import { formatMoney } from '../../utils/currency';
 import { fmtNum, formatDate } from '../../utils/date';
 import { escapeHtml, printDocument } from '../../utils/print';
 import { DashboardPage, PrimaryAction, SecondaryAction, Panel, EmptyState } from '../../components/dashboard';
-import { QuickActionModals, type ActionKey } from '../../components/dashboard/QuickActionCenter';
 import StatusBadge from '../../components/ui/StatusBadge';
 import AddSubscription from './subscriptions/AddSubscription';
 import EditSubscription from './subscriptions/EditSubscription';
-import { SPORTS, sportLabel } from './subscriptions/shared';
+import { SPORTS, sportName, useSportsCatalog } from './subscriptions/shared';
 
 /** Extract the server's own error text so the UI never hides a real rejection. */
 function apiError(e: unknown, fallback: string): string {
@@ -72,6 +71,11 @@ export default function SubscriptionsPage() {
   const rtl = language === 'ar';
   const currency = gymProfile?.currency;
   const gymName = gymProfile?.name || branding?.name;
+  const { sports: catalogSports } = useSportsCatalog();
+  const sportOptions = catalogSports.length > 0
+    ? catalogSports.map((s) => ({ code: s.code, label: s.name_ar }))
+    : SPORTS.map((s) => ({ code: s.code, label: rtl ? s.ar : s.en }));
+  const sName = (code?: string | null) => sportName(code, catalogSports, rtl);
 
   const [params] = useSearchParams();
   const initialStatus = STATUS_OPTIONS.some((s) => s.value === params.get('status')) ? params.get('status')! : 'all';
@@ -87,7 +91,6 @@ export default function SubscriptionsPage() {
   const [sort, setSort] = useState('start_date');
   const [order, setOrder] = useState('desc');
 
-  const [quick, setQuick] = useState<ActionKey | null>(null);
   const [showForm, setShowForm] = useState(params.get('new') === '1'); // §35ت — dashboard «اشتراك جديد» deep link
   const [cancelling, setCancelling] = useState<SubscriptionRow | null>(null);
   const [editing, setEditing] = useState<SubscriptionRow | null>(null);
@@ -167,7 +170,7 @@ export default function SubscriptionsPage() {
   const exportPdf = () => {
     if (!rows.length) { showToast(rtl ? 'لا صفوف للتصدير' : 'Nothing to export', 'error'); return; }
     const head = ['العضو', 'الباقة', 'الرياضة', 'المدرب', 'من', 'إلى', 'المتبقي', 'المبلغ', 'الدفع'];
-    const body = rows.map((r) => `<tr><td>${escapeHtml(r.member_name)}</td><td>${escapeHtml(r.offer_title)}</td><td>${escapeHtml(sportLabel(r.sport))}</td><td>${escapeHtml(r.coach_name || '—')}</td><td>${escapeHtml(formatDate(r.start_date))}</td><td>${escapeHtml(formatDate(r.end_date))}</td><td>${escapeHtml(remainingCell(r).text)}</td><td>${escapeHtml(formatMoney(Number(r.offer_price), currency))}</td><td>${escapeHtml(r.payment_state === 'paid' ? 'مدفوع' : 'غير مدفوع')}</td></tr>`).join('');
+    const body = rows.map((r) => `<tr><td>${escapeHtml(r.member_name)}</td><td>${escapeHtml(r.offer_title)}</td><td>${escapeHtml(sName(r.sport))}</td><td>${escapeHtml(r.coach_name || '—')}</td><td>${escapeHtml(formatDate(r.start_date))}</td><td>${escapeHtml(formatDate(r.end_date))}</td><td>${escapeHtml(remainingCell(r).text)}</td><td>${escapeHtml(formatMoney(Number(r.offer_price), currency))}</td><td>${escapeHtml(r.payment_state === 'paid' ? 'مدفوع' : 'غير مدفوع')}</td></tr>`).join('');
     const ok = printDocument({
       title: rtl ? 'تصدير الاشتراكات' : 'Subscriptions export',
       innerHtml: `<h1>${escapeHtml(rtl ? 'قائمة الاشتراكات' : 'Subscriptions')}${gymName ? ` — ${escapeHtml(gymName)}` : ''}</h1>
@@ -179,21 +182,8 @@ export default function SubscriptionsPage() {
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="bg-gray-50 min-h-screen -m-6 p-6">
-      {/* 1) الهيدر العلوي: العنوان + الأزرار السريعة */}
+      {/* 1) الهيدر العلوي (الأزرار السريعة حُذفت بطلب صاحب المشروع) */}
       <DashboardPage
-        actions={
-          <>
-            <SecondaryAction onClick={() => setQuick('checkin')}>
-              <UserCheck size={15} />{rtl ? 'حصة' : 'Check-in'}
-            </SecondaryAction>
-            <SecondaryAction onClick={() => navigate('/admin/sales')}>
-              <DollarSign size={15} />{rtl ? 'بيع' : 'POS sale'}
-            </SecondaryAction>
-            <SecondaryAction onClick={() => setQuick('member')}>
-              <Plus size={15} />{rtl ? 'عضو' : 'Member'}
-            </SecondaryAction>
-          </>
-        }
       >
         {/* 2) شريط العنوان والأزرار */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -216,7 +206,7 @@ export default function SubscriptionsPage() {
           <button type="button" onClick={() => { setStatus('unpaid'); setPage(1); }} className="text-start">
             <Statish icon={<AlertTriangle size={22} />} color="text-rose-600" bg="bg-rose-50" value={fmtNum(stats?.unpaid ?? 0)} label={rtl ? 'غير مدفوع' : 'Unpaid'} />
           </button>
-          <button type="button" onClick={() => navigate('/admin/billing?tab=Debts')} className="text-start">
+          <button type="button" onClick={() => navigate('/admin/debts')} className="text-start">
             <Statish icon={<DollarSign size={22} />} color="text-cyan-600" bg="bg-cyan-50" value={formatMoney(Number(stats?.dues ?? 0), currency)} label={rtl ? 'مستحقات (ديون مفتوحة)' : 'Dues (open debts)'} />
           </button>
         </div>
@@ -228,7 +218,7 @@ export default function SubscriptionsPage() {
           </select>
           <select aria-label={rtl ? 'الرياضة' : 'Sport'} className={inputCls} value={sport} onChange={(e) => { setSport(e.target.value); setPage(1); }}>
             <option value="">{rtl ? 'الرياضة: الكل' : 'Sport: All'}</option>
-            {SPORTS.map((s) => <option key={s.code} value={s.code}>{rtl ? s.ar : s.en}</option>)}
+            {sportOptions.map((s) => <option key={s.code} value={s.code}>{s.label}</option>)}
           </select>
           <select aria-label={rtl ? 'مدة الباقة' : 'Duration'} className={inputCls} value={duration} onChange={(e) => { setDuration(e.target.value); setPage(1); }}>
             {DURATION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{rtl ? `مدة الباقة: ${o.ar}` : `Duration: ${o.ar}`}</option>)}
@@ -298,7 +288,7 @@ export default function SubscriptionsPage() {
                         <td className="py-3 px-2 text-start">
                           <p className="text-gray-800">{r.offer_title}</p>
                         </td>
-                        <td className="py-3 px-2 text-start text-gray-700">{sportLabel(r.sport)}</td>
+                        <td className="py-3 px-2 text-start text-gray-700">{sName(r.sport)}</td>
                         <td className="py-3 px-2 text-start text-gray-700">{r.coach_name || (rtl ? 'بدون مدرب' : 'No coach')}</td>
                         <td className="py-3 px-2 text-start text-gray-700 whitespace-nowrap">{formatDate(r.start_date)}</td>
                         <td className="py-3 px-2 text-start text-gray-700 whitespace-nowrap">{formatDate(r.end_date)}</td>
@@ -362,9 +352,15 @@ export default function SubscriptionsPage() {
         </Panel>
       </DashboardPage>
 
-      {/* أزرار سريعة + شاشة الاشتراك الجديد */}
-      <QuickActionModals action={quick} onClose={() => setQuick(null)} />
-      {showForm && <AddSubscription onClose={() => setShowForm(false)} />}
+      {/* شاشة الاشتراك الجديد */}
+      {showForm && (
+        <AddSubscription
+          onClose={() => setShowForm(false)}
+          initialOfferId={params.get('offer')}
+          initialSport={params.get('sport')}
+          initialWeekly={params.get('weekly')}
+        />
+      )}
       {editing && (
         <EditSubscription
           sub={editing}
@@ -411,11 +407,11 @@ export default function SubscriptionsPage() {
 /** §35ث — أيقونة في اليمين عمودياً وبجانبها الرقم والوصف (نمط أفقي). */
 function Statish({ icon, color, bg, value, label }: { icon: React.ReactNode; color: string; bg: string; value: string; label: string }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:border-gray-200 transition-colors flex items-center gap-4">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:border-gray-200 transition-colors flex items-center gap-4 [container-type:inline-size]">
       <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${bg} ${color}`}>{icon}</div>
       <div className="min-w-0">
-        <p className={`text-2xl md:text-3xl font-bold tracking-tight leading-none ${color}`}>{value}</p>
-        <p className="text-sm text-gray-500 mt-1 truncate">{label}</p>
+        <p className={`font-bold tracking-tight leading-none whitespace-nowrap text-[clamp(18px,8cqw,30px)] ${color}`}>{value}</p>
+        <p className="text-gray-500 mt-1 truncate whitespace-nowrap text-[clamp(11px,4.5cqw,14px)]">{label}</p>
       </div>
     </div>
   );

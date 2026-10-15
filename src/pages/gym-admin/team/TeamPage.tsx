@@ -4,11 +4,9 @@ import StaffDirectory from './StaffDirectory';
 import ShiftsLog from './ShiftsLog';
 import HrOverview from './HrOverview';
 
-// Team hub — merged from four duplicated pages (§18 IA cleanup follow-up):
-//   UsersPage (staff CRUD)      → tab "staff"  (+ role filter replaces TrainersPage)
-//   StaffManagement (shifts)    → tab "shifts" (its staff table was a UsersPage duplicate)
-//   HRDashboard (HR & payroll)  → tab "hr"
-// Old routes /admin/trainers|shifts|hr now redirect here with ?tab= deep links.
+// Team hub — merged staff/shifts/hr tabs (§18 IA cleanup follow-up).
+// /admin/trainers is a standalone cards page again (TrainersPage);
+// /admin/shifts|hr still redirect here with ?tab= deep links.
 const TABS = [
   { key: 'staff', icon: 'badge', ar: 'الموظفون', en: 'Staff' },
   { key: 'shifts', icon: 'schedule', ar: 'سجل الدوام', en: 'Attendance log' },

@@ -13,11 +13,12 @@ interface ProductForm {
   name: string;
   barcode: string;
   stock_quantity: number;
+  min_stock: number;
   purchase_price: number;
   selling_price: number;
 }
 
-const emptyForm: ProductForm = { name: '', barcode: '', stock_quantity: 0, purchase_price: 0, selling_price: 0 };
+const emptyForm: ProductForm = { name: '', barcode: '', stock_quantity: 0, min_stock: 5, purchase_price: 0, selling_price: 0 };
 
 const inputClass =
   'w-full px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400';
@@ -82,6 +83,7 @@ export default function ProductCatalog() {
       name: p.name,
       barcode: p.barcode || '',
       stock_quantity: p.stock_quantity,
+      min_stock: p.min_stock ?? 5,
       purchase_price: p.purchase_price,
       selling_price: p.selling_price,
     });
@@ -142,6 +144,10 @@ export default function ProductCatalog() {
               <input type="number" value={form.stock_quantity} onChange={(e) => setForm({ ...form, stock_quantity: +e.target.value })} className={inputClass} min="0" />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الحد الأدنى للمخزون' : 'Min stock'}</label>
+              <input type="number" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: +e.target.value })} className={inputClass} min="0" />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {rtl ? 'سعر الشراء' : 'Purchase Price'} <span className="text-red-500">*</span>
               </label>
@@ -177,6 +183,7 @@ export default function ProductCatalog() {
                   <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الاسم' : 'Name'}</th>
                   <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الباركود' : 'Barcode'}</th>
                   <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'المخزون' : 'Stock'}</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الحد الأدنى' : 'Min'}</th>
                   <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'سعر الشراء' : 'Purchase'}</th>
                   <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'سعر البيع' : 'Selling'}</th>
                   <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الإجراءات' : 'Actions'}</th>
@@ -189,6 +196,7 @@ export default function ProductCatalog() {
                     <td className="p-4 font-medium text-gray-900">{p.name}</td>
                     <td className="p-4 text-gray-500" dir="ltr">{p.barcode || '-'}</td>
                     <td className="p-4 text-gray-900">{p.stock_quantity}</td>
+                    <td className="p-4 text-gray-500">{p.min_stock ?? 5}</td>
                     <td className="p-4 text-gray-500">{p.purchase_price?.toLocaleString?.() ?? p.purchase_price}</td>
                     <td className="p-4 font-medium text-emerald-600">{p.selling_price?.toLocaleString?.() ?? p.selling_price}</td>
                     <td className="p-4 space-x-2 space-x-reverse">
@@ -206,7 +214,7 @@ export default function ProductCatalog() {
                 ))}
                 {products.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-gray-400">
+                    <td colSpan={8} className="p-8 text-center text-gray-400">
                       {rtl ? 'لا توجد منتجات' : 'No products found'}
                     </td>
                   </tr>

@@ -184,6 +184,14 @@ export const createSubscription = async (req: Request, res: Response): Promise<v
       }
     }
 
+    if (sport) {
+      const sportRes = await query(`SELECT 1 FROM gym_sports WHERE gym_id = $1 AND code = $2`, [gym_id, sport]);
+      if (sportRes.rows.length === 0) {
+        res.status(400).json({ error: 'Unknown sport for this gym.' });
+        return;
+      }
+    }
+
     const paid = Number(amount_paid);
     const price = Number(offer.price);
     if (!(paid >= 0) || paid > price) {
@@ -300,6 +308,14 @@ export const updateSubscription = async (req: Request, res: Response): Promise<v
         [coach_id, gym_id]);
       if (coachRes.rows.length === 0) {
         res.status(400).json({ error: 'Coach not found in this gym' });
+        return;
+      }
+    }
+
+    if (sport) {
+      const sportRes = await query(`SELECT 1 FROM gym_sports WHERE gym_id = $1 AND code = $2`, [gym_id, sport]);
+      if (sportRes.rows.length === 0) {
+        res.status(400).json({ error: 'Unknown sport for this gym.' });
         return;
       }
     }
