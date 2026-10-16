@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useApp } from '../../../context/GymBrandContext';
+import { useApp, DEFAULT_BRAND_COLOR } from '../../../context/GymBrandContext';
 import { getSettings, updateSettings, uploadGymLogo } from '../../../services/api';
 import { useToast } from '../../../context/ToastContext';
 import { Buildings as Building2, MapPin, Phone, GlobeSimple as Globe, Clock, Palette } from '@phosphor-icons/react';
@@ -62,7 +62,7 @@ export default function GymTab() {
       gym_timezone: form.gym_timezone || 'Africa/Cairo',
       currency: form.currency || 'EGP',
       logo_url: form.logo_url || '',
-      gym_brand_color: form.gym_brand_color || '#f97316',
+      gym_brand_color: form.gym_brand_color || DEFAULT_BRAND_COLOR,
       work_open: form.work_open || '',
       work_close: form.work_close || '',
       work_days: workDays.join(','),
@@ -171,7 +171,7 @@ export default function GymTab() {
           </div>
           <div>
             <label className="flex items-center gap-2 text-sm font-semibold text-gray-500 mb-2">
-              <Palette size={16} className="text-orange-500" /> {rtl ? 'لون البراند' : 'Brand color'}
+              <Palette size={16} className="text-primary" /> {rtl ? 'لون البراند' : 'Brand color'}
             </label>
             <div className="flex flex-wrap gap-2">
               {SPORT_COLORS.map((c) => (
@@ -181,7 +181,7 @@ export default function GymTab() {
                   onClick={() => setField('gym_brand_color', c)}
                   aria-label={c}
                   className={`w-9 h-9 rounded-full transition-all active:scale-95 ${
-                    (form.gym_brand_color || '#f97316') === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'hover:scale-110'
+                    (form.gym_brand_color || DEFAULT_BRAND_COLOR) === c ? 'ring-2 ring-offset-2 ring-gray-900' : 'hover:scale-110'
                   }`}
                   style={{ backgroundColor: c }}
                 />

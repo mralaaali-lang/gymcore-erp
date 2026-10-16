@@ -78,11 +78,13 @@ export function useSportsCatalog() {
   return { sports, isLoading, active: sports.filter((s) => s.is_active) };
 }
 
-/** دوائر الألوان لصفحة الرياضات (صف أول 10 + رمادي/تركواز). */
+/** دوائر الألوان لصفحة الرياضات (صف أول 10 + رمادي/تركواز/زمردي).
+ *  #10b981 موجود لأنه لون البراند الافتراضي لنادٍ جديد — لازم يبقى قابل للتحديد
+ *  في منتقي «لون البراند» وإلا ظهر الافتراضي بدون أي دائرة مُعلَّمة. */
 export const SPORT_COLORS = [
   '#0284c7', '#f97316', '#ef4444', '#8b5cf6', '#22c55e',
   '#eab308', '#ec4899', '#14b8a6', '#6366f1', '#84cc16',
-  '#6b7280', '#06b6d4',
+  '#6b7280', '#06b6d4', '#10b981',
 ] as const;
 
 export function paymentMethodLabel(code?: string | null): string {

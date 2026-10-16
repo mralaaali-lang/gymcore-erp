@@ -34,6 +34,14 @@ const initialState: AppState = {
   isAuthenticated: false,
 };
 
+/**
+ * Colour a gym gets before its owner picks one. It was `#f97316` — the old
+ * pre-rebrand orange — which is why freshly created gyms kept showing orange
+ * chrome. Kept as a named constant so the settings fallback and the zero-state
+ * reducer cannot drift apart. Must stay selectable in `SPORT_COLORS`.
+ */
+export const DEFAULT_BRAND_COLOR = '#10b981';
+
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'UPDATE_BRANDING':
@@ -46,7 +54,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         tenantId: action.payload.id,
         isZeroState: action.payload.isNew,
         branding: action.payload.isNew
-          ? { name: 'جيم جديد', logoUrl: '', primaryColor: '#f97316' }
+          ? { name: 'جيم جديد', logoUrl: '', primaryColor: DEFAULT_BRAND_COLOR }
           : initialState.branding,
       };
     case 'SET_ROLE':

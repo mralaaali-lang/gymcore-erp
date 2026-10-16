@@ -15,12 +15,12 @@ import PageHeader from '../../components/shared/PageHeader';
 const DEFAULT_BRANDING: PlatformBranding = {
   logo_url: '',
   primary_color: '#006c49',
-  accent_color: '#f97316',
+  accent_color: '#10b981',
   sidebar_bg: '#ffffff',
   sidebar_text: '#374151',
   favicon_url: '',
   app_name: 'GymCore',
-  footer_text: 'آ© 2024 GymCore. All rights reserved.',
+  footer_text: '© 2024 GymCore. All rights reserved.',
   login_bg_image: '',
   custom_css: '',
 };
