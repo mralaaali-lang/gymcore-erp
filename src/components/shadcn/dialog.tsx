@@ -48,7 +48,13 @@ const DialogContent = forwardRef<
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          'relative flex w-full max-w-lg flex-col gap-4 rounded-xl border border-border bg-card p-6 text-card-foreground shadow-xl',
+          // Layout and animation only — no radius, border colour, padding or
+          // shadow. This project redefines `rounded-xl` to 1.5rem
+          // (Bootstrap-aligned scale), and `tailwind-merge` does not recognise
+          // the custom `rounded-shell` / `border-hairline` keys, so a shell
+          // class here would silently outrank the one the caller passes.
+          // Callers (see components/shared/Modal) own the shell.
+          'relative flex w-full flex-col text-card-foreground',
           'max-h-[calc(100dvh-2rem)] overflow-y-auto',
           'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
           className,

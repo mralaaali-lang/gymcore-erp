@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, UserCheck, UserMinus as UserX, Wallet, Plus, Clock, X, Trash as Trash2, Pencil, Eye, FileText, Bank as Banknote } from '@phosphor-icons/react';
+import { Users, UserCheck, UserMinus as UserX, Wallet, Plus, Clock, Trash as Trash2, Pencil, Eye, FileText, Bank as Banknote } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -14,6 +14,14 @@ import {
 } from '../../services/api';
 import { DashboardPage, StatCard, Panel, EmptyState } from '../../components/dashboard';
 import StatusBadge from '../../components/ui/StatusBadge';
+import Modal from '../../components/shared/Modal';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../../components/shadcn/dropdown-menu';
 
 // ====================================================================
 // شئون الموظفين (/admin/hr) — أول تاب في مجموعة الإعدادات.
@@ -51,7 +59,6 @@ export default function HrMainPage() {
   const [draftQ, setDraftQ] = useState('');
   const [draftStatus, setDraftStatus] = useState('active');
   const [applied, setApplied] = useState({ q: '', status: 'active' });
-  const [menuId, setMenuId] = useState<string | null>(null);
   const [viewing, setViewing] = useState<StaffData | null>(null);
   const [showSelf, setShowSelf] = useState(false);
   const [selfId, setSelfId] = useState('');
@@ -236,44 +243,38 @@ export default function HrMainPage() {
                         <StatusBadge status={s.is_active ? (rtl ? 'نشط' : 'Active') : (rtl ? 'غير نشط' : 'Inactive')} variant={s.is_active ? 'success' : 'neutral'} />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="relative">
-                          <button type="button" onClick={() => setMenuId(menuId === s.id ? null : s.id)}
-                            className="w-10 h-10 inline-flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-600 font-bold" aria-label="⋯">
-                            ⋯
-                          </button>
-                          {menuId === s.id && (
-                            <>
-                              <div className="fixed inset-0 z-30" onClick={() => setMenuId(null)} />
-                              <div className="absolute left-0 z-40 w-44 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
-                                <button type="button" onClick={() => { setViewing(s); setMenuId(null); }}
-                                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 text-gray-700">
-                                  <Eye size={15} />{rtl ? 'عرض' : 'View'}
-                                </button>
-                                <button type="button" onClick={() => { setViewing(s); setMenuId(null); }}
-                                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 text-gray-700">
-                                  <FileText size={15} />{rtl ? 'ملف' : 'Dossier'}
-                                </button>
-                                <button type="button" onClick={() => navigate(`/admin/hr/add?edit=${s.id}`)}
-                                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 text-gray-700">
-                                  <Pencil size={15} />{rtl ? 'تعديل' : 'Edit'}
-                                </button>
-                                <button type="button" onClick={() => navigate(`/admin/hr/contracts?staff=${s.id}`)}
-                                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 text-gray-700">
-                                  <FileText size={15} />{rtl ? 'عقد' : 'Contract'}
-                                </button>
-                                <button type="button" onClick={() => navigate(`/admin/hr/adjustments?staff=${s.id}`)}
-                                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 text-gray-700">
-                                  <Banknote size={15} />{rtl ? 'حركة راتب' : 'Adjustment'}
-                                </button>
-                                <button type="button"
-                                  onClick={() => { if (confirm(rtl ? `حذف ${s.full_name}؟` : `Delete ${s.full_name}?`)) del.mutate(s.id); setMenuId(null); }}
-                                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-red-50 text-red-600">
-                                  <Trash2 size={15} />{rtl ? 'حذف' : 'Delete'}
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button type="button"
+                              className="w-10 h-10 inline-flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-600 font-bold" aria-label="⋯">
+                              ⋯
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem onSelect={() => setViewing(s)}>
+                              <Eye size={15} />{rtl ? 'عرض' : 'View'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setViewing(s)}>
+                              <FileText size={15} />{rtl ? 'ملف' : 'Dossier'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => navigate(`/admin/hr/add?edit=${s.id}`)}>
+                              <Pencil size={15} />{rtl ? 'تعديل' : 'Edit'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => navigate(`/admin/hr/contracts?staff=${s.id}`)}>
+                              <FileText size={15} />{rtl ? 'عقد' : 'Contract'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => navigate(`/admin/hr/adjustments?staff=${s.id}`)}>
+                              <Banknote size={15} />{rtl ? 'حركة راتب' : 'Adjustment'}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="danger"
+                              onSelect={() => { if (confirm(rtl ? `حذف ${s.full_name}؟` : `Delete ${s.full_name}?`)) del.mutate(s.id); }}
+                            >
+                              <Trash2 size={15} />{rtl ? 'حذف' : 'Delete'}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   ))}
@@ -286,84 +287,96 @@ export default function HrMainPage() {
 
       {/* ملف الموظف */}
       {viewing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setViewing(null)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <StaffAvatar name={viewing.full_name} size="w-12 h-12 text-xl" />
-                <div>
-                  <h2 className="font-bold text-gray-900">{viewing.full_name}</h2>
-                  <p className="text-xs text-gray-400" dir="ltr">{viewing.employee_code || ''}</p>
-                </div>
+        <Modal
+          open
+          onClose={() => setViewing(null)}
+          size="md"
+          title={
+            <span className="flex items-center gap-3">
+              <StaffAvatar name={viewing.full_name} size="w-12 h-12 text-xl" />
+              <span className="min-w-0">
+                <span className="block truncate">{viewing.full_name}</span>
+                <span className="block text-xs font-normal text-muted-foreground" dir="ltr">
+                  {viewing.employee_code || ''}
+                </span>
+              </span>
+            </span>
+          }
+        >
+          <dl className="space-y-2 text-sm">
+            {([
+              [rtl ? 'الوظيفة' : 'Job', `${viewing.job_title || ROLE_AR[viewing.role] || viewing.role}${viewing.department ? ` / ${viewing.department}` : ''}`],
+              [rtl ? 'الهاتف' : 'Phone', viewing.phone || '—'],
+              [rtl ? 'البريد' : 'Email', viewing.email],
+              [rtl ? 'الراتب' : 'Salary', viewing.salary != null ? money(viewing.salary) : '—'],
+              [rtl ? 'العمولة' : 'Commission', `${Number(viewing.commission_pct ?? 0)}%`],
+              [rtl ? 'التعيين' : 'Hired', viewing.hire_date || '—'],
+              [rtl ? 'الدوام' : 'Shift', viewing.shift_start && viewing.shift_end ? `${viewing.shift_start}–${viewing.shift_end} (+${viewing.late_allowance_min ?? 0}د)` : '—'],
+              [rtl ? 'البدلات' : 'Allowances', money(Number(viewing.housing_allowance ?? 0) + Number(viewing.transport_allowance ?? 0) + Number(viewing.other_allowance ?? 0))],
+              [rtl ? 'الحالة' : 'Status', viewing.is_active ? (rtl ? 'نشط' : 'Active') : (rtl ? 'غير نشط' : 'Inactive')],
+            ] as [string, string][]).map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between gap-2 border-b border-gray-50 pb-1.5">
+                <dt className="text-gray-500">{k}</dt>
+                <dd className="font-semibold text-gray-900 text-start">{v}</dd>
               </div>
-              <button onClick={() => setViewing(null)} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <dl className="space-y-2 text-sm">
-              {([
-                [rtl ? 'الوظيفة' : 'Job', `${viewing.job_title || ROLE_AR[viewing.role] || viewing.role}${viewing.department ? ` / ${viewing.department}` : ''}`],
-                [rtl ? 'الهاتف' : 'Phone', viewing.phone || '—'],
-                [rtl ? 'البريد' : 'Email', viewing.email],
-                [rtl ? 'الراتب' : 'Salary', viewing.salary != null ? money(viewing.salary) : '—'],
-                [rtl ? 'العمولة' : 'Commission', `${Number(viewing.commission_pct ?? 0)}%`],
-                [rtl ? 'التعيين' : 'Hired', viewing.hire_date || '—'],
-                [rtl ? 'الدوام' : 'Shift', viewing.shift_start && viewing.shift_end ? `${viewing.shift_start}–${viewing.shift_end} (+${viewing.late_allowance_min ?? 0}د)` : '—'],
-                [rtl ? 'البدلات' : 'Allowances', money(Number(viewing.housing_allowance ?? 0) + Number(viewing.transport_allowance ?? 0) + Number(viewing.other_allowance ?? 0))],
-                [rtl ? 'الحالة' : 'Status', viewing.is_active ? (rtl ? 'نشط' : 'Active') : (rtl ? 'غير نشط' : 'Inactive')],
-              ] as [string, string][]).map(([k, v]) => (
-                <div key={k} className="flex items-center justify-between gap-2 border-b border-gray-50 pb-1.5">
-                  <dt className="text-gray-500">{k}</dt>
-                  <dd className="font-semibold text-gray-900 text-start">{v}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </div>
+            ))}
+          </dl>
+        </Modal>
       )}
 
       {/* حضور ذاتي */}
       {showSelf && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowSelf(false)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-gray-900 mb-1">{rtl ? 'حضور ذاتي' : 'Self check-in'}</h2>
-            <p className="text-xs text-gray-400 mb-4">{rtl ? 'اختر الموظف ثم أدخل PIN الحضور الخاص به' : 'Pick staff, then enter their attendance PIN'}</p>
-            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'الموظف' : 'Staff'}</label>
-            <select value={selfId} onChange={(e) => setSelfId(e.target.value)} className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm mb-3 outline-none">
+        <Modal
+          open
+          onClose={() => setShowSelf(false)}
+          size="sm"
+          disableDismiss={selfMut.isPending}
+          title={rtl ? 'حضور ذاتي' : 'Self check-in'}
+          description={rtl ? 'اختر الموظف ثم أدخل PIN الحضور الخاص به' : 'Pick staff, then enter their attendance PIN'}
+          footer={
+            <button onClick={() => selfMut.mutate()} disabled={!selfId || selfPin.length < 4 || selfMut.isPending}
+              className="w-full min-h-[48px] rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-sm font-bold disabled:opacity-50">
+              {rtl ? 'تسجيل الحضور' : 'Check in'}
+            </button>
+          }
+        >
+          <div className="space-y-1.5">
+            <label className="block text-sm font-semibold text-gray-500">{rtl ? 'الموظف' : 'Staff'}</label>
+            <select value={selfId} onChange={(e) => setSelfId(e.target.value)} className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm outline-none">
               <option value="">{rtl ? 'اختر…' : 'Select…'}</option>
               {activeList.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
             </select>
-            <label className="block text-sm font-semibold text-gray-500 mb-1.5">PIN</label>
+            <label className="mt-2 block text-sm font-semibold text-gray-500">PIN</label>
             <input type="password" inputMode="numeric" dir="ltr" value={selfPin} onChange={(e) => setSelfPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
               className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm text-center tracking-[0.5em] outline-none" placeholder="••••" />
-            <button onClick={() => selfMut.mutate()} disabled={!selfId || selfPin.length < 4 || selfMut.isPending}
-              className="mt-4 w-full min-h-[48px] rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-sm font-bold disabled:opacity-50">
-              {rtl ? 'تسجيل الحضور' : 'Check in'}
-            </button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ملخص التقارير */}
       {showSummary && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowSummary(false)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">{rtl ? `ملخص الموارد — ${month}` : `HR summary — ${month}`}</h2>
-              <button onClick={() => setShowSummary(false)} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <dl className="space-y-2 text-sm">
-              <div className="flex justify-between border-b border-gray-50 pb-1.5"><dt className="text-gray-500">{rtl ? 'مسير الشهر' : 'Payroll'}</dt><dd className="font-bold">{payRes?.data ? money(payRes.data.total_net) : '—'}</dd></div>
-              <div className="flex justify-between border-b border-gray-50 pb-1.5"><dt className="text-gray-500">{rtl ? 'مكافآت الشهر' : 'Bonuses'}</dt><dd className="font-bold text-emerald-600">{money(adjRes?.stats?.bonus ?? 0)}</dd></div>
-              <div className="flex justify-between border-b border-gray-50 pb-1.5"><dt className="text-gray-500">{rtl ? 'خصومات الشهر' : 'Deductions'}</dt><dd className="font-bold text-red-600">{money(adjRes?.stats?.deductions ?? 0)}</dd></div>
-              <div className="flex justify-between border-b border-gray-50 pb-1.5"><dt className="text-gray-500">{rtl ? 'سلف مستحقة' : 'Advances due'}</dt><dd className="font-bold text-amber-600">{money(adjRes?.stats?.advances ?? 0)}</dd></div>
-              <div className="flex justify-between border-b border-gray-50 pb-1.5"><dt className="text-gray-500">{rtl ? 'أيام إجازات الشهر' : 'Leave days'}</dt><dd className="font-bold">{fmtNum((balRes?.data ?? []).reduce((s, b) => s + Number(b.monthly_used ?? 0), 0))}</dd></div>
-              <div className="flex justify-between"><dt className="text-gray-500">{rtl ? 'موظفون نشطون' : 'Active staff'}</dt><dd className="font-bold">{fmtNum(activeList.length)}</dd></div>
-            </dl>
-            <div className="flex gap-2 mt-5">
+        <Modal
+          open
+          onClose={() => setShowSummary(false)}
+          size="md"
+          title={rtl ? `ملخص الموارد — ${month}` : `HR summary — ${month}`}
+          description={rtl ? 'أرقام الشهر من المسير والتسويات والإجازات.' : 'This month across payroll, adjustments and leave.'}
+          footer={
+            <>
               <Link to="/admin/hr/payroll" className="flex-1 text-center min-h-[44px] px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold">{rtl ? 'الرواتب' : 'Payroll'}</Link>
               <Link to="/admin/hr/leaves" className="flex-1 text-center min-h-[44px] px-4 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold">{rtl ? 'الإجازات' : 'Leaves'}</Link>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between border-b border-gray-50 pb-1.5"><dt className="text-gray-500">{rtl ? 'مسير الشهر' : 'Payroll'}</dt><dd className="font-bold">{payRes?.data ? money(payRes.data.total_net) : '—'}</dd></div>
+            <div className="flex justify-between border-b border-gray-50 pb-1.5"><dt className="text-gray-500">{rtl ? 'مكافآت الشهر' : 'Bonuses'}</dt><dd className="font-bold text-emerald-600">{money(adjRes?.stats?.bonus ?? 0)}</dd></div>
+            <div className="flex justify-between border-b border-gray-50 pb-1.5"><dt className="text-gray-500">{rtl ? 'خصومات الشهر' : 'Deductions'}</dt><dd className="font-bold text-red-600">{money(adjRes?.stats?.deductions ?? 0)}</dd></div>
+            <div className="flex justify-between border-b border-gray-50 pb-1.5"><dt className="text-gray-500">{rtl ? 'سلف مستحقة' : 'Advances due'}</dt><dd className="font-bold text-amber-600">{money(adjRes?.stats?.advances ?? 0)}</dd></div>
+            <div className="flex justify-between border-b border-gray-50 pb-1.5"><dt className="text-gray-500">{rtl ? 'أيام إجازات الشهر' : 'Leave days'}</dt><dd className="font-bold">{fmtNum((balRes?.data ?? []).reduce((s, b) => s + Number(b.monthly_used ?? 0), 0))}</dd></div>
+            <div className="flex justify-between"><dt className="text-gray-500">{rtl ? 'موظفون نشطون' : 'Active staff'}</dt><dd className="font-bold">{fmtNum(activeList.length)}</dd></div>
+          </dl>
+        </Modal>
       )}
     </div>
   );

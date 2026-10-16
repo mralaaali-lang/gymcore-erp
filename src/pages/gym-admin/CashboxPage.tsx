@@ -20,6 +20,7 @@ import {
 } from '../../services/api';
 import { PAYMENT_METHODS } from './subscriptions/shared';
 import PageLoader from '../../components/shared/PageLoader';
+import Modal from '../../components/shared/Modal';
 import { AddExpenseModal } from './ExpensesPage';
 
 // ====================================================================
@@ -492,10 +493,20 @@ function SearchModal({ onClose, currency, rtl }: {
     t === 'payment' ? 'text-emerald-600' : t === 'expense' ? 'text-red-500' : 'text-orange-500';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40" aria-hidden />
-      <div dir={rtl ? 'rtl' : 'ltr'} className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h3 className="font-bold text-lg text-gray-900">{rtl ? 'بحث متقدم في الحركات' : 'Advanced movements search'}</h3>
+    <Modal
+      open
+      onClose={onClose}
+      size="xl"
+      title={rtl ? 'بحث متقدم في الحركات' : 'Advanced movements search'}
+      description={rtl ? 'بحث في الإيرادات والمصروفات والمرتجعات.' : 'Search income, expenses and refunds.'}
+      footer={
+        <button type="button" onClick={onClose}
+          className="w-full rounded-xl border border-hairline py-2.5 text-sm font-bold text-muted-foreground hover:bg-muted">
+          {rtl ? 'إغلاق' : 'Close'}
+        </button>
+      }
+    >
+      <div className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           <label className="block text-xs font-semibold text-gray-500">{rtl ? 'من' : 'From'}
             <input type="date" value={from} max={today} onChange={(e) => setFrom(e.target.value)} className="mt-1 w-full h-11 px-2 rounded-xl border border-gray-200 text-sm" />
@@ -557,12 +568,8 @@ function SearchModal({ onClose, currency, rtl }: {
             )}
           </>
         )}
-        <button type="button" onClick={onClose}
-          className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50">
-          {rtl ? 'إغلاق' : 'Close'}
-        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -619,10 +626,27 @@ function ReportModal({ date, rows, currency, rtl, onClose }: {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40" aria-hidden />
-      <div dir={rtl ? 'rtl' : 'ltr'} className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h3 className="font-bold text-lg text-gray-900">{rtl ? `تقرير الخزنة ${date}` : `Cashbox report ${date}`}</h3>
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      title={rtl ? `تقرير الخزنة ${date}` : `Cashbox report ${date}`}
+      description={rtl ? 'ملخص اليوم وحركاته، قابل للطباعة.' : 'Day summary and movements, printable.'}
+      footer={
+        <>
+          <button type="button" onClick={onClose}
+            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50">
+            {rtl ? 'إغلاق' : 'Close'}
+          </button>
+          <button type="button" onClick={print}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gray-900 py-2.5 text-sm font-bold text-white hover:bg-gray-800">
+            <span className="material-symbols-outlined text-lg">print</span>
+            {rtl ? 'طباعة' : 'Print'}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-3 text-center">
             <p className="text-xs text-emerald-700 font-semibold">{rtl ? 'إيرادات' : 'Income'}</p>
@@ -648,19 +672,8 @@ function ReportModal({ date, rows, currency, rtl, onClose }: {
         <Block title={rtl ? 'إيرادات' : 'Income'} xs={pin} color="text-emerald-600" />
         <Block title={rtl ? 'مصروفات' : 'Expenses'} xs={pout} color="text-red-500" />
         <Block title={rtl ? 'مرتجعات' : 'Refunds'} xs={pref} color="text-orange-500" />
-        <div className="flex gap-2">
-          <button type="button" onClick={onClose}
-            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50">
-            {rtl ? 'إغلاق' : 'Close'}
-          </button>
-          <button type="button" onClick={print}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gray-900 py-2.5 text-sm font-bold text-white hover:bg-gray-800">
-            <span className="material-symbols-outlined text-lg">print</span>
-            {rtl ? 'طباعة' : 'Print'}
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -703,10 +716,27 @@ function RefundModal({ onClose, onDone, currency, rtl }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40" aria-hidden />
-      <div dir={rtl ? 'rtl' : 'ltr'} className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h3 className="font-bold text-lg text-gray-900">{rtl ? 'تسجيل مرتجع' : 'Record refund'}</h3>
+    <Modal
+      open
+      onClose={onClose}
+      size="md"
+      disableDismiss={busy}
+      title={rtl ? 'تسجيل مرتجع' : 'Record refund'}
+      description={rtl ? 'يُخصم المرتجع من الدرج مباشرة.' : 'Deducted from the drawer immediately.'}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={busy}
+            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            {rtl ? 'تراجع' : 'Back'}
+          </button>
+          <button type="button" onClick={save} disabled={busy}
+            className="flex-1 rounded-xl bg-orange-600 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-50">
+            {busy ? (rtl ? 'جارٍ…' : '…') : (rtl ? 'تسجيل المرتجع' : 'Record refund')}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
         <div className="relative">
           <label className="block text-sm font-semibold text-gray-700 mb-1">{rtl ? 'العضو (اختياري)' : 'Member (optional)'}</label>
           <input
@@ -760,17 +790,7 @@ function RefundModal({ onClose, onDone, currency, rtl }: {
             {rtl ? 'سيُخصم من الدرج:' : 'Deducted from drawer:'} <b className="text-orange-600 tabular-nums">{formatMoney(Number(amount), currency)}</b>
           </p>
         )}
-        <div className="flex gap-2">
-          <button type="button" onClick={onClose}
-            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50">
-            {rtl ? 'تراجع' : 'Back'}
-          </button>
-          <button type="button" onClick={save} disabled={busy}
-            className="flex-1 rounded-xl bg-orange-600 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-50">
-            {busy ? (rtl ? 'جارٍ…' : '…') : (rtl ? 'تسجيل المرتجع' : 'Record refund')}
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

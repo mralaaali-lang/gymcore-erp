@@ -13,6 +13,7 @@
  * | `StatsGrid` | Responsive stat/metric cards grid | `stats`, `columns` |
  * | `FilterBar` | Search input + filter dropdowns + actions | `search`, `onSearchChange`, `filters`, `onRefresh` |
  * | `ExportButton` | CSV export with column selection | `columns`, `data`, `filename` |
+ * | `Modal` | Centred accessible dialog (Radix) | `open`, `onClose`, `title`, `size`, `footer` |
  *
  * ## Design Principles
  *
@@ -73,9 +74,11 @@ export {
   SkeletonRows,
 } from './Skeleton';
 export { default as CountUp } from './CountUp';
+export { default as Modal } from './Modal';
 
 export type { Tab } from './UnifiedTabs';
 export type { StatItem } from './StatsGrid';
 export type { FilterOption, FilterGroup } from './FilterBar';
 export type { ExportColumn } from './ExportButton';
 export type { SkeletonProps } from './Skeleton';
+export type { ModalProps } from './Modal';

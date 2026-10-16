@@ -15,9 +15,10 @@
 | `a4b7c1d` | سُلّم سلسلة الرسوم مقاس + كروت الـKPI على التوكنات + `chartTheme.ts` |
 | `51f1e9d` | المرحلة 2: عائلة `Skeleton` + `CountUp` (61 موضع skeleton، والـKPI بيعدّ) |
 | `104954d` | المرحلة 3 دفعة 1: الداكن + جسر الكلاسات الحرفية + محرك السمة |
+| HEAD بعد `104954d` | المرحلة 4 دفعة 1: `shared/Modal` + `shadcn/dropdown-menu` على رادكس — 7 مودالات + قائمتين (الدليل: `LOCAL_TESTING_REPORT.md` §المرحلة 4) |
 
-**الحالة:** المرحلة 0 و1 و3 (بنية) تمام. المرحلة 2 خلصت ما عدا التوستات (لها ملف تسليم
-مستقل: `TASK_TOASTS_SONNER.md`). المتبقي: **المرحلة 4 و5 و6** — تفصيلها في §4.
+**الحالة:** المرحلة 0 و1 و3 (بنية) و4 (دفعة 1) تمام. المرحلة 2 خلصت ما عدا التوستات (لها ملف
+تسليم مستقل: `TASK_TOASTS_SONNER.md`). المتبقي: **المرحلة 5 و6** — تفصيلها في §4.
 
 ---
 
@@ -59,15 +60,23 @@ src/components/layout/ThemeControl.tsx · src/context/ThemeContext.tsx
 
 ## 4) المتبقي من الخطة — قابل للتنفيذ كما هو
 
-### المرحلة 4 — Radix على أسوأ 4 مكرّرات فقط (Dialog / Dropdown / Tooltip)
+### المرحلة 4 — Radix على أسوأ مكرّرات Dialog/Dropdown (خلصت دفعة 1)
 
-- جرد أولًا: `Modal/Drawer/Dropdown/Tooltip` في `components/shared` و`components/ui`،
-  واختاري الأربعة الأسوأ (focus-trap ناقص / Escape مكسور / aria غايب / tab-order مكسور).
-- `react-tooltip` و`react-dropdown-menu` **غير مثبتين** — تثبيت + توثيق في
-  `AGENT_HANDOVER.md` §5 بند 1د قبل الاستخدام.
-- السلوك المطلوب: focus-trap و`Escape` وaria من Radix، **المودال في نص الشاشة** (اتفاقية
-  سارية)، الحشو directional، والألوان من التوكنات فقط.
-- الحدود: 4 مواضع بس. أي تحويل جماعي للـclick-outside مرفوض.
+- **اتعمل:** `src/components/shared/Modal.tsx` فوق `components/shadcn/dialog.tsx`، و
+  `src/components/shadcn/dropdown-menu.tsx` (+ `@radix-ui/react-dropdown-menu@2.2.1` في
+  `package.json`). اتحوّل 7 مودالات (CashboxPage: بحث/تقرير/مرتجع — HrMainPage: ملف موظف/حضور
+  ذاتي/ملخص موارد — BillingEngine: كوبون) وقائمتين (قائمة `⋯` في HrMainPage و`ThemeControl`).
+  الاتفاقية بقت في `AGENT_HANDOVER.md` §5 بند **1ح** — اقرئيها قبل أي منبثق جديد.
+- **Tooltip متعمد ما اتعملش:** الجرد طلع صفر تكرار (`group-hover` وحيدة فوق أفاتار، `ooltip`
+  التلاتة بتوع apexcharts، و`title=` لمربعات ألوان). `@radix-ui/react-tooltip` اتثبتت واتشالت
+  تاني — ما نضيفش حزمة ومكوّن لموضع استخدام واحد.
+- **المتبقي من نفس المرحلة (مش مطلوب دلوقتي):** 36 ملف / 46 موضعًا لسه `fixed inset-0` يدوي
+  (كانوا 38/54 قبل الدفعة دي). المسار الصحيح: تحويل المودالات اللي جوه الشاشات اللي هتلمسيها
+  في المرحلة 5/6 (MemberList/SalesPage/POS) بدل دفعة جماعية — وكل تحويل لازم `tsc` + `build` +
+  قياس `role=dialog` في المتصفح.
+- **الفرق عن المواصفة:** الخطة قالت «أسوأ 4» وطلعت 7+2 — لأن التحويل جوه نفس الملف بيطلب
+  الملفات التلاتة معاه (وإلا يبقى في الملف نمطان)، ولأن `ThemeControl` كان بيعيد نفس
+  مستمعات `mousedown/Escape` اللي القائمة بتعملهم.
 
 ### المرحلة 5 — `@tanstack/react-table` على 3 شاشات حصراً
 
@@ -135,6 +144,16 @@ src/components/layout/ThemeControl.tsx · src/context/ThemeContext.tsx
 9. `:9000` بيقدم build الكونتينر القديم. التحقق الحقيقي: `npm run dev` أو
    `docker compose build frontend && docker compose up -d frontend`.
 10. أدوات الـshell كانت بترجع أخطاء إخراج في بعض الأدوار — لو حصلت، حولي لـRead/Glob.
+11. **`tailwind-merge` ما يعرفش الأسماء المخصصة:** `cn('rounded-xl …', 'rounded-shell …')`
+    بيسيب الاتنين، والفوز بترتيب الـCSS — و`rounded-xl` هنا = 1.5rem (مقياس bootstrap) فما
+    تتفاجيش إن المودال طلع 24px. القاعدة: طبقة `shadcn/*.tsx` ما تحملش radius/لون حدود/حشو/ظل.
+12. **مُعدّل ألفا خارج سلّم `opacity` يسكّت بصمت:** `bg-series-6/12` انكتب وما اتولّدش منه أي
+    قاعدة في الـCSS المبني (السلّم 0/5/10/20/…) — استخدمي `/10` أو `/[0.12]` واتأكدي بـgrep في
+    `dist/assets/*.css`.
+13. **الـviewport بلا سطح بيجمدّ ساعة الأنيميشن:** `data-[state=closed]:animate-out` بيخلي
+    Radix `Presence` مستنية `animationend` مش جاية → السكريم بيفضل mounted والـscroll lock
+    على الـbody، و`:focus` ما بيطابقش، و`.click()` البرمجي ما بينقلش الفوكس. قبل ما تكتب
+    «المكوّن مكسور»: عطّلي الأنيميشن بـ`*{animation:none!important}` أو قارني برادكس عاري.
 
 ---
 
@@ -184,9 +203,11 @@ src/services/api.ts
 
 ## 10) نقطة البداية
 
-1. اقرئي `AGENT_HANDOVER.md` §5 و§6، ثم `LOCAL_TESTING_REPORT.md` §خطة البرميوم
-   و§المرحلة 3 (دفعة 1).
-2. ابدأي بالمرحلة 4 (Radix) — الاعتماديات الناقصة فيها اتنين بس.
-3. أول commit يكون جرد الأربعة المكررة + اختبار focus-trap/Escape/aria قبل وبعد.
+1. اقرئي `AGENT_HANDOVER.md` §5 (خصوصًا بند **1ح** عن المنبثقات) و§6، ثم
+   `LOCAL_TESTING_REPORT.md` §خطة البرميوم و§المرحلة 3 و§المرحلة 4.
+2. ابدأي بالمرحلة 5 (`@tanstack/react-table` على MemberList · CashboxPage · SalesPage) —
+   الحزمة لسه **غير مثبتة**، وتثبيتها + توثيقها في `AGENT_HANDOVER.md` §5 يسبق أول سطر جدول.
+3. أول commit يكون جردًا: أعمدة الشاشات التلات + أي منها مُرتَّب/مُختار يدويًا اليوم، وقياس
+   ارتفاع الصف الحقيقي قبل وبعد عشان `SkeletonTable` ما يقفزش المحتوى.
 4. قرارين §5 معلّقين على صاحب المشروع — متستناش عليهم في شغل تاني، ومتنفّذيش واحد منهم
    لوحدك.

@@ -18,9 +18,16 @@ import { FloppyDisk, Plus, X, MagnifyingGlass, CheckCircle, Calendar, Trash, Arr
 import PageLoader from '../../components/shared/PageLoader';
 import PageHeader from '../../components/shared/PageHeader';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
+import Modal from '../../components/shared/Modal';
 
 const CURRENCY_SYMBOL = 'ج.م';
 const VAT_RATE = 0.14;
+/**
+ * The coupon form lives in the Modal body while its submit button lives in the
+ * Modal footer, so the button is wired to the form by id (`<button form=…>`).
+ * A shared constant keeps the two ends of that link from drifting apart.
+ */
+const COUPON_FORM_ID = 'billing-engine-coupon-form';
 
 const statusColors: Record<string, string> = {
   paid: 'bg-green-100 text-green-700',
@@ -630,17 +637,33 @@ export default function BillingEngine() {
   const renderCouponModal = () => {
     if (!showCouponModal) return null;
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowCouponModal(false)}>
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2">
-              <Ticket size={20} className="text-primary" />
-              <h2 className="text-lg font-bold text-gray-900">{t('Add Discount Coupon', 'إضافة كوبون خصم')}</h2>
-            </div>
-            <button onClick={() => setShowCouponModal(false)} className="p-1.5 hover:bg-gray-50 rounded-lg"><X size={18} /></button>
-          </div>
-
-          <form onSubmit={handleCreateCoupon} className="space-y-4">
+      <Modal
+        open
+        onClose={() => setShowCouponModal(false)}
+        size="md"
+        disableDismiss={createCouponMutation.isPending}
+        title={
+          <span className="flex items-center gap-2">
+            <Ticket size={20} className="text-primary shrink-0" />
+            <span>{t('Add Discount Coupon', 'إضافة كوبون خصم')}</span>
+          </span>
+        }
+        footer={
+          <>
+            <button type="button" onClick={() => setShowCouponModal(false)}
+              className="px-5 py-3 border border-gray-200 rounded-xl text-gray-500 font-medium hover:bg-gray-50 transition-colors">
+              {t('Cancel', 'إلغاء')}
+            </button>
+            <button type="submit" form={COUPON_FORM_ID} disabled={createCouponMutation.isPending}
+              className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2">
+              {createCouponMutation.isPending && (<span className="material-symbols-outlined animate-spin text-base">progress_activity</span>)}
+              <FloppyDisk size={16} />
+              {t('Create Coupon', 'إنشاء الكوبون')}
+            </button>
+          </>
+        }
+      >
+        <form id={COUPON_FORM_ID} onSubmit={handleCreateCoupon} className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-600 mb-1.5">{t('Coupon Code', 'رمز الكوبون')} *</label>
               <input type="text" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
@@ -699,22 +722,8 @@ export default function BillingEngine() {
             </div>
 
             {couponError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{couponError}</p>}
-
-            <div className="flex gap-3">
-              <button type="submit" disabled={createCouponMutation.isPending}
-                className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2">
-                {createCouponMutation.isPending && (<span className="material-symbols-outlined animate-spin text-base">progress_activity</span>)}
-                <FloppyDisk size={16} />
-                {t('Create Coupon', 'إنشاء الكوبون')}
-              </button>
-              <button type="button" onClick={() => setShowCouponModal(false)}
-                className="px-5 py-3 border border-gray-200 rounded-xl text-gray-500 font-medium hover:bg-gray-50 transition-colors">
-                {t('Cancel', 'إلغاء')}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+        </form>
+      </Modal>
     );
   };
 

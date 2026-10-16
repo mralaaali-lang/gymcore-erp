@@ -1,7 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Sun, Moon, CircleHalf as MonitorSmartphone, Check, CaretDown } from '@phosphor-icons/react';
+import { Sun, Moon, CircleHalf as MonitorSmartphone, CaretDown } from '@phosphor-icons/react';
 import { useTheme, type ThemePreference } from '../../context/ThemeContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '../shadcn/dropdown-menu';
 
 const OPTIONS: { value: ThemePreference; icon: typeof Sun; ar: string; en: string }[] = [
   { value: 'light', icon: Sun, ar: 'فاتح', en: 'Light' },
@@ -20,75 +26,45 @@ const OPTIONS: { value: ThemePreference; icon: typeof Sun; ar: string; en: strin
  * The trigger shows the *resolved* palette (what is on screen), while the check
  * mark follows the stored preference — so choosing "تلقائي" on an OS in dark
  * mode still shows a moon, which is what the user is actually looking at.
+ *
+ * The panel is Radix's DropdownMenu (Phase 4), which replaced a hand-rolled
+ * `mousedown` + `Escape` listener pair here: arrow keys, `menuitemradio`,
+ * focus return to the trigger and outside-dismiss come from the primitive.
  */
 export default function ThemeControl() {
   const { t } = useTranslation();
   const { theme, resolvedTheme, setTheme } = useTheme();
-  const [open, setOpen] = useState(false);
-  const boxRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onDocClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDocClick);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
   const TriggerIcon = resolvedTheme === 'dark' ? Moon : Sun;
 
   return (
-    <div className="relative shrink-0" ref={boxRef}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        title={t('السمة', 'Appearance')}
-        className="flex items-center gap-1 bg-white/15 hover:bg-white/25 text-white rounded-full px-3 py-2.5 font-bold transition-all duration-200"
-      >
-        <TriggerIcon size={18} weight="duotone" />
-        <CaretDown size={12} weight="bold" className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
-      </button>
-
-      {open && (
-        <div
-          role="menu"
-          className="absolute end-0 top-full mt-2 w-44 bg-card border border-hairline rounded-shell shadow-lg overflow-hidden z-50"
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={t('السمة', 'Appearance')}
+          className="group flex items-center gap-1 bg-white/15 hover:bg-white/25 text-white rounded-full px-3 py-2.5 font-bold transition-all duration-200"
         >
+          <TriggerIcon size={18} weight="duotone" />
+          {/* `data-state` lands on Radix's trigger, so the chevron reads it
+              through the group rather than its own attribute. */}
+          <CaretDown size={12} weight="bold" className="transition-transform group-data-[state=open]:rotate-180" />
+        </button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent align="end" className="w-44 p-1">
+        <DropdownMenuRadioGroup value={theme}>
           {OPTIONS.map((opt) => {
             const Icon = opt.icon;
             const active = theme === opt.value;
             return (
-              <button
-                key={opt.value}
-                type="button"
-                role="menuitemradio"
-                aria-checked={active}
-                onClick={() => {
-                  setTheme(opt.value);
-                  setOpen(false);
-                }}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] font-medium transition-colors ${
-                  active ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
-                }`}
-              >
+              <DropdownMenuRadioItem key={opt.value} value={opt.value} onSelect={() => setTheme(opt.value)}>
                 <Icon size={17} weight={active ? 'fill' : 'regular'} className="shrink-0" />
                 <span className="flex-1 text-start">{t(opt.ar, opt.en)}</span>
-                {active && <Check size={15} weight="bold" className="text-brass shrink-0" />}
-              </button>
+              </DropdownMenuRadioItem>
             );
           })}
-        </div>
-      )}
-    </div>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

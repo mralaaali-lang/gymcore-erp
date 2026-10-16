@@ -2511,3 +2511,85 @@ endpoint العقود، بلا أي بيانات وهمية.
 - **برضه متبقاش:** مرحلة `bg-white/5` ونظائرها الشفافة — سيبتها زي ما هي عمدًا، دي طبقات
   شفافيتها مقصودة وبتقرا صح فوق السطح الداكن.
 
+
+---
+
+## المرحلة 4 (دفعة 1) — المودالات والقوائم على Radix: الصدفة بقت مكوّن واحد (2026-10-16)
+
+**القياس قبل الشغل.** `git grep -l "fixed inset-0" HEAD -- 'src/**/*.tsx'` طلع 38 ملف في 54
+موضعًا، والنمط المكرر حرفيًا في أغلبهم:
+
+```tsx
+<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={close}>
+  <div className="bg-white rounded-3xl shadow-2xl …" onClick={(e) => e.stopPropagation()}>
+```
+
+دي بتوسّط اللوحة (كويس) وما بتعملش حاجة تانية: Tab بيمشي من المودال للصفحة وراه، Escape
+مسكوتة، السكريم div عادي مش affordance للإغلاق، `aria-modal` مش موجود، والصفحة بتفضل تتسكرول
+تحت اللوحة. فالاتفاقية مش «غيّر الألوان» دي Agreement: **لا مودال في `src/pages` يكتب
+`fixed inset-0` بنفسه تاني.**
+
+**اللي اتعمل (مودالات).** `src/components/shared/Modal.tsx` فوق `components/shadcn/dialog.tsx`
+الموجود — رادكس بيعطي Focus trap، Escape، إرجاع الفوكس، قفل السكرول، وعزل الخلفية. الصدفة
+`bg-card + border-hairline + rounded-shell` بلا ظل، والأحجام الأربعة هي اللي الصفحات القديمة
+كانت بتستخدمه فعلًا (24/28/32/42rem). اتحوّل 7 مودالات: CashboxPage ‏(بحث + تقرير + مرتجع)،
+HrMainPage ‏(ملف الموظف + حضور ذاتي + ملخص الموارد)، BillingEngine (كوبون الخصم). الحاجات
+المعلّقة على آخر الملف (إغلاق/طباعة/حفظ) اتنقلت لـ`footer` بتاع Modal، والزر اللي بره الـ`<form>`
+بترابط بيها بـ`form={COUPON_FORM_ID}` (const في نفس الملف عشان الطرفين ما يتفارقوش). المودالات
+اللي فيها mutation شغّالة بتمرّر `disableDismiss={busy}` — دي كانت بتقفل في نص الحفظ.
+
+**اللي اتعمل (قوائم).** `src/components/shadcn/dropdown-menu.tsx` (جديد) + `@radix-ui/react-dropdown-menu@2.2.1`
+في `package.json`. اتحوّلت القائمتين اللي كانت كل واحدة منهم بتعيد اختراع نفس المستمعين:
+`HrMainPage` (قائمة `⋯` بتاعة الصف: كان `fixed inset-0 z-30` كلسكرين + 6 أزرار بنفس الـclass)
+و`ThemeControl` (كان `mousedown` + `keydown` بنفسه). `ThemeControl` بقت `RadioGroup/RadioItem`
+فسيمانتي `menuitemradio` والعلامة النحاسية جاية من `ItemIndicator`. **Tooltip ما اتعملش:**
+الجرد طلع صفر مكررات — `group-hover:opacity-100` الوحيدة كاميرا فوق أفاتار، و`ooltip` التلاتة
+tooltips بتوع apexcharts (رسوم)، و`title=` أسماء مربعات ألوان. فحزمة
+`@radix-ui/react-tooltip` اتثبتت واتشالت تاني: مافيش مبرر لمكوّن لموضع استخدام واحد.
+
+**تحقق بالمتصفح (مش بالعين).** اتبنى سطح مؤقت (`probe/` + `probe.vite.config.ts` → `dist-probe/`)
+بيستورد نفس `Modal` و`DropdownMenu` اللي الصفحات بتستوردهم، واتقاس بـ`getComputedStyle` على
+منفذ مؤقت، وبعدين المساحة دي اتحذفت كاملة (الـcommit ما فيهوش ملفات probe):
+
+| المطلوب | النتيجة |
+|---|---|
+| `role=dialog` + `aria-labelledby`/`aria-describedby` | موجودين، والنص بتاعهم هو العنوان/الوصف ✓ |
+| الفوكس عند الفتح | على أول حقل (`field-a`) ✓ |
+| Focus trap | نقل الفوكس لعنصر بره اللوحة بترجع فورًا للداخل (`immediately: field-a`) ✓ |
+| Escape | بتقفل و`onClose` تشتغل مرة واحدة ✓ |
+| عزل الخلفية | `#root` بياخد `aria-hidden="true"` وقت الفتح وبيتمسح بعد القفل ✓ |
+| قفل السكرول | `data-scroll-locked` + `overflow:hidden` أثناء الفتح ✓ |
+| التوسيط | `top 338 / h 264` على `vh 940` و`left 244 / right 244` على `vw 914` ✓ |
+| الصدفة فاتح | bg #fffdf9، border #efe9dd، نصف قطر 10px، ظل `none` ✓ |
+| الصدفة داكن | bg #172c24، border #2e4a3e، حبر #eeeff0 — نفس الكلاس، صفر تعديل صفحة ✓ |
+| القائمة | `role=menu`، ‏3 `menuitem`، ArrowDown بيمشي عرض←تعديل←حذف، وEscape بترجّع الفوكس للزر ✓ |
+| اللون الخطر | `rgb(140,47,58)` = `--series-6` (oxblood) بدل `text-red-600` الحرفية ✓ |
+
+**تلات عيوب طلعت من القياس واتصلّحت.** (1) **نصّف القطر كان 24px مش 10px:**
+`components/shadcn/dialog.tsx` كان حامل `rounded-xl` في الكلاس الأساسي، والمشروع بيعرّف
+`rounded-xl = 1.5rem` (مقياس bootstrap اللي في `tailwind.config.js`)، و`tailwind-merge`
+بيتعامل مع الأسماء المخصصة (`rounded-shell`, `border-hairline`) ككلاسات مجهولة فما يفكّ
+التعارض — الكلاس الأساسي كان بيفوز بالترتيب. الإصلاح: طبقة الـprimitive بقى تخطيط وأنيميشن
+بس، والصدفة كلها من المُستدعي. (2) **الـhover ما كانش بيطلع:** `bg-series-6/12` اتكتب وما
+اتولّدش — مُعدّل ألفا خارج سلّم `opacity` بيُسكت بصمت (الـCSS النهائي فيه `/10` و`/15` وبس)،
+فالتلوّن بقى `/10` زي بقية الشيبس. (3) الـclose buttons القديمة اللي كانت `<X size={18}>`
+بـ`aria-label` يدائي اتبدلت بزر رادكس (`aria-label="إغلاق"` في `dialog.tsx`)، فـ`X` اتشال
+من استيراد phosphor في HrMainPage.
+
+**اللي مكانش عيب وخد وقفة فهم.** أول قياس بعد القفل ساب `data-scroll-locked` و`overflow:hidden`
+على الـbody — بدا إن السكرول بيفضل مقفول بعد كل مودال. التجربة الضابطة: نفس الدورة على **رادكس
+عاري** (بدون كلاسات `animate-*`) بتفكّ القفل، ومع الـshell بتاعنا تسيبه، والسبب إن أنيميشن
+الـexit كان `playState: running` و`currentTime: 0` للأبد — الرقية دي بتشتغل في viewport
+ملوش وجود فعلي (`take_screenshot` بيرفض بـ`NATIVE_BROWSER_VIEWPORT_UNAVAILABLE` و`visible=false`)
+فالساعة بتاعة الأنيميشن متجمّدة، و`Presence` مستنية `animationend` مش جاي. بعد ما عطّلت الأنيميشن
+بـ`animation: none !important` الدورة بقت كاملة: فتح ← قفل ← `lock:false, overflow:visible` ✓.
+يعني السلوك متأكد منه منطقيًا (رادكس + نفس المسار)، والعيب لو موجود هو في البيئة مش في المكوّن.
+بنفس السبب `:focus` ما كانش بيطابق (`document.activeElement` = العنصر و`matches(':focus')` = false)،
+فما قدرتش أقيس لون الـhighlight نفسه بالـCSS — اتأكد إن قاعدتي `data-[highlighted]:bg-muted`
+و`…:bg-series-6/10` **موجودة فعلًا في الـCSS المبني** وبقي التحقق البصري الصغير ده في المتصفح
+العادي.
+
+**المتحققش منه:** النقر الحقيقي بعد اللوجين على الشاشات التلات (Cashbox/HR/BillingEngine) —
+الكونتينر على :9000 لسه بيعرض البنل القديم. قبل الكسر ما اتصلّح كمان: 36 ملف (46 موضعًا) لسه
+`fixed inset-0` بنفس النمط، والمطلوب منهم خطوة خطوة مع الشاشات اللي هتلمسها المرحلة 5/6،
+مش دفعة واحدة.
