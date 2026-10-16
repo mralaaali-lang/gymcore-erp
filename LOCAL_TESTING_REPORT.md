@@ -2261,3 +2261,58 @@ endpoint العقود، بلا أي بيانات وهمية.
   مش هوية، ومش متلمسين. `initialState.branding.primaryColor = '#114b5f'` تُركت كما هي (براند الصالة المزروعة،
   مش افتراضي نادٍ جديد).
 - **تحقق:** `tsc` = 0 + `vite build` ✓. لم يُعَد إنشاء حاوية الواجهة بعد لهذا التغيير (لا أثر له في الشاشات العامة).
+
+---
+
+## §Phase 1b (دفعة 2) — أول مكوّنات Aceternity/shadcn على الأساس الجديد (2026-10-16)
+
+- **اعتماديات حقيقية:** ثُبّتت `@radix-ui/react-slot` و`@radix-ui/react-dialog` و`@radix-ui/react-label`
+  (`lucide-react` و`class-variance-authority` و`tailwind-merge` و`tailwindcss-animate` كانت مثبّتة).
+  لم يُستخدم `npx shadcn init` — كان سيكتب فوق `tokens.css` و`tailwind.config.js`.
+- **مكان الهبوط:** `src/components/shadcn/` بأسماء السجل الرسمية (`button.tsx`, `card.tsx`, `input.tsx`,
+  `label.tsx`, `dialog.tsx`). `src/components/ui/` لم يُمَسّ: `Button.tsx` القديمة واجهتها
+  (`variant: primary|secondary|ghost|outline` + `fullWidth`) و`Card.tsx` القديمة (`hoverable/onClick`)
+  يعتمد عليهما 60+ صفحة. الاستيرادات كلها ببادئة `@/` لأن الـ alias معرّف في `tsconfig.json` و`vite.config.ts`،
+  فأي مكوّن يُنسخ من Aceternity يعمل بلا تعديل أسطر استيراد.
+- **`components.json`:** `aliases.ui` صار `@/components/shadcn` (كان `src/components/ui`) — أي `shadcn add`
+  مستقبلي يهبط في المجلد الآمن ولا يكتب فوق المكوّنات القديمة.
+- **ما فُعّل في المنسوخ (لا نسخ أعمى):** كل لون من متغير توكن (صفر hex) · `asChild` عبر `Slot` ·
+  `rounded-lg` = 1rem = `--radius` في الثيم المحلي · Dialog **مركزي** دائماً طبقاً لاتفاقية المودال، وطبقة
+  التوسيط لا يستقبل المستدعي `className` عليها (الـ `className` يذهب للوحة كما في shadcn) · زر الإغلاق
+  `[inset-inline-end:1rem]` بدل `right-4` ليصح تحت `dir="rtl"` · الحشو `text-start` ·
+  scrim `bg-black/50` عمدياً لا `bg-foreground/50` لأن `--foreground` شبه أبيض في الوضع الداكن.
+- **تحقق:** `tsc --noEmit` = 0 · `vite build` ✓ (4.97s) · فُحص ملف CSS الناتج للتأكد أن Tailwind يولّد
+  الفئات الجديدة (14 فئة كلها OK: `animate-in/out`, `zoom-in-95`, `zoom-out-95`, `fade-in-0`, `fade-out-0`,
+  `inset-inline-end:1rem`, `ring-offset-background`, `bg-primary\/90`, `backdrop-blur-[2px]`, `h-11`,
+  `tabular-nums`, `peer-disabled`).
+- **غير موثَّق بعد (بصدق):** المكوّنات الخمسة لا تستهلكها أي صفحة حتى الآن، فلا لقطة متصفح تثبت رسمها الحي.
+  أول اختبار runtime حقيقي يكون بترحيل أول مستهلك فعلي (المرشح: `ui/Button.tsx` مرآة فوق الجديد
+  بخصائص محفوظة الشكل) — وهو قرار يغيّر مظهر الأزرار في المشروع كله، فلا يُتَّخذ بلا موافقة المالك.
+
+---
+
+## §الانتكاسة — تجربة الخطط العربية كسرت طباعة التطبيق كله، ورُجِّعت (2026-10-16)
+
+- **ما شكا منه المالك:** «غيّرت الخطوط وبقا شكلها أسوأ بكثير من الخط السابق» — وشكوى ثانية عن طلب
+  تصميم بروابط/رسوم/ثيم برميوم مع خط أفضل (موثّقة كخطة، انظر §خطة البرميوم أدناه).
+- **التشخيص (بالأدلة لا بالحدس):** `Be Vietnam Pro` هو الخط الوحيد **المستضاف محلياً** (`public/fonts/*.woff2`
+  + `@font-face` في `src/styles/index.css`)، ونطاقه `unicode-range` لاتيني فقط. تجربة الطباعة حطّت
+  `IBM Plex Sans Arabic` و`Cairo` — وهما **CDN فقط** — في **رأس** كل سلسلة: `body` في `index.html`
+  (بلا شرط لغة)، وقاعدة `.font-arabic`، ومفاتيح `body/headline/sans/arabic` في `tailwind-tokens.js`.
+  النتيجة أن أي فشل/بطء في `fonts.googleapis.com` يُسقط التطبيق كله — اللاتيني والأرقام — إلى `system-ui`.
+  زيادة على ذلك: مفتاح `sans` المضاف في الثيم يستبدل خط `html` في Tailwind preflight، فهو تأثير عام لا محلي.
+- **ملاحظة صدق عن المسؤولية:** قاعدة `.font-arabic` التي بدأت الانزلاق أُضيفت في `0c393fd` (المرحلة 0a) باسمي؛
+  قبلها كان اسم الكلاس موجوداً في `GymBrandContext` بلا تعريف، أي بلا أي أثر. الاختبار الذي كان يجب أن
+  يُجرى أولاً: تعطيل الشبكة/حظر الـ CDN والتحقق من الخط المحسوب فعلياً، لا الاكتفاء بـ«الشكل حلو عندي».
+- **الإصلاح (`3c4b1e3`):** رجوع السلاسل كما كانت — `.font-arabic: Be Vietnam Pro, Tahoma, Segoe UI, system-ui`،
+  `.font-sans: Be Vietnam Pro, system-ui`، حذف مفاتيح `arabic/sans` من الثيم، رجوع `<body class="bg-[#f8f9ff]">`
+  وطلب Be Vietnam Pro وحده في `index.html`. تُرِكت عمداً: الأرقام الجدولية العامة، وتعديل خط نوافذ الطباعة
+  (`print.ts`/`memberCard.ts` — مستندات منفصلة تسقط لـ Segoe/Tahoma عند الفشل)، ومقياس obsidian اللوني
+  (غير مستهلك بعد ولا يؤثر في الشكل).
+- **تحقق الرجوع:** `tsc` = 0 · `vite build` ✓ (5.02s) · فحص CSS الناتج: كل تعريقات `font-family` في التطبيق
+  تبدأ بـ `Be Vietnam Pro`، ولا عائلة اعتمادية على الـ CDN خارج `@font-face` · `dist/index.html` يطلب
+  Be Vietnam Pro وMaterial Symbols فقط · و`curl` أكّد وصول `fonts.googleapis.com` من الجهاز (200) — فالسبب
+  الأساسي هو **ترتيب السلسلة والانهيار للـ fallback**، لا انقطاع الشبكة وحده.
+- **الشرط لأي خطوة قادمة (لا يُتَّخذ قرار من غير لقطة):** أي خط عربي جديد يُجرَّب **self-host** في `public/fonts`
+  (woff2 بنطاق عربي) ويُعرض في مقارنة مرئية على نصوص عربية حقيقية قبل لمس `index.html` أو الثيم، ويظل
+  `Be Vietnam Pro` أولاً للّاتيني والأرقام حتى لا تتغير الأعمدة الرقمية ولا `tabular-nums`.

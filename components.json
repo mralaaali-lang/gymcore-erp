@@ -11,11 +11,12 @@
     "prefix": ""
   },
   "iconLibrary": "lucide",
+  "_comment": "Aliases are `@/`-prefixed because vite.config.ts + tsconfig map `@` to ./src — that is what makes copy-pasted Aceternity imports resolve. `ui` points at the NEW shadcn directory, never src/components/ui, so `shadcn add` can never overwrite the legacy primitives that 60+ pages still import.",
   "aliases": {
-    "components": "src/components",
-    "ui": "src/components/ui",
-    "lib": "src/lib",
-    "utils": "src/lib/utils",
-    "hooks": "src/hooks"
+    "components": "@/components",
+    "ui": "@/components/shadcn",
+    "lib": "@/lib",
+    "utils": "@/lib/utils",
+    "hooks": "@/hooks"
   }
 }
