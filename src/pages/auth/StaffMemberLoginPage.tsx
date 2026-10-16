@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Phone, KeyRound, Mail, Lock, Users, ArrowLeft, ArrowRight, Flame,
-  Eye, EyeOff, Check, ShieldCheck, Dumbbell, Activity, Target,
+  Phone, KeyRound, Mail, Lock, Users, ArrowLeft, ArrowRight,
+  Eye, EyeOff, Check, ShieldCheck, Dumbbell, Activity, Zap, Target,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/GymBrandContext';
@@ -19,19 +19,19 @@ const STAFF_ROLE_ROUTE: Record<string, string> = {
   reception: '/reception/dashboard',
 };
 
-// ─── Floating background particles (same language as the admin console) ───
-const BG_ICONS = [Dumbbell, Activity, Flame, Target];
-const PARTICLE_COUNT = 7;
+// ─── Floating background particles — identical set to the admin console ───
+const BG_ICONS = [Dumbbell, Activity, Zap, Target];
+const PARTICLE_COUNT = 8;
 
 function randomBetween(min: number, max: number) { return Math.random() * (max - min) + min; }
 
 // Shared field chrome so every input on this screen behaves identically.
+// Colours match AdminLoginPage; the height is a comfortable mobile touch target.
 function fieldBox(active: boolean, bad: boolean) {
-  const base = 'group flex items-center gap-3 px-4 rounded-2xl border transition-all duration-200 ';
-  const h = 'min-h-[54px] ';
-  if (bad) return base + h + 'border-rose-400/70 bg-rose-500/10 ring-1 ring-rose-400/30';
-  if (active) return base + h + 'border-[#f97316] bg-[#f97316]/5 ring-1 ring-[#f97316]/35 shadow-sm shadow-[#f97316]/10';
-  return base + h + 'border-white/10 bg-white/5 hover:border-white/20';
+  const base = 'group flex items-center gap-3 px-4 min-h-[54px] rounded-xl border transition-all duration-200 ';
+  if (bad) return base + 'border-rose-400/70 bg-rose-500/10 ring-1 ring-rose-400/30';
+  if (active) return base + 'border-[#06b6d4] bg-[#06b6d4]/5 ring-1 ring-[#06b6d4]/30 shadow-sm shadow-[#06b6d4]/10';
+  return base + 'border-white/10 bg-white/5 hover:border-white/20';
 }
 
 export default function StaffMemberLoginPage() {
@@ -61,12 +61,12 @@ export default function StaffMemberLoginPage() {
     Array.from({ length: PARTICLE_COUNT }, (_, i) => ({
       id: i,
       Icon: BG_ICONS[i % BG_ICONS.length],
-      x: randomBetween(4, 96),
-      y: randomBetween(4, 96),
-      size: randomBetween(26, 58),
+      x: randomBetween(5, 95),
+      y: randomBetween(5, 95),
+      size: randomBetween(28, 64),
       delay: randomBetween(0, 8),
       duration: randomBetween(12, 20),
-      opacity: randomBetween(0.03, 0.07),
+      opacity: randomBetween(0.03, 0.08),
       rotation: randomBetween(-20, 20),
     })), []);
 
@@ -159,19 +159,19 @@ export default function StaffMemberLoginPage() {
       className="team-fx relative min-h-[100dvh] flex items-center justify-center overflow-hidden px-margin-mobile py-8 select-none"
       dir={isRtl ? 'rtl' : 'ltr'}
       style={{
-        background: 'linear-gradient(135deg, #17100c 0%, #1d1410 30%, #241a12 60%, #120d0a 100%)',
+        background: 'linear-gradient(135deg, #0a1628 0%, #0f1a2e 30%, #13203a 60%, #0d1f2c 100%)',
       }}
     >
-      {/* ═══════════ AMBIENT BACKGROUND LAYERS ═══════════ */}
+      {/* ═══════════ AMBIENT BACKGROUND LAYERS (identical to the admin console) ═══════════ */}
 
-      {/* 1. Gradient mesh */}
+      {/* 1. Main gradient mesh */}
       <div
         className="absolute inset-0"
         style={{
           background: `
-            radial-gradient(ellipse at 15% 18%, rgba(249,115,22,0.14) 0%, transparent 55%),
-            radial-gradient(ellipse at 85% 12%, rgba(245,158,11,0.09) 0%, transparent 45%),
-            radial-gradient(ellipse at 50% 85%, rgba(249,115,22,0.07) 0%, transparent 50%)
+            radial-gradient(ellipse at 15% 20%, rgba(6,182,212,0.12) 0%, transparent 55%),
+            radial-gradient(ellipse at 85% 15%, rgba(245,158,11,0.08) 0%, transparent 45%),
+            radial-gradient(ellipse at 50% 80%, rgba(6,182,212,0.06) 0%, transparent 50%)
           `,
         }}
       />
@@ -180,14 +180,15 @@ export default function StaffMemberLoginPage() {
       <div
         className="absolute inset-0 opacity-[0.04]"
         style={{
-          backgroundImage: `linear-gradient(rgba(253,186,116,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(253,186,116,0.18) 1px, transparent 1px)`,
-          backgroundSize: '40px 40px',
+          backgroundImage: `linear-gradient(rgba(110,231,183,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(110,231,183,0.15) 1px, transparent 1px)`,
+          backgroundSize: '48px 48px',
         }}
       />
 
       {/* 3. Animated glow orbs */}
-      <div className="absolute top-[12%] right-[16%] w-[420px] h-[420px] rounded-full bg-[#f97316]/10 blur-[110px] animate-pulse" style={{ animationDuration: '7s' }} />
-      <div className="absolute bottom-[16%] left-[8%] w-[340px] h-[340px] rounded-full bg-[#f59e0b]/8 blur-[100px] animate-pulse" style={{ animationDuration: '9s', animationDelay: '2s' }} />
+      <div className="absolute top-[15%] right-[20%] w-[500px] h-[500px] rounded-full bg-[#06b6d4]/8 blur-[120px] animate-pulse" style={{ animationDuration: '6s' }} />
+      <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] rounded-full bg-[#f59e0b]/6 blur-[100px] animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
+      <div className="absolute top-[40%] left-[40%] w-[300px] h-[300px] rounded-full bg-[#06b6d4]/5 blur-[90px] animate-pulse" style={{ animationDuration: '10s', animationDelay: '4s' }} />
 
       {/* 4. Floating sport icons */}
       {particles.map((p) => (
@@ -206,21 +207,21 @@ export default function StaffMemberLoginPage() {
         </div>
       ))}
 
-      {/* 5. Vignette */}
+      {/* 5. Subtle vignette */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        background: 'radial-gradient(ellipse at center, transparent 50%, rgba(12,8,6,0.65) 100%)',
+        background: 'radial-gradient(ellipse at center, transparent 50%, rgba(10,22,40,0.6) 100%)',
       }} />
 
       {/* ═══════════ LOGIN CARD ═══════════ */}
-      <div className="relative w-full max-w-[420px] z-10">
+      <div className="relative w-full max-w-[440px] z-10">
 
         {/* Animated border glow */}
-        <div className={`absolute -inset-[2px] rounded-3xl bg-gradient-to-br from-[#f97316]/45 via-[#f59e0b]/20 to-[#f97316]/45 blur-sm transition-all duration-1000 ${
+        <div className={`absolute -inset-[2px] rounded-3xl bg-gradient-to-br from-[#06b6d4]/40 via-[#f59e0b]/20 to-[#06b6d4]/40 blur-sm transition-all duration-1000 ${
           showCard ? 'opacity-100' : 'opacity-0'
         }`} />
 
         <div
-          className={`relative backdrop-blur-2xl rounded-3xl p-7 sm:p-9 border transition-all duration-700 ease-out ${
+          className={`relative backdrop-blur-2xl rounded-3xl p-8 sm:p-10 border transition-all duration-700 ease-out ${
             showCard ? 'opacity-100 translate-y-0 border-white/10' : 'opacity-0 translate-y-8 border-transparent'
           }`}
           style={{
@@ -231,17 +232,17 @@ export default function StaffMemberLoginPage() {
           }}
         >
           {/* ── HEADER ── */}
-          <div className="text-center mb-7" style={fadeDelay(0)}>
+          <div className="text-center mb-8" style={fadeDelay(0)}>
             <div
               className={`h-16 w-16 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-all duration-700 ${
                 showCard ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
               }`}
               style={{
-                background: 'linear-gradient(135deg, rgba(249,115,22,0.22) 0%, rgba(245,158,11,0.10) 100%)',
-                border: '1px solid rgba(249,115,22,0.28)',
+                background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(245,158,11,0.1) 100%)',
+                border: '1px solid rgba(6,182,212,0.25)',
               }}
             >
-              <Flame size={30} className="text-[#f97316]" strokeWidth={1.6} />
+              <Users size={32} strokeWidth={1.5} className="text-[#06b6d4]" />
             </div>
 
             <h1 className={`text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent transition-all duration-700 ${
@@ -254,7 +255,7 @@ export default function StaffMemberLoginPage() {
               {t('auth.teamSubtitle')}
             </p>
 
-            <div className={`mx-auto mt-4 h-[3px] w-12 rounded-full bg-gradient-to-r from-[#f97316] to-[#f59e0b] transition-all duration-700 ${
+            <div className={`mx-auto mt-4 h-[3px] w-12 rounded-full bg-gradient-to-r from-[#06b6d4] to-[#f59e0b] transition-all duration-700 ${
               showCard ? 'opacity-100 scale-100' : 'opacity-0 scale-0'
             }`} style={{ transitionDelay: '150ms' }} />
           </div>
@@ -275,7 +276,7 @@ export default function StaffMemberLoginPage() {
               onClick={() => setLoginType('member')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${
                 loginType === 'member'
-                  ? 'bg-gradient-to-r from-[#f97316] to-[#ea580c] text-white shadow-lg shadow-[#f97316]/25 scale-105'
+                  ? 'bg-gradient-to-r from-[#06b6d4] to-[#0891b2] text-white shadow-lg shadow-[#06b6d4]/25 scale-105'
                   : 'text-white/50 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -290,7 +291,7 @@ export default function StaffMemberLoginPage() {
               onClick={() => setLoginType('staff')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${
                 loginType === 'staff'
-                  ? 'bg-gradient-to-r from-[#f97316] to-[#ea580c] text-white shadow-lg shadow-[#f97316]/25 scale-105'
+                  ? 'bg-gradient-to-r from-[#06b6d4] to-[#0891b2] text-white shadow-lg shadow-[#06b6d4]/25 scale-105'
                   : 'text-white/50 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -312,7 +313,7 @@ export default function StaffMemberLoginPage() {
                   </label>
                   <div className={fieldBox(focusedField === 'phone', phoneBad)}>
                     <Phone size={18} className={`transition-colors duration-200 ${
-                      phoneBad ? 'text-rose-300' : focusedField === 'phone' ? 'text-[#f97316]' : 'text-white/30 group-hover:text-white/50'
+                      phoneBad ? 'text-rose-300' : focusedField === 'phone' ? 'text-[#06b6d4]' : 'text-white/30 group-hover:text-white/50'
                     }`} />
                     <input
                       id="member-phone"
@@ -350,7 +351,7 @@ export default function StaffMemberLoginPage() {
                   </label>
                   <div className={fieldBox(focusedField === 'code', pinBad)}>
                     <KeyRound size={18} className={`transition-colors duration-200 ${
-                      pinBad ? 'text-rose-300' : focusedField === 'code' ? 'text-[#f97316]' : 'text-white/30 group-hover:text-white/50'
+                      pinBad ? 'text-rose-300' : focusedField === 'code' ? 'text-[#06b6d4]' : 'text-white/30 group-hover:text-white/50'
                     }`} />
                     <input
                       id="member-pin"
@@ -372,7 +373,7 @@ export default function StaffMemberLoginPage() {
                     <button
                       type="button"
                       onClick={() => setShowMemberPin(!showMemberPin)}
-                      className="text-white/40 hover:text-white/70 transition-colors p-1.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f97316]"
+                      className="text-white/30 hover:text-white/60 transition-colors p-1.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06b6d4]"
                       aria-pressed={showMemberPin}
                       aria-label={showMemberPin ? 'Hide PIN' : 'Show PIN'}
                     >
@@ -398,7 +399,7 @@ export default function StaffMemberLoginPage() {
                   </label>
                   <div className={fieldBox(focusedField === 'email', false)}>
                     <Mail size={18} className={`transition-colors duration-200 ${
-                      focusedField === 'email' ? 'text-[#f97316]' : 'text-white/30 group-hover:text-white/50'
+                      focusedField === 'email' ? 'text-[#06b6d4]' : 'text-white/30 group-hover:text-white/50'
                     }`} />
                     <input
                       id="staff-email"
@@ -426,7 +427,7 @@ export default function StaffMemberLoginPage() {
                   </label>
                   <div className={fieldBox(focusedField === 'password', false)}>
                     <Lock size={18} className={`transition-colors duration-200 ${
-                      focusedField === 'password' ? 'text-[#f97316]' : 'text-white/30 group-hover:text-white/50'
+                      focusedField === 'password' ? 'text-[#06b6d4]' : 'text-white/30 group-hover:text-white/50'
                     }`} />
                     <input
                       id="staff-password"
@@ -445,7 +446,7 @@ export default function StaffMemberLoginPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="text-white/40 hover:text-white/70 transition-colors p-1.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f97316]"
+                      className="text-white/30 hover:text-white/60 transition-colors p-1.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06b6d4]"
                       aria-pressed={showPassword}
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
@@ -461,7 +462,7 @@ export default function StaffMemberLoginPage() {
                     <div
                       onClick={() => handleRememberMeChange(!rememberMe)}
                       className={`w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center transition-all duration-150 ${
-                        rememberMe ? 'bg-[#f97316] border-[#f97316] shadow-sm shadow-[#f97316]/30' : 'border-white/20 group-hover:border-white/40'
+                        rememberMe ? 'bg-[#06b6d4] border-[#06b6d4] shadow-sm shadow-[#06b6d4]/30' : 'border-white/20 group-hover:border-white/40'
                       }`}
                     >
                       {rememberMe && <Check size={12} className="text-white" strokeWidth={3} />}
@@ -471,7 +472,7 @@ export default function StaffMemberLoginPage() {
                       {t('auth.rememberMe')}
                     </span>
                   </label>
-                  <Link to="/forgot-password?area=team" className="text-xs text-white/40 hover:text-[#f97316] transition-colors">
+                  <Link to="/forgot-password?area=team" className="text-xs text-white/40 hover:text-[#06b6d4] transition-colors">
                     {t('auth.forgotPassword')}
                   </Link>
                 </div>
@@ -484,10 +485,10 @@ export default function StaffMemberLoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="relative w-full py-4 rounded-2xl font-bold text-base tracking-wide text-white overflow-hidden transition-all duration-200 active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f97316]"
+                className="relative w-full py-4 rounded-2xl font-bold text-base tracking-wide text-white overflow-hidden transition-all duration-200 active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06b6d4]"
                 style={{
-                  background: 'linear-gradient(135deg, #f97316 0%, #ea580c 50%, #c2410c 100%)',
-                  boxShadow: '0 4px 20px rgba(249,115,22,0.3)',
+                  background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 50%, #0e7490 100%)',
+                  boxShadow: '0 4px 20px rgba(6,182,212,0.3)',
                 }}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
@@ -502,21 +503,21 @@ export default function StaffMemberLoginPage() {
           </form>
 
           {/* ── FOOTER ── */}
-          <div className={`mt-7 pt-5 border-t border-white/5 flex items-center justify-between gap-3 transition-all duration-400 ${
+          <div className={`mt-8 pt-6 border-t border-white/5 flex items-center justify-between gap-3 transition-all duration-400 ${
             showCard ? 'opacity-100' : 'opacity-0'
           }`} style={{ transitionDelay: '500ms' }}>
             <Link
               to="/login"
               className="group inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
             >
-              <ShieldCheck size={14} className="transition-colors group-hover:text-[#f97316]" />
+              <ShieldCheck size={14} className="transition-colors group-hover:text-[#06b6d4]" />
               {t('auth.adminLinkFromTeam')}
               <ArrowIcon size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
             <button
               type="button"
               onClick={() => setLanguage(isRtl ? 'en' : 'ar')}
-              className="text-xs text-white/30 hover:text-[#f97316]/80 transition-colors"
+              className="text-xs text-white/30 hover:text-[#06b6d4]/80 transition-colors"
             >
               {isRtl ? 'English' : 'العربية'}
             </button>
@@ -524,7 +525,7 @@ export default function StaffMemberLoginPage() {
         </div>
 
         {/* ── Watermark ── */}
-        <div className={`text-center mt-5 transition-all duration-700 ${showCard ? 'opacity-40' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+        <div className={`text-center mt-6 transition-all duration-700 ${showCard ? 'opacity-40' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
           <p className="text-[10px] text-white/20 tracking-[0.2em] uppercase font-light">
             {isRtl ? 'بوابة الأعضاء وفريق الصالة' : 'Member & Team Portal'}
           </p>
@@ -546,7 +547,7 @@ export default function StaffMemberLoginPage() {
         }
       `}</style>
 
-      <PwaInstallPrompts isRtl={isRtl} appName={t('auth.teamTitle')} accentColor="#f97316" logoInitial="ج" />
+      <PwaInstallPrompts isRtl={isRtl} appName={t('auth.teamTitle')} accentColor="#06b6d4" logoInitial="ج" />
     </div>
   );
 }

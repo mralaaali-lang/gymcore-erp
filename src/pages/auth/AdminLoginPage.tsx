@@ -272,7 +272,7 @@ export default function AdminLoginPage() {
         >
           {/* ═══ HEADER ═══ */}
           <div className="text-center mb-8" style={fadeDelay(0)}>
-            <div className={`w-18 h-18 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-all duration-700 ${
+            <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-all duration-700 ${
               showCard ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
             }`}
               style={{
