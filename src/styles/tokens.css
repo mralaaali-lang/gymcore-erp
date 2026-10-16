@@ -1,0 +1,77 @@
+/*
+ * Design tokens — single source of truth for colour (Phase 1a).
+ *
+ * Values are bare HSL triplets so Tailwind can apply alpha: a class like
+ * `bg-primary/10` compiles to `hsl(var(--primary) / 0.1)`. The names follow
+ * the shadcn/ui convention on purpose — Aceternity UI components are
+ * copy-pasted against exactly these variables, so adopting them never
+ * introduces a second token system.
+ *
+ * Light values are the current Control-Center palette; dark values are the
+ * Obsidian scale. Existing hex tokens in tailwind-tokens.js keep working and
+ * now point at these same numbers.
+ */
+
+:root {
+  --background: 231.4 100% 98.6%; /* #f8f9ff */
+  --foreground: 215 40% 11.8%; /* #121c2a */
+  --card: 0 0% 100%;           /* #ffffff */
+  --card-foreground: 220.9 39.3% 11%; /* #111827 */
+  --popover: 0 0% 100%;        /* #ffffff */
+  --popover-foreground: 220.9 39.3% 11%; /* #111827 */
+  --primary: 160.1 84.1% 39.4%; /* #10b981 */
+  --primary-foreground: 0 0% 100%; /* #ffffff */
+  --secondary: 160.6 100% 21.2%; /* #006c49 */
+  --secondary-foreground: 0 0% 100%; /* #ffffff */
+  --muted: 220 14.3% 95.9%;    /* #f3f4f6 */
+  --muted-foreground: 220 8.9% 46.1%; /* #6b7280 */
+  --accent: 160.1 84.1% 39.4%; /* #10b981 */
+  --accent-foreground: 0 0% 100%; /* #ffffff */
+  --destructive: 0 75.5% 41.6%; /* #ba1a1a */
+  --destructive-foreground: 0 0% 100%; /* #ffffff */
+  --border: 220 13% 91%;       /* #e5e7eb */
+  --input: 220 13% 91%;        /* #e5e7eb */
+  --ring: 160.1 84.1% 39.4%;   /* #10b981 */
+  --surface: 210 20% 98%;      /* #f9fafb */
+  --surface-dim: 220 13% 91%;  /* #e5e7eb */
+
+  /* Geometry */
+  --radius: 1rem;
+
+  /* Auth console identity (login / team-login / forgot / reset) */
+  --auth-accent: 188.7 94.5% 42.7%; /* #06b6d4 */
+  --auth-accent-strong: 191.6 91.4% 36.5%; /* #0891b2 */
+  --auth-amber: 37.7 92.1% 50.2%; /* #f59e0b */
+  --auth-root-bg: linear-gradient(135deg, #0a1628 0%, #0f1a2e 30%, #13203a 60%, #0d1f2c 100%);
+
+  /* Obsidian scale (raw hex for gradients/shadows that need literal stops) */
+  --obsidian-950: #070a0f;
+  --obsidian-900: #0b0f17;
+  --obsidian-850: #0f1420;
+  --obsidian-800: #141b2b;
+  --obsidian-700: #1e293b;
+}
+
+.dark {
+  --background: 220 35.3% 6.7%; /* #0b0f17 */
+  --foreground: 210 40% 98%;   /* #f8fafc */
+  --card: 220.9 39.3% 11%;     /* #111827 */
+  --card-foreground: 210 40% 98%; /* #f8fafc */
+  --popover: 221.7 36.5% 12.4%; /* #141b2b */
+  --popover-foreground: 210 40% 98%; /* #f8fafc */
+  --primary: 160.1 84.1% 39.4%; /* #10b981 */
+  --primary-foreground: 0 0% 100%; /* #ffffff */
+  --secondary: 217.2 32.6% 17.5%; /* #1e293b */
+  --secondary-foreground: 210 40% 98%; /* #f8fafc */
+  --muted: 222.4 36.2% 9.2%;   /* #0f1420 */
+  --muted-foreground: 215 20.2% 65.1%; /* #94a3b8 */
+  --accent: 158.1 64.4% 51.6%; /* #34d399 */
+  --accent-foreground: 162.4 80.4% 10%; /* #052e22 */
+  --destructive: 0 90.6% 70.8%; /* #f87171 */
+  --destructive-foreground: 0 69.7% 6.5%; /* #1c0505 */
+  --border: 215 27.9% 16.9%;   /* #1f2937 */
+  --input: 215 27.9% 16.9%;    /* #1f2937 */
+  --ring: 160.1 84.1% 39.4%;   /* #10b981 */
+  --surface: 222.4 36.2% 9.2%; /* #0f1420 */
+  --surface-dim: 217.5 36.4% 4.3%; /* #070a0f */
+}

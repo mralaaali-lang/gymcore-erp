@@ -2207,3 +2207,20 @@ endpoint العقود، بلا أي بيانات وهمية.
   من lucide (~30 موضعاً) كانت تُتجاهَل قبل الحذف وبعده — تحويلها إلى `weight="regular"` مهمة معلّقة لا أثر لها الآن.
 - **تحقق:** `npx tsc --noEmit` = 0 أخطاء (بعد أن كان 41) + `npx vite build` ✓ 5.09s. أُبقي خارج هذا الـ commit شغل
   غير متعلق بالموضوع (ToastContext، routes، api، tailwind-tokens، سيرفر) وهو ما زال غير مُسجَّن في الشجرة.
+
+---
+
+## §Phase 1a — طبقة التوكنات + أساس shadcn/Aceternity (2026-10-16)
+
+- **ما تم:** `src/styles/tokens.css` (جديد) = ثلاثيات HSL عارية بأسماء shadcn في `:root` + `.dark` بمقياس Obsidian؛
+  `src/styles/shadcn-colors.js` يربطها بـ Tailwind عبر `hsl(var(--x) / <alpha-value>)`؛ `src/lib/utils.ts` فيه `cn()`؛
+  `components.json` يهيّئ الـ registry. الحزم: `clsx`, `tailwind-merge`, `class-variance-authority`,
+  `tailwindcss-animate`, `lucide-react@1.57` (حزمة حقيقية — المحاكي المحلي ما رجعش).
+- **قرار التبنّي:** المالك اختار تبنّي Aceternity بالمجلود بعد عرض التعارضات الخمسة (أيقونات/توكنات/حجم/RTL/إتاحة).
+  الحل: طبقة التوكنات كُتبت بأسماء shadcn من البداية، فبدل نظامين متوازيين صار أساس Aceternity هو أساس المشروع.
+  الأسماء الأربعة المتعارضة (`background, primary, secondary, accent`) أُعيد توصيلها على متغيرات بنفس القيم الحالية.
+- **تحقق:** تحويل عكسي hex→HSL→hex لكل توكن (45 متغيراً، أقصى انحراف 1/255) + `tsc --noEmit` = 0 + `vite build` ✓
+  + `.bg-primary` يُصرَّف الآن `hsl(var(--primary) / var(--tw-bg-opacity,1))`. حُذفت كتلة `--bg-page/--text-main/…`
+  القديمة من `index.css` بعد التأكد أن استهلاكها صفر.
+- **غير مُتحقق بعد:** التكافؤ البصري داخل الصفحات المحروسه (تحتاج تسجيل دخول من المالك) — الحاوية أُعيد بناؤها
+  والمعاينة تمت على شاشتي الدخول العامتين. متغيرات `--auth-*` معرّفة وموثقة لكنها تُستهلك في 1b.

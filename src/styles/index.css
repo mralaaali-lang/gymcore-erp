@@ -1,26 +1,11 @@
+@import './tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --color-card: #ffffff;
-  --bg-page: #f8f9ff;
-  --bg-surface: #ffffff;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --border-subtle: #e2e8f0;
-  --primary-accent: #10b981;
-}
-
-.dark {
-  --color-card: #111827;
-  --bg-page: #0b0f17;
-  --bg-surface: #111827;
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --border-subtle: #1f2937;
-  --primary-accent: #10b981;
-}
+/* The old --bg-page / --text-main / --border-subtle / --primary-accent block
+   lived here with zero consumers; colour now comes from tokens.css alone. */
 
 /* Be Vietnam Pro — self-hosted (public/fonts), works offline */
 @font-face {
