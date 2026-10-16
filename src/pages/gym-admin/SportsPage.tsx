@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Pencil, Save, Trash2, X } from 'lucide-react';
+import { ArrowRight, Pencil, FloppyDisk as Save, Trash as Trash2, X } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';

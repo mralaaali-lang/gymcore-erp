@@ -12,7 +12,7 @@ import {
   getNotifications,
   markGymNotificationRead,
 } from '../../services/api';
-import { Bell as BellIcon, Menu as MenuIcon } from 'lucide-react';
+import { Bell as BellIcon, List as MenuIcon } from '@phosphor-icons/react';
 
 interface FeedItem {
   id: string;

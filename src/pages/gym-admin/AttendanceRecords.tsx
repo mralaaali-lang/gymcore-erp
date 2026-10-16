@@ -11,9 +11,14 @@ import CheckInCard from '../../components/attendance/CheckInCard';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import { escapeHtml, printDocument } from '../../utils/print';
 import {
-  DoorOpen, LogOut,
-  FileText, Users, Clock, Calendar, Activity,
-} from 'lucide-react';
+  DoorOpen,
+  SignOut as LogOut,
+  FileText,
+  Users,
+  Clock,
+  Calendar,
+  ActivityIcon as Activity
+} from '@phosphor-icons/react';
 
 // ====================================================================
 // §35ب — redesigned attendance screen.

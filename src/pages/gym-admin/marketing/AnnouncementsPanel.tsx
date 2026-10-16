@@ -8,7 +8,7 @@ import PageLoader from '../../../components/shared/PageLoader';
 import Button from '../../../components/ui/Button';
 import Card from '../../../components/ui/Card';
 import StatusBadge from '../../../components/ui/StatusBadge';
-import { Plus } from 'lucide-react';
+import { Plus } from '@phosphor-icons/react';
 
 // Announcements panel — merged from AnnouncementsPage (§26), the "Announcements"
 // tab of the Marketing hub. Old route /admin/announcements deep-links here via

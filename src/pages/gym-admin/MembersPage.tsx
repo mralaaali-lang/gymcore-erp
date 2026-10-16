@@ -9,7 +9,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import Card from '../../components/ui/Card';
 import { formatDate, daysUntil } from '../../utils/date';
 import { buildExportMatrix, downloadMatrixXlsx } from '../../utils/csv';
-import { Plus } from 'lucide-react';
+import { Plus } from '@phosphor-icons/react';
 import { DashboardPage, PrimaryAction } from '../../components/dashboard';
 import EditMemberModal from './EditMemberModal';
 import ImportMembersModal from './ImportMembersModal';

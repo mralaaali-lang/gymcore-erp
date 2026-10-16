@@ -10,7 +10,7 @@ import { buildExportMatrix, downloadMatrixXlsx } from '../../utils/csv';
 import { StatCard, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
 import StatusBadge from '../../components/ui/StatusBadge';
-import { FileText, Users, User, CreditCard, FileSpreadsheet } from 'lucide-react';
+import { FileText, Users, User, CreditCard, FileCsv as FileSpreadsheet } from '@phosphor-icons/react';
 import EditMemberModal from './EditMemberModal';
 import type { MemberResponse } from '../../services/api';
 

@@ -7,7 +7,7 @@ import { formatMoney } from '../../utils/currency';
 import { formatDate } from '../../utils/date';
 import Panel from '../../components/dashboard/Panel';
 import PageLoader from '../../components/shared/PageLoader';
-import { Banknote, CalendarClock, Clock, Package, Plus } from 'lucide-react';
+import { Bank as Banknote, CalendarCheck as CalendarClock, Clock, Package, Plus } from '@phosphor-icons/react';
 
 // ====================================================================
 // مركز الإنذار المبكر (/admin/notifications) — view تجميعية read-only.

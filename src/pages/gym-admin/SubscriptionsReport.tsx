@@ -10,7 +10,7 @@ import { buildExportMatrix, downloadMatrixXlsx } from '../../utils/csv';
 import { StatCard, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
 import StatusBadge from '../../components/ui/StatusBadge';
-import { FileText, FileSpreadsheet, Users, CheckCircle2, Clock, Wallet } from 'lucide-react';
+import { FileText, FileCsv as FileSpreadsheet, Users, CheckCircle as CheckCircle2, Clock, Wallet } from '@phosphor-icons/react';
 
 // ====================================================================
 // تقرير الاشتراكات (/admin/reports/subscriptions) — مربوط بزر

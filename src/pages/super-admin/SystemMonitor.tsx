@@ -4,25 +4,25 @@ import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { getSystemStatus, type SystemMetricItem, type SystemEvent } from '../../services/api';
 import {
-  RefreshCw,
-  Activity,
+  ArrowsClockwise as RefreshCw,
+  ActivityIcon as Activity,
   Database,
-  Server,
+  ComputerTower as Server,
   Bell,
-  TrendingUp,
-  TrendingDown,
+  TrendUp as TrendingUp,
+  TrendDown as TrendingDown,
   Minus,
-  CheckCircle2,
-  AlertTriangle,
+  CheckCircle as CheckCircle2,
+  Warning as AlertTriangle,
   XCircle,
   Clock,
   Cpu,
-  HardDrive,
-  Wifi,
-  ShieldAlert,
-  BarChart3,
-  Circle,
-} from 'lucide-react';
+  HardDrives as HardDrive,
+  WifiHigh as Wifi,
+  ShieldWarning as ShieldAlert,
+  ChartBar as BarChart3,
+  Circle
+} from '@phosphor-icons/react';
 import PageHeader from '../../components/shared/PageHeader';
 import Button from '../../components/ui/Button';
 

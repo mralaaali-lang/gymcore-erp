@@ -10,7 +10,7 @@ import { downloadMatrixXlsx } from '../../utils/csv';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Chart from '../../components/charts/Chart';
 import Spinner from '../../components/ui/Spinner';
-import { FileText, FileSpreadsheet, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { FileText, FileCsv as FileSpreadsheet, TrendUp as TrendingUp, TrendDown as TrendingDown, Wallet } from '@phosphor-icons/react';
 import { paymentMethodLabel } from './subscriptions/shared';
 
 // ====================================================================

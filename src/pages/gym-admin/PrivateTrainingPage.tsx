@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Check, X, Dumbbell, Ticket } from 'lucide-react';
+import { Plus, Check, X, Barbell as Dumbbell, Ticket } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';

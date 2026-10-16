@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, UserCheck, Clock, Ticket, Plus, Phone, Percent, Wallet, X } from 'lucide-react';
+import { Users, UserCheck, Clock, Ticket, Plus, Phone, Percent, Wallet, X } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';

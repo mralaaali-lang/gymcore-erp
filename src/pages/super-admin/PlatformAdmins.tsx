@@ -13,9 +13,19 @@ import {
   type PlatformAdminRole,
 } from '../../services/api';
 import {
-  X, Shield, ShieldCheck, ShieldHalf, Eye,
-  EyeOff, MoreVertical, UserPlus, Edit3, Trash2, ToggleLeft, ToggleRight,
-} from 'lucide-react';
+  X,
+  Shield,
+  ShieldCheck,
+  ShieldChevron as ShieldHalf,
+  Eye,
+  EyeSlash as EyeOff,
+  DotsThreeVertical as MoreVertical,
+  UserPlus,
+  Pencil as Edit3,
+  Trash as Trash2,
+  ToggleLeft,
+  ToggleRight
+} from '@phosphor-icons/react';
 import PageHeader from '../../components/shared/PageHeader';
 import FilterBar from '../../components/shared/FilterBar';
 import PageLoader from '../../components/shared/PageLoader';

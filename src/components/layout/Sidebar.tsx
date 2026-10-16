@@ -7,16 +7,46 @@ import { useApiQuery } from '../../hooks/useApiQuery';
 import { getSettings } from '../../services/api';
 import type { NavItem, UserRole } from '../../types';
 import {
-  LayoutDashboard, Users, Package, ClipboardCheck, ShoppingCart,
-  Warehouse, Wallet, Clock, BarChart3, MessageSquare, Settings,
-  Database, Brain, Palette, Bell, Tv, LogOut, Sparkles,
-  Receipt, Megaphone, Globe, Dumbbell, Armchair, CircleUserRound, HelpCircle, Code,
-  CreditCard, Banknote, Percent, Target, CalendarDays, UserCog,
-  DoorOpen, HandCoins, FileSpreadsheet, BellRing,
-  type LucideIcon,
-} from 'lucide-react';
+  Layout as LayoutDashboard,
+  Users,
+  Package,
+  ClipboardText as ClipboardCheck,
+  ShoppingCart,
+  Warehouse,
+  Wallet,
+  Clock,
+  ChartBar as BarChart3,
+  ChatText as MessageSquare,
+  Gear as Settings,
+  Database,
+  Brain,
+  Palette,
+  Bell,
+  Television as Tv,
+  SignOut as LogOut,
+  Sparkle as Sparkles,
+  Receipt,
+  MegaphoneSimple as Megaphone,
+  GlobeSimple as Globe,
+  Barbell as Dumbbell,
+  Armchair,
+  UserCircle as CircleUserRound,
+  Question as HelpCircle,
+  Code,
+  CreditCard,
+  Bank as Banknote,
+  Percent,
+  Target,
+  CalendarDots as CalendarDays,
+  UserGear as UserCog,
+  DoorOpen,
+  HandCoins,
+  FileCsv as FileSpreadsheet,
+  BellRinging as BellRing,
+  type Icon as PhosphorIcon
+} from '@phosphor-icons/react';
 
-const iconMap: Record<string, LucideIcon> = {
+const iconMap: Record<string, PhosphorIcon> = {
   dashboard: LayoutDashboard,
   users: Users,
   package: Package,
@@ -151,7 +181,7 @@ export default function Sidebar({ items }: SidebarProps) {
   );
 
   const renderItem = (item: NavItem) => {
-    const IconComp = iconMap[item.icon] as LucideIcon | undefined;
+    const IconComp = iconMap[item.icon] as PhosphorIcon | undefined;
 
     return (
       <NavLink

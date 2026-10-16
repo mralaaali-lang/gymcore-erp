@@ -8,9 +8,24 @@ import {
   listPlatformGyms, type ApiKey,
 } from '../../services/api';
 import {
-  Key, Plus, Trash2, Copy, Eye, EyeOff, RefreshCw, CheckCircle2, XCircle,
-  Loader2, Globe, BookOpen, Shield, Activity, Clock, AlertTriangle, Code,
-} from 'lucide-react';
+  Key,
+  Plus,
+  Trash as Trash2,
+  Copy,
+  Eye,
+  EyeSlash as EyeOff,
+  ArrowsClockwise as RefreshCw,
+  CheckCircle as CheckCircle2,
+  XCircle,
+  Spinner as Loader2,
+  GlobeSimple as Globe,
+  BookOpenText as BookOpen,
+  Shield,
+  ActivityIcon as Activity,
+  Clock,
+  Warning as AlertTriangle,
+  Code
+} from '@phosphor-icons/react';
 import PageHeader from '../../components/shared/PageHeader';
 import PageLoader from '../../components/shared/PageLoader';
 import Button from '../../components/ui/Button';

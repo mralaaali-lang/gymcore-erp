@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Clock, Save } from 'lucide-react';
+import { ArrowRight, Clock, FloppyDisk as Save } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';

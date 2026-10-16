@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Mail, ArrowLeft, ArrowRight, KeyRound, CheckCircle2 } from 'lucide-react';
+import { Envelope as Mail, ArrowLeft, ArrowRight, Key as KeyRound, CheckCircle as CheckCircle2 } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import Spinner from '../../components/ui/Spinner';
 import AuthAmbience, { AUTH_ACCENT, AUTH_ROOT_BG } from '../../components/auth/AuthAmbience';

@@ -13,9 +13,21 @@ import {
 } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
 import {
-  TrendingUp, Users, DollarSign, Clock, AlertTriangle, UserX, UserPlus,
-  ChevronLeft, CreditCard, Wallet, ShoppingCart, BarChart3, Banknote, Dumbbell,
-} from 'lucide-react';
+  TrendUp as TrendingUp,
+  Users,
+  CurrencyDollar as DollarSign,
+  Clock,
+  Warning as AlertTriangle,
+  UserMinus as UserX,
+  UserPlus,
+  CaretLeft as ChevronLeft,
+  CreditCard,
+  Wallet,
+  ShoppingCart,
+  ChartBar as BarChart3,
+  Bank as Banknote,
+  Barbell as Dumbbell
+} from '@phosphor-icons/react';
 import { StatCard, Panel, Banner, DashboardPage } from '../../components/dashboard';
 import MarketingCards from '../../components/marketing/MarketingCards';
 import { QuickActionModals, type ActionKey } from '../../components/dashboard/QuickActionCenter';

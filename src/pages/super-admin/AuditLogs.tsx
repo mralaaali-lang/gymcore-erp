@@ -6,7 +6,7 @@ import { listPlatformAudit, listPlatformGyms, type PlatformAuditEntry } from '..
 import PageHeader from '../../components/shared/PageHeader';
 import Card from '../../components/ui/Card';
 import PageLoader from '../../components/shared/PageLoader';
-import { ChevronDown, ChevronUp, ClipboardCheck } from 'lucide-react';
+import { CaretDown as ChevronDown, CaretUp as ChevronUp, ClipboardText as ClipboardCheck } from '@phosphor-icons/react';
 
 // §40-M3 — سجل تدقيق المنصة: platform_audit_logs الحقيقي (فلاتر خادمية + old/new فعلي).
 // لا استنتاج للأفعال من نص الوصف — الفعل مخزَّن صريحًا في العمود.

@@ -6,7 +6,7 @@ import { getAbsentReport, getSettings } from '../../services/api';
 import { formatDate, fmtNum } from '../../utils/date';
 import { StatCard, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
-import { Users, UserX, Clock } from 'lucide-react';
+import { Users, UserMinus as UserX, Clock } from '@phosphor-icons/react';
 import MemberContactButtons from '../../components/members/MemberContact';
 
 // ====================================================================

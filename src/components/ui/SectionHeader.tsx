@@ -1,8 +1,8 @@
-import { type LucideIcon } from 'lucide-react';
+import { type Icon as PhosphorIcon } from '@phosphor-icons/react';
 
 interface SectionHeaderProps {
   title: string;
-  icon: LucideIcon;
+  icon: PhosphorIcon;
   iconColor?: string;
 }
 

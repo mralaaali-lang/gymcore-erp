@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowsDownUp, Clock, DollarSign, FileText, Plus, UserCheck, X } from 'lucide-react';
+import { Warning as AlertTriangle, ArrowDown, ArrowUp, ArrowsDownUp, Clock, CurrencyDollar as DollarSign, FileText, Plus, UserCheck, X } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';

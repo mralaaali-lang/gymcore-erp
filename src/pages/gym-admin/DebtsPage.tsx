@@ -9,9 +9,18 @@ import { formatDate, fmtNum } from '../../utils/date';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
 import {
-  Plus, X, Search, RefreshCw, Banknote, MessageSquare, Receipt,
-  EgyptianPound, CalendarClock, ShoppingCart, Users,
-} from 'lucide-react';
+  Plus,
+  X,
+  MagnifyingGlass as Search,
+  ArrowsClockwise as RefreshCw,
+  Bank as Banknote,
+  ChatText as MessageSquare,
+  Receipt,
+  CurrencyGbp as EgyptianPound,
+  CalendarCheck as CalendarClock,
+  ShoppingCart,
+  Users
+} from '@phosphor-icons/react';
 // wa.me normalization lives in the shared member-contact component
 // (same pattern reused by the absent-members report).
 import { toWhatsAppNumber } from '../../components/members/MemberContact';

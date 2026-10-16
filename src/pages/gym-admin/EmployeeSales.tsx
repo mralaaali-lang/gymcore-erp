@@ -7,7 +7,7 @@ import { formatMoney } from '../../utils/currency';
 import { fmtNum } from '../../utils/date';
 import { StatCard, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
-import { Users, Wallet, Banknote, Percent } from 'lucide-react';
+import { Users, Wallet, Bank as Banknote, Percent } from '@phosphor-icons/react';
 
 // ====================================================================
 // مبيعات الموظفين (/admin/reports/employee-sales) — مربوط بزر

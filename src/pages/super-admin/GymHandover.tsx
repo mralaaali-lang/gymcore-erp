@@ -10,26 +10,26 @@ import {
 } from '../../services/api';
 import {
   ArrowRight,
-  CheckCircle2,
+  CheckCircle as CheckCircle2,
   Clock,
-  Mail,
-  Building2,
-  Globe,
-  Smartphone,
+  Envelope as Mail,
+  Buildings as Building2,
+  GlobeSimple as Globe,
+  DeviceMobile as Smartphone,
   CreditCard,
   UserCheck,
   Users,
   Calendar,
-  Loader2,
-  ExternalLink,
-  LogIn,
+  Spinner as Loader2,
+  ArrowSquareOut as ExternalLink,
+  SignIn as LogIn,
   Plus,
   Copy,
-  Sparkles,
+  Sparkle as Sparkles,
   MapPin,
   ShieldCheck,
-  Settings,
-} from 'lucide-react';
+  Gear as Settings
+} from '@phosphor-icons/react';
 import PageLoader from '../../components/shared/PageLoader';
 
 interface ChecklistItem {

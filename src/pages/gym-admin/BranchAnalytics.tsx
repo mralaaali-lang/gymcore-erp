@@ -7,7 +7,7 @@ import { formatDate, formatDateTime, fmtNum } from '../../utils/date';
 import {
   getPeakHours, getRetentionRate, getRevenueForecast, getEngagement,
 } from '../../services/analytics';
-import { Users, Calendar, Percent, DollarSign, Clock } from 'lucide-react';
+import { Users, Calendar, Percent, CurrencyDollar as DollarSign, Clock } from '@phosphor-icons/react';
 
 /**
  * §34ب — Analytics page rebuilt on the real server contracts.

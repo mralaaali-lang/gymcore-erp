@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../../context/GymBrandContext';
 import { getSettings, updateSettings, uploadGymLogo } from '../../../services/api';
 import { useToast } from '../../../context/ToastContext';
-import { Building2, MapPin, Phone, Globe, Clock, Palette } from 'lucide-react';
+import { Buildings as Building2, MapPin, Phone, GlobeSimple as Globe, Clock, Palette } from '@phosphor-icons/react';
 import Button from '../../../components/ui/Button';
 import PageLoader from '../../../components/shared/PageLoader';
 import { WEEK_DAYS } from '../../gym-admin/subscriptions/shared';

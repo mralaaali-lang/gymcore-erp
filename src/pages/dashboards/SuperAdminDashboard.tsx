@@ -22,24 +22,24 @@ import ContractFormModal from '../super-admin/contracts/ContractFormModal';
 import { fmtMoney, cycleLabel, todayIso } from '../super-admin/contracts/contractsUtils';
 import type { PlatformContract } from '../../services/api';
 import {
-  Building2,
+  Buildings as Building2,
   FileText,
   Headset,
-  Megaphone,
+  MegaphoneSimple as Megaphone,
   Receipt,
-  Activity,
+  ActivityIcon as Activity,
   ShieldCheck,
-  ClipboardCheck,
+  ClipboardText as ClipboardCheck,
   Plus,
-  CheckCircle2,
-  AlertTriangle,
-  CalendarClock,
+  CheckCircle as CheckCircle2,
+  Warning as AlertTriangle,
+  CalendarCheck as CalendarClock,
   Cpu,
-  Mail,
-  RefreshCw,
-  ExternalLink,
-  Ban,
-} from 'lucide-react';
+  Envelope as Mail,
+  ArrowsClockwise as RefreshCw,
+  ArrowSquareOut as ExternalLink,
+  Prohibit as Ban
+} from '@phosphor-icons/react';
 
 // ════════════════════════════════════════════════════════════════════
 // §40 — مركز إجراءات المنصة: كل رقم وكارت هنا من /platform/overview

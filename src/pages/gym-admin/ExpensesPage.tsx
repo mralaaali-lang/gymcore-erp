@@ -10,9 +10,14 @@ import { escapeHtml, printDocument } from '../../utils/print';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
 import {
-  Plus, FileText, X,
-  Wallet, Banknote, HandCoins, Receipt,
-} from 'lucide-react';
+  Plus,
+  FileText,
+  X,
+  Wallet,
+  Bank as Banknote,
+  HandCoins,
+  Receipt
+} from '@phosphor-icons/react';
 
 // ====================================================================
 // §44 — expenses screen. Same shell as the payments screen (§43):

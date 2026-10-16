@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Dumbbell, Activity, Zap, Target } from 'lucide-react';
+import { Barbell as Dumbbell, ActivityIcon as Activity, Lightning as Zap, Target } from '@phosphor-icons/react';
 
 // ─── Ambient background shared by every unauthenticated GymCore screen ───
 // These values are copied verbatim from AdminLoginPage. Keeping them in one

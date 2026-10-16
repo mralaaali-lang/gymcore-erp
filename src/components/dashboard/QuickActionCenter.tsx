@@ -11,7 +11,7 @@ import {
   listOffers, listExpenseCategories, searchMembers, getTodayAttendance,
 } from '../../services/api';
 import Spinner from '../../components/ui/Spinner';
-import { UserPlus, UserCog, QrCode, Banknote, Receipt, X } from 'lucide-react';
+import { UserPlus, UserGear as UserCog, QrCode, Bank as Banknote, Receipt, X } from '@phosphor-icons/react';
 
 // ====================================================================
 // §33 دفعة 1 — Quick Action Center for the manager dashboard.

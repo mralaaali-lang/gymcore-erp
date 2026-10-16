@@ -10,9 +10,15 @@ import { escapeHtml, printDocument } from '../../utils/print';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
 import {
-  Plus, FileText, X,
-  Wallet, Banknote, HandCoins, Smartphone, Receipt,
-} from 'lucide-react';
+  Plus,
+  FileText,
+  X,
+  Wallet,
+  Bank as Banknote,
+  HandCoins,
+  DeviceMobile as Smartphone,
+  Receipt
+} from '@phosphor-icons/react';
 
 // ====================================================================
 // §43 — payments screen (مقبوضات فقط). Built on the exact attendance

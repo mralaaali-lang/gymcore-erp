@@ -8,7 +8,7 @@ import FilterBar from '../../../components/shared/FilterBar';
 import PageLoader from '../../../components/shared/PageLoader';
 import Card from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
-import { Plus } from 'lucide-react';
+import { Plus } from '@phosphor-icons/react';
 
 const COLUMNS = ['new', 'contacted', 'trial_booked', 'converted', 'lost'];
 

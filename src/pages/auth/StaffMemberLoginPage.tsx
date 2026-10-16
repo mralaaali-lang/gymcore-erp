@@ -1,9 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Phone, KeyRound, Mail, Lock, Users, ArrowLeft, ArrowRight,
-  Eye, EyeOff, Check, ShieldCheck, Dumbbell, Activity, Zap, Target,
-} from 'lucide-react';
+  Phone,
+  Key as KeyRound,
+  Envelope as Mail,
+  Lock,
+  Users,
+  ArrowLeft,
+  ArrowRight,
+  Eye,
+  EyeSlash as EyeOff,
+  Check,
+  ShieldCheck,
+  Barbell as Dumbbell,
+  ActivityIcon as Activity,
+  Lightning as Zap,
+  Target
+} from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';

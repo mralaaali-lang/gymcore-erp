@@ -2,9 +2,21 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ShieldCheck, Mail, Lock, Dumbbell, ArrowLeft, ArrowRight,
-  Eye, EyeOff, Smartphone, Check, Activity, Zap, Target, Users,
-} from 'lucide-react';
+  ShieldCheck,
+  Envelope as Mail,
+  Lock,
+  Barbell as Dumbbell,
+  ArrowLeft,
+  ArrowRight,
+  Eye,
+  EyeSlash as EyeOff,
+  DeviceMobile as Smartphone,
+  Check,
+  ActivityIcon as Activity,
+  Lightning as Zap,
+  Target,
+  Users
+} from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { setPlatformCookieSession, setTokens } from '../../services/api';

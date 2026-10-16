@@ -12,7 +12,7 @@ import {
   qrCheckIn,
   type CheckInMemberHit,
 } from '../../services/api';
-import { Activity, Camera, Scan } from 'lucide-react';
+import { ActivityIcon as Activity, Camera, Scan } from '@phosphor-icons/react';
 
 // ====================================================================
 // §35ب — the unified check-in card. ONE field that accepts whatever the

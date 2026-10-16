@@ -1,4 +1,4 @@
-import { Download, Share2, X } from 'lucide-react';
+import { Download, Share as Share2, X } from '@phosphor-icons/react';
 import { usePwaInstall } from '../../hooks/usePwaInstall';
 
 interface PwaInstallPromptsProps {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, FileText, Pencil } from 'lucide-react';
+import { X, FileText, Pencil } from '@phosphor-icons/react';
 import { useToast } from '../../../context/ToastContext';
 import {
   createContract,

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Search, FileText, Plus, Eye, ExternalLink } from 'lucide-react';
+import { MagnifyingGlass as Search, FileText, Plus, Eye, ArrowSquareOut as ExternalLink } from '@phosphor-icons/react';
 import { Link } from 'react-router-dom';
 import { useApiQuery } from '../../../hooks/useApiQuery';
 import {

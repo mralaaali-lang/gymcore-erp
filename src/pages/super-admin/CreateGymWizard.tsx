@@ -11,7 +11,7 @@ import {
   type CreateGymWizardPayload,
   type PlatformGymDetail,
 } from '../../services/api';
-import { ArrowRight, Upload, Image as ImageIcon, X, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Upload, Image as ImageIcon, X, CheckCircle as CheckCircle2 } from '@phosphor-icons/react';
 
 interface WizardForm {
   // Hero

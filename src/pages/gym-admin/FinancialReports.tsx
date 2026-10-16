@@ -11,11 +11,23 @@ import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Chart from '../../components/charts/Chart';
 import Spinner from '../../components/ui/Spinner';
 import {
-  FileText, Users, CreditCard, CalendarDays, AlertTriangle,
-  TrendingUp, TrendingDown, Wallet, Crown, HandCoins,
-  User, Banknote, ClipboardCheck, LayoutGrid, UserX,
-  ChevronLeft,
-} from 'lucide-react';
+  FileText,
+  Users,
+  CreditCard,
+  CalendarDots as CalendarDays,
+  Warning as AlertTriangle,
+  TrendUp as TrendingUp,
+  TrendDown as TrendingDown,
+  Wallet,
+  Crown,
+  HandCoins,
+  User,
+  Bank as Banknote,
+  ClipboardText as ClipboardCheck,
+  GridFour as LayoutGrid,
+  UserMinus as UserX,
+  CaretLeft as ChevronLeft
+} from '@phosphor-icons/react';
 
 function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

@@ -9,7 +9,7 @@ import { buildExportMatrix, downloadMatrixXlsx } from '../../utils/csv';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Chart from '../../components/charts/Chart';
 import Spinner from '../../components/ui/Spinner';
-import { FileText, FileSpreadsheet, DoorOpen, Users, CalendarDays, Activity } from 'lucide-react';
+import { FileText, FileCsv as FileSpreadsheet, DoorOpen, Users, CalendarDots as CalendarDays, ActivityIcon as Activity } from '@phosphor-icons/react';
 
 // ====================================================================
 // تقرير الحضور (/admin/reports/attendance) — مربوط بزر «تقرير الحضور»

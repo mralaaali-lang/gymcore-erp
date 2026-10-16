@@ -11,25 +11,24 @@ import {
   type OnboardingProgress,
 } from '../../services/api';
 import {
-  Sparkles,
-  Dumbbell,
+  Sparkle as Sparkles,
+  Barbell as Dumbbell,
   Shield,
-  Settings,
-  CheckCircle2,
-
+  Gear as Settings,
+  CheckCircle as CheckCircle2,
   Check,
-  Building2,
+  Buildings as Building2,
   UserPlus,
-  Globe,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
+  GlobeSimple as Globe,
+  Spinner as Loader2,
+  CaretLeft as ChevronLeft,
+  CaretRight as ChevronRight,
   Star,
-  BarChart3,
+  ChartBar as BarChart3,
   Bell,
   Users,
-  Wallet,
-} from 'lucide-react';
+  Wallet
+} from '@phosphor-icons/react';
 import PageLoader from '../../components/shared/PageLoader';
 
 const steps = [

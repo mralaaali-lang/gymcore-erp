@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Pencil, Plus, Trash2, CalendarDays, Ticket, Users, Clock, Dumbbell, Gift } from 'lucide-react';
+import { X, Pencil, Plus, Trash as Trash2, CalendarDots as CalendarDays, Ticket, Users, Clock, Barbell as Dumbbell, Gift } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { formatMoney, currencySymbol } from '../../utils/currency';

@@ -1,5 +1,5 @@
 import type { ElementType, ReactNode } from 'react';
-import { Package } from 'lucide-react';
+import { Package } from '@phosphor-icons/react';
 import { ACCENTS, type AccentName } from './tokens';
 
 interface EmptyStateProps {

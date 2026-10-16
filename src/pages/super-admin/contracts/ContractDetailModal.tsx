@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, RefreshCw, Receipt, Ban, Pencil, Plus, CheckCircle2, FileText } from 'lucide-react';
+import { X, ArrowsClockwise as RefreshCw, Receipt, Prohibit as Ban, Pencil, Plus, CheckCircle as CheckCircle2, FileText } from '@phosphor-icons/react';
 import { useToast } from '../../../context/ToastContext';
 import { useApiQuery } from '../../../hooks/useApiQuery';
 import {

@@ -7,7 +7,7 @@ import { fmtNum } from '../../utils/date';
 import { printDocument, escapeHtml } from '../../utils/print';
 import { coachAttendanceReport, listCoachesSummary } from '../../services/api';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
-import { TrendingUp, TrendingDown, Users, ArrowRight } from 'lucide-react';
+import { TrendUp as TrendingUp, TrendDown as TrendingDown, Users, ArrowRight } from '@phosphor-icons/react';
 import PageLoader from '../../components/shared/PageLoader';
 import { sportName, useSportsCatalog } from './subscriptions/shared';
 

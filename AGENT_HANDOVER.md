@@ -59,7 +59,7 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
 1. **التصميم:** لغة مركز التحكم (`bg-gray-50`، أبيض `rounded-3xl`، أساسي `emerald-500`) عبر المكوّنات المشتركة فقط (`shared/PageHeader,StatsGrid,FilterBar,UnifiedTabs,PageLoader,ExportButton` + `ui/Card,Button,StatusBadge` + `dashboard/*`). **ممنوع mocks جديدة** — أي بيانات تعرضها صفحة يجب أن تأتي من endpoint حقيقي (أو تُترك placeholder صريح).
 2. **التحقق:** `npx tsc --noEmit` (أمامي وخلفي، `noUnusedLocals/Parameters` مفعّلة) + `npm run build` بعد أي تعديل واجهة.
 3. **i18n:** مفاتيح `ar.json/en.json` (تكافؤ 100% — حافظ عليه) للقوائم (`nav.*`) والهيدر واللوحات؛ بقية الصفحات ternaries داخلية (`isRtl ? ar : en`) — لا تخلط النظامين في ملف واحد بلا داعٍ. الافتراضي `ar` + `ar-EG` للتواريخ + `EGP/ج.م`.
-4. **الأيقونات:** Material Symbols للمكوّنات المشتركة، phosphor/lucide-shim للصفحات — لا نظام رابع. `lucide-react` اسم مستعار لمحاكي محلي (`src/lib/lucide-react.ts`، ~121 أيقونة فقط — تحقق قبل استيراد اسم جديد).
+4. **الأيقونات:** نظامان فقط — Material Symbols للمكوّنات المشتركة، و`@phosphor-icons/react` للصفحات. محاكي `lucide-react` حُذف نهائياً (2026-10-16): لا تستورد من `lucide-react` ولا تضف اسماً له؛ تحقق من اسم الأيقونة في Phosphor مباشرة (`Warning`←AlertTriangle، `CheckCircle`←CheckCircle2، `List`←Menu، `Pencil`←Edit3، `Gear`←Settings، `Envelope`←Mail، `EyeSlash`←EyeOff، `Barbell`←Dumbbell، `Spinner`←Loader2، `Trash`←Trash2…). أي اسم قديم متبقٍّ كاسم محلي (`CheckCircle as CheckCircle2`) مقصود لتقليل الدفوع.
 5. **السيد:** أي جدول جديد يُغذّى في `seedEngagement.ts` (إضافي) لا في `seedTenGyms.ts` (تأسيسي). راجع قيود CHECK/FK من `information_schema` قبل الإدخال (الأخطاء السابقة كلها من هذا النوع).
 6. **التوثيق:** أي إصلاح/قرار يُضاف لـ `LOCAL_TESTING_REPORT.md` (سجل حي) + هذا الملف عند تغيّر الإجراءات.
 

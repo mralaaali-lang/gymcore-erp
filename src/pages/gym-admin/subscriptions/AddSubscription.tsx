@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Check, User } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, User } from '@phosphor-icons/react';
 import { useApp } from '../../../context/GymBrandContext';
 import { useToast } from '../../../context/ToastContext';
 import { useApiQuery } from '../../../hooks/useApiQuery';

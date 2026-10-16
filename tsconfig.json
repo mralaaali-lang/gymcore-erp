@@ -16,8 +16,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@/*": ["./src/*"],
-      "lucide-react": ["./src/lib/lucide-react.ts"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src"]

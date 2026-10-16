@@ -1,5 +1,5 @@
 import type { ElementType } from 'react';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendUp as TrendingUp, TrendDown as TrendingDown } from '@phosphor-icons/react';
 import Sparkline from './Sparkline';
 import { ACCENTS, CARD_HOVER_CLASS, type AccentName } from './tokens';
 
