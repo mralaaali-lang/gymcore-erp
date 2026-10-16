@@ -6,9 +6,15 @@
     <meta name="theme-color" content="#114b5f" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Typography: Be Vietnam Pro is SELF-HOSTED from public/fonts (@font-face in
+         src/styles/index.css) and that file is the only thing that must declare a
+         family here. IBM Plex Sans Arabic / Cairo were removed because they are
+         CDN-only — in an offline or blocked Docker run they fail, and because they
+         sat FIRST in the stack the whole app (Latin and digits included) fell to
+         system-ui. Restore order: local face first, Arabic glyphs fall through. -->
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0,0" rel="stylesheet" />
-    <title>جيم كور - GymCore</title>
+    <title>جيم كور - GymCore ERP</title>
   </head>
   <body class="bg-[#f8f9ff]">
     <div id="root"></div>

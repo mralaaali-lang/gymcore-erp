@@ -58,8 +58,21 @@ export const theme = {
     background: '#f8f9ff',
     'on-background': '#121c2a',
     'surface-variant': '#d9e3f6',
+    // Obsidian dark-mode palette for luxury athletic dashboards
+    obsidian: {
+      950: '#070a0f',
+      900: '#0b0f17',
+      850: '#0f1420',
+      800: '#141b2b',
+      700: '#1e293b',
+    },
   },
   fontFamily: {
+    // Only two keys, and both start with the SELF-HOSTED face. A `sans` key here
+    // would also feed Tailwind preflight's `html` font-family, and an `arabic`
+    // key would generate a `.font-arabic` utility that fights the hand-written
+    // rule in index.css — both were added by the typography experiment and both
+    // made the app depend on Google Fonts for its primary text.
     body: ['Be Vietnam Pro', 'sans-serif'],
     headline: ['Be Vietnam Pro', 'sans-serif'],
   },
