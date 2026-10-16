@@ -26,6 +26,15 @@ export const shadcnColors = {
   input: v('input'),
   ring: v('ring'),
 
+  // Chalk & Brass shell extras: hairline rules, the two meta accents, and the
+  // table pair — cell text is a softer graphite than `foreground`, and headers
+  // are micro-labels. Nothing here is a button colour.
+  hairline: v('hairline'),
+  brass: { DEFAULT: v('brass'), soft: v('brass-soft') },
+  pine: v('pine'),
+  'table-fg': v('table-fg'),
+  'table-head': v('table-head'),
+
   // Auth console identity. Not shadcn names — these are the project's own,
   // exposed the same way so `bg-auth-accent/5` and `from-auth-accent/40`
   // work with correct alpha instead of `bg-[#06b6d4]/5`.

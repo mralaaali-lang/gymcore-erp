@@ -74,19 +74,31 @@
 }
 
 /*
+ * Alexandria — the first Arabic face this product has ever SHIPPED (self-hosted
+ * like Be Vietnam Pro, so it survives an offline Docker run). No unicode-range:
+ * Be Vietnam Pro sits first in every stack with a latin-only range, so Latin and
+ * digits keep taking it and only Arabic glyphs fall through to here.
+ */
+@font-face {
+  font-family: 'Alexandria';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/alexandria-arabic-var.woff2') format('woff2');
+}
+
+/*
  * The two families the app root actually applies (GymBrandContext wraps the tree
  * in `font-arabic` for ar / `font-sans` for en). Both start with Be Vietnam Pro
- * because it is the only face we ship locally; Arabic glyphs are outside its
- * `unicode-range`, so they fall through to the system Arabic font — which is how
- * the product has always looked. Putting a CDN-only Arabic webfont first here
- * broke Latin text and digits too whenever fonts.googleapis.com was unreachable.
+ * because it carries Latin + digits (tabular alignment depends on it), then
+ * Alexandria for Arabic, then the old system chain as the escape hatch.
  */
 .font-arabic {
-  font-family: 'Be Vietnam Pro', Tahoma, 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Be Vietnam Pro', 'Alexandria', Tahoma, 'Segoe UI', system-ui, sans-serif;
 }
 
 .font-sans {
-  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+  font-family: 'Be Vietnam Pro', 'Alexandria', system-ui, sans-serif;
 }
 
 /* Tabular Numbers for accounting/financial tables */
@@ -102,6 +114,19 @@ table:not(.no-tabular) td,
 table:not(.no-tabular) th {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
+}
+
+/*
+ * Table ink: 27 of the 83 tables ask for `text-gray-900` (#111827) — near-black
+ * body type, which is what made the grid read like a printed form. The shell
+ * drops cell text to warm graphite (`--table-fg`, #4A4239) and lets headers stay
+ * whatever muted label the table already sets. Specificity note: `table:not(...)`
+ * is class+element, so it beats a lone `text-gray-900` on the <table> element,
+ * while any colour utility on a <td>/<th> still wins — deliberate emphasis is
+ * never flattened. Opt a table out with className="no-shell-ink".
+ */
+table:not(.no-shell-ink) {
+  color: hsl(var(--table-fg));
 }
 
 /* Glassmorphism & Modern Card Primitives */

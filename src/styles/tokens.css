@@ -7,36 +7,56 @@
  * copy-pasted against exactly these variables, so adopting them never
  * introduces a second token system.
  *
- * Light values are the current Control-Center palette; dark values are the
- * Obsidian scale. Existing hex tokens in tailwind-tokens.js keep working and
- * now point at these same numbers.
+ * Light values are the Chalk & Brass shell (bone paper + warm graphite ink);
+ * dark values are the Court Green scale. Existing hex tokens in
+ * tailwind-tokens.js keep working and now point at these same numbers.
  */
 
 :root {
-  --background: 231.4 100% 98.6%; /* #f8f9ff */
-  --foreground: 215 40% 11.8%; /* #121c2a */
-  --card: 0 0% 100%;           /* #ffffff */
-  --card-foreground: 220.9 39.3% 11%; /* #111827 */
-  --popover: 0 0% 100%;        /* #ffffff */
-  --popover-foreground: 220.9 39.3% 11%; /* #111827 */
+  /*
+   * Chalk & Brass shell (2026-10-16): bone paper, warm graphite ink, hairline
+   * rules. Deliberately NOT black text — `--foreground` is #2B2620 and table
+   * cells drop further to #4A4239, because near-black body type reads as a
+   * form, not a premium product. `--primary` stays the tenant/action colour
+   * (123 call sites) and brass is only ever a meta accent: rules, active marks
+   * and chart series 1 — never a button.
+   */
+  --background: 42.9 25.9% 94.7%; /* #f5f3ee bone */
+  --foreground: 32.7 14.7% 14.7%; /* #2b2620 warm graphite, not black */
+  --card: 40 100% 98.8%;          /* #fffdf9 paper */
+  --card-foreground: 32.7 14.7% 14.7%; /* #2b2620 */
+  --popover: 40 100% 98.8%;       /* #fffdf9 */
+  --popover-foreground: 32.7 14.7% 14.7%; /* #2b2620 */
   --primary: 160.1 84.1% 39.4%; /* #10b981 */
   --primary-foreground: 0 0% 100%; /* #ffffff */
   --secondary: 160.6 100% 21.2%; /* #006c49 */
   --secondary-foreground: 0 0% 100%; /* #ffffff */
-  --muted: 220 14.3% 95.9%;    /* #f3f4f6 */
-  --muted-foreground: 220 8.9% 46.1%; /* #6b7280 */
+  --muted: 41.5 31.7% 92%;       /* #f1ede4 wash */
+  --muted-foreground: 38.8 8.5% 39.4%; /* #6d675c */
   --accent: 160.1 84.1% 39.4%; /* #10b981 */
   --accent-foreground: 0 0% 100%; /* #ffffff */
   --destructive: 0 75.5% 41.6%; /* #ba1a1a */
   --destructive-foreground: 0 0% 100%; /* #ffffff */
-  --border: 220 13% 91%;       /* #e5e7eb */
-  --input: 220 13% 91%;        /* #e5e7eb */
+  --border: 41.3 21.6% 85.5%;    /* #e2ddd2 */
+  --input: 41.3 21.6% 85.5%;     /* #e2ddd2 */
   --ring: 160.1 84.1% 39.4%;   /* #10b981 */
-  --surface: 210 20% 98%;      /* #f9fafb */
-  --surface-dim: 220 13% 91%;  /* #e5e7eb */
+  --surface: 40 100% 98.8%;      /* #fffdf9 paper */
+  --surface-dim: 41.3 21.6% 85.5%; /* #e2ddd2 */
 
-  /* Geometry */
-  --radius: 1rem;
+  /* Surfaces & meta accents for the Chalk & Brass shell. Brass is the only
+     non-tenant colour allowed to touch the chrome; pine carries the brand mark
+     and solid buttons so the action colour never competes with it. */
+  --hairline: 40 36% 90.2%;      /* #efe9dd — row separators */
+  --brass: 39 56.6% 41.6%;       /* #a67c2e */
+  --brass-soft: 40 50% 88.2%;    /* #f0e6d2 */
+  --pine: 153.3 30.3% 17.5%;     /* #1f3a2e */
+  --table-fg: 31.8 13% 25.7%;    /* #4a4239 — cell body, never black */
+  --table-head: 38.8 8.5% 39.4%; /* #6d675c — micro-labels */
+
+  /* Geometry — 10px is the Chalk & Brass radius (2px = Score Sheet, 18px = Clay).
+     Only the new shadcn primitives read this; the legacy `rounded-3xl` classes on
+     60+ pages keep their own scale until each page is migrated. */
+  --radius: 0.625rem;
 
   /* Auth console identity — the whole unauthenticated area (login, team-login,
      forgot/reset) paints from these and nothing else. */
@@ -64,26 +84,40 @@
   --obsidian-700: #1e293b;
 }
 
+/*
+ * Dark sibling of the shell = Court Green (warm bottle green, chalk text), not
+ * blue-black + neon. Still unused at runtime: nothing toggles `.dark` until
+ * Phase 3, so this block is a committed decision, not a shipped screen.
+ */
 .dark {
-  --background: 220 35.3% 6.7%; /* #0b0f17 */
-  --foreground: 210 40% 98%;   /* #f8fafc */
-  --card: 220.9 39.3% 11%;     /* #111827 */
-  --card-foreground: 210 40% 98%; /* #f8fafc */
-  --popover: 221.7 36.5% 12.4%; /* #141b2b */
-  --popover-foreground: 210 40% 98%; /* #f8fafc */
+  --background: 156.7 33.3% 10.6%; /* #12241d court */
+  --foreground: 75 21.1% 92.5%;    /* #eef0e8 chalk */
+  --card: 157.1 31.3% 13.1%;       /* #172c24 */
+  --card-foreground: 75 21.1% 92.5%; /* #eef0e8 */
+  --popover: 157.1 31.3% 13.1%;    /* #172c24 */
+  --popover-foreground: 75 21.1% 92.5%; /* #eef0e8 */
   --primary: 160.1 84.1% 39.4%; /* #10b981 */
   --primary-foreground: 0 0% 100%; /* #ffffff */
-  --secondary: 217.2 32.6% 17.5%; /* #1e293b */
-  --secondary-foreground: 210 40% 98%; /* #f8fafc */
-  --muted: 222.4 36.2% 9.2%;   /* #0f1420 */
-  --muted-foreground: 215 20.2% 65.1%; /* #94a3b8 */
+  --secondary: 152.7 24.4% 17.6%; /* #22382e */
+  --secondary-foreground: 75 21.1% 92.5%; /* #eef0e8 */
+  --muted: 152.7 25.6% 16.9%;     /* #20362c */
+  --muted-foreground: 148.6 10.8% 61.8%; /* #93a89d */
   --accent: 158.1 64.4% 51.6%; /* #34d399 */
   --accent-foreground: 162.4 80.4% 10%; /* #052e22 */
   --destructive: 0 90.6% 70.8%; /* #f87171 */
   --destructive-foreground: 0 69.7% 6.5%; /* #1c0505 */
-  --border: 215 27.9% 16.9%;   /* #1f2937 */
-  --input: 215 27.9% 16.9%;    /* #1f2937 */
+  --border: 152.7 24.4% 17.6%;    /* #22382e */
+  --input: 152.7 24.4% 17.6%;     /* #22382e */
   --ring: 160.1 84.1% 39.4%;   /* #10b981 */
-  --surface: 222.4 36.2% 9.2%; /* #0f1420 */
-  --surface-dim: 217.5 36.4% 4.3%; /* #070a0f */
+  --surface: 157.1 31.3% 13.1%;  /* #172c24 */
+  --surface-dim: 156.7 33.3% 10.6%; /* #12241d */
+
+  /* Court Green reading of the shell extras. Brass lifts a step (#d8b26a) so it
+     keeps contrast on the dark surface; cells stay chalk, never pure white. */
+  --hairline: 152.7 25.6% 16.9%; /* #20362c */
+  --brass: 39.3 58.5% 63.1%;     /* #d8b26a */
+  --brass-soft: 152.7 25.6% 16.9%; /* #20362c */
+  --pine: 148.6 10.8% 61.8%;     /* #93a89d — marks invert to chalk-green on dark */
+  --table-fg: 75 21.1% 92.5%;    /* #eef0e8 */
+  --table-head: 148.6 10.8% 61.8%; /* #93a89d */
 }

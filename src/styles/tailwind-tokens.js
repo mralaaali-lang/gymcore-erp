@@ -90,6 +90,9 @@ export const theme = {
     lg: '1rem',
     xl: '1.5rem',
     full: '9999px',
+    // Reads --radius from tokens.css (10px = Chalk & Brass, 2px = Score Sheet,
+    // 18px = Thermal Clay) so the shell radius is one token change, not a codemod.
+    shell: 'var(--radius)',
   },
   spacing: {
     'container-max': '1440px',
