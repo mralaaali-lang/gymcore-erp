@@ -22,6 +22,7 @@ import { useToast } from '../../context/ToastContext';
 import { setPlatformCookieSession, setTokens } from '../../services/api';
 import Spinner from '../../components/ui/Spinner';
 import PwaInstallPrompts from '../../components/auth/PwaInstallPrompts';
+import { AUTH_ACCENT } from '../../components/auth/AuthAmbience';
 import { ROLE_MAP } from '../../types';
 
 type LoginMethod = 'email' | 'phone';
@@ -203,7 +204,7 @@ export default function AdminLoginPage() {
       className="relative min-h-screen flex items-center justify-center overflow-hidden p-margin-mobile select-none"
       dir={isRtl ? 'rtl' : 'ltr'}
       style={{
-        background: 'linear-gradient(135deg, #0a1628 0%, #0f1a2e 30%, #13203a 60%, #0d1f2c 100%)',
+        background: 'var(--auth-root-bg)',
       }}
     >
       {/* ═══════════════════════════════════════════════════════════
@@ -215,9 +216,9 @@ export default function AdminLoginPage() {
         className="absolute inset-0"
         style={{
           background: `
-            radial-gradient(ellipse at 15% 20%, rgba(6,182,212,0.12) 0%, transparent 55%),
-            radial-gradient(ellipse at 85% 15%, rgba(245,158,11,0.08) 0%, transparent 45%),
-            radial-gradient(ellipse at 50% 80%, rgba(6,182,212,0.06) 0%, transparent 50%)
+            radial-gradient(ellipse at 15% 20%, hsl(var(--auth-accent) / 0.12) 0%, transparent 55%),
+            radial-gradient(ellipse at 85% 15%, hsl(var(--auth-amber) / 0.08) 0%, transparent 45%),
+            radial-gradient(ellipse at 50% 80%, hsl(var(--auth-accent) / 0.06) 0%, transparent 50%)
           `,
         }}
       />
@@ -226,15 +227,15 @@ export default function AdminLoginPage() {
       <div
         className="absolute inset-0 opacity-[0.04]"
         style={{
-          backgroundImage: `linear-gradient(rgba(110,231,183,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(110,231,183,0.15) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(hsl(var(--auth-grid-line) / 0.15) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--auth-grid-line) / 0.15) 1px, transparent 1px)`,
           backgroundSize: '48px 48px',
         }}
       />
 
       {/* 3. Animated glow orbs */}
-      <div className="absolute top-[15%] right-[20%] w-[500px] h-[500px] rounded-full bg-[#06b6d4]/8 blur-[120px] animate-pulse" style={{ animationDuration: '6s' }} />
-      <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] rounded-full bg-[#f59e0b]/6 blur-[100px] animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
-      <div className="absolute top-[40%] left-[40%] w-[300px] h-[300px] rounded-full bg-[#06b6d4]/5 blur-[90px] animate-pulse" style={{ animationDuration: '10s', animationDelay: '4s' }} />
+      <div className="absolute top-[15%] right-[20%] w-[500px] h-[500px] rounded-full bg-auth-accent/8 blur-[120px] animate-pulse" style={{ animationDuration: '6s' }} />
+      <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] rounded-full bg-auth-amber/6 blur-[100px] animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
+      <div className="absolute top-[40%] left-[40%] w-[300px] h-[300px] rounded-full bg-auth-accent/5 blur-[90px] animate-pulse" style={{ animationDuration: '10s', animationDelay: '4s' }} />
 
       {/* 4. Floating sport icons */}
       {particles.map((p) => (
@@ -255,7 +256,7 @@ export default function AdminLoginPage() {
 
       {/* 5. Subtle vignette */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        background: 'radial-gradient(ellipse at center, transparent 50%, rgba(10,22,40,0.6) 100%)',
+        background: 'radial-gradient(ellipse at center, transparent 50%, hsl(var(--auth-bg-1) / 0.6) 100%)',
       }} />
 
       {/* ═══════════════════════════════════════════════════════════
@@ -264,7 +265,7 @@ export default function AdminLoginPage() {
       <div className="relative w-full max-w-[440px] z-10">
 
         {/* Animated border glow behind card */}
-        <div className={`absolute -inset-[2px] rounded-3xl bg-gradient-to-br from-[#06b6d4]/40 via-[#f59e0b]/20 to-[#06b6d4]/40 opacity-0 blur-sm transition-all duration-1000 ${
+        <div className={`absolute -inset-[2px] rounded-3xl bg-gradient-to-br from-auth-accent/40 via-auth-amber/20 to-auth-accent/40 opacity-0 blur-sm transition-all duration-1000 ${
           showCard ? 'opacity-100' : 'opacity-0'
         }`} />
 
@@ -292,7 +293,7 @@ export default function AdminLoginPage() {
                 border: '1px solid rgba(6,182,212,0.25)',
               }}
             >
-              <ShieldCheck size={32} className="text-[#06b6d4]" strokeWidth={1.5} />
+              <ShieldCheck size={32} className="text-auth-accent" strokeWidth={1.5} />
             </div>
 
             <h1 className={`text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent transition-all duration-700 ${
@@ -307,7 +308,7 @@ export default function AdminLoginPage() {
             </p>
 
             {/* Gym accent line */}
-            <div className={`mx-auto mt-4 h-[3px] w-12 rounded-full bg-gradient-to-r from-[#06b6d4] to-[#f59e0b] transition-all duration-700 ${
+            <div className={`mx-auto mt-4 h-[3px] w-12 rounded-full bg-gradient-to-r from-auth-accent to-auth-amber transition-all duration-700 ${
               showCard ? 'opacity-100 scale-100' : 'opacity-0 scale-0'
             }`} style={{ transitionDelay: '150ms' }} />
           </div>
@@ -325,7 +326,7 @@ export default function AdminLoginPage() {
               onClick={() => setLoginMethod('email')}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${
                 loginMethod === 'email'
-                  ? 'bg-gradient-to-r from-[#06b6d4] to-[#0891b2] text-white shadow-lg shadow-[#06b6d4]/25 scale-105'
+                  ? 'bg-gradient-to-r from-auth-accent to-auth-accent-strong text-white shadow-lg shadow-auth-accent/25 scale-105'
                   : 'text-white/50 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -337,7 +338,7 @@ export default function AdminLoginPage() {
               onClick={() => setLoginMethod('phone')}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${
                 loginMethod === 'phone'
-                  ? 'bg-gradient-to-r from-[#06b6d4] to-[#0891b2] text-white shadow-lg shadow-[#06b6d4]/25 scale-105'
+                  ? 'bg-gradient-to-r from-auth-accent to-auth-accent-strong text-white shadow-lg shadow-auth-accent/25 scale-105'
                   : 'text-white/50 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -356,10 +357,10 @@ export default function AdminLoginPage() {
                 <label className="block text-sm font-semibold text-white/70 mb-2">{t('auth.email')}</label>
                 <div className={`group flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all duration-200 ${
                   focusedField === 'email'
-                    ? 'border-[#06b6d4] bg-[#06b6d4]/5 ring-1 ring-[#06b6d4]/30 shadow-sm shadow-[#06b6d4]/10'
+                    ? 'border-auth-accent bg-auth-accent/5 ring-1 ring-auth-accent/30 shadow-sm shadow-auth-accent/10'
                     : 'border-white/10 bg-white/5 hover:border-white/20'
                 }`}>
-                  <Mail size={18} className={`transition-colors duration-200 ${focusedField === 'email' ? 'text-[#06b6d4]' : 'text-white/30 group-hover:text-white/50'}`} />
+                  <Mail size={18} className={`transition-colors duration-200 ${focusedField === 'email' ? 'text-auth-accent' : 'text-white/30 group-hover:text-white/50'}`} />
                   <input
                     type="email"
                     value={email}
@@ -383,10 +384,10 @@ export default function AdminLoginPage() {
                 <label className="block text-sm font-semibold text-white/70 mb-2">{t('auth.phone')}</label>
                 <div className={`group flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all duration-200 ${
                   focusedField === 'phone'
-                    ? 'border-[#06b6d4] bg-[#06b6d4]/5 ring-1 ring-[#06b6d4]/30 shadow-sm shadow-[#06b6d4]/10'
+                    ? 'border-auth-accent bg-auth-accent/5 ring-1 ring-auth-accent/30 shadow-sm shadow-auth-accent/10'
                     : 'border-white/10 bg-white/5 hover:border-white/20'
                 }`}>
-                  <Smartphone size={18} className={`transition-colors duration-200 ${focusedField === 'phone' ? 'text-[#06b6d4]' : 'text-white/30 group-hover:text-white/50'}`} />
+                  <Smartphone size={18} className={`transition-colors duration-200 ${focusedField === 'phone' ? 'text-auth-accent' : 'text-white/30 group-hover:text-white/50'}`} />
                   <input
                     type="tel"
                     value={phoneNumber}
@@ -409,10 +410,10 @@ export default function AdminLoginPage() {
               <label className="block text-sm font-semibold text-white/70 mb-2">{t('auth.password')}</label>
               <div className={`group flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all duration-200 ${
                 focusedField === 'password'
-                  ? 'border-[#06b6d4] bg-[#06b6d4]/5 ring-1 ring-[#06b6d4]/30 shadow-sm shadow-[#06b6d4]/10'
+                  ? 'border-auth-accent bg-auth-accent/5 ring-1 ring-auth-accent/30 shadow-sm shadow-auth-accent/10'
                   : 'border-white/10 bg-white/5 hover:border-white/20'
               }`}>
-                <Lock size={18} className={`transition-colors duration-200 ${focusedField === 'password' ? 'text-[#06b6d4]' : 'text-white/30 group-hover:text-white/50'}`} />
+                <Lock size={18} className={`transition-colors duration-200 ${focusedField === 'password' ? 'text-auth-accent' : 'text-white/30 group-hover:text-white/50'}`} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -444,7 +445,7 @@ export default function AdminLoginPage() {
                   onClick={() => handleRememberMeChange(!rememberMe)}
                   className={`w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center transition-all duration-150 ${
                     rememberMe
-                      ? 'bg-[#06b6d4] border-[#06b6d4] shadow-sm shadow-[#06b6d4]/30'
+                      ? 'bg-auth-accent border-auth-accent shadow-sm shadow-auth-accent/30'
                       : 'border-white/20 group-hover:border-white/40'
                   }`}
                 >
@@ -457,7 +458,7 @@ export default function AdminLoginPage() {
               </label>
               <Link
                 to="/forgot-password?area=admin"
-                className="text-xs text-white/40 hover:text-[#06b6d4] transition-colors"
+                className="text-xs text-white/40 hover:text-auth-accent transition-colors"
               >
                 {t('auth.forgotPassword')}
               </Link>
@@ -471,7 +472,7 @@ export default function AdminLoginPage() {
                 disabled={loading}
                 className="relative w-full py-3.5 rounded-2xl font-bold text-sm tracking-wide text-white overflow-hidden transition-all duration-200 active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed group"
                 style={{
-                  background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 50%, #0e7490 100%)',
+                  background: 'var(--auth-cta-bg)',
                   boxShadow: '0 4px 20px rgba(6,182,212,0.3)',
                 }}
               >
@@ -503,7 +504,7 @@ export default function AdminLoginPage() {
             </Link>
             <button
               onClick={() => setLanguage(isRtl ? 'en' : 'ar')}
-              className="text-xs text-white/30 hover:text-[#06b6d4]/70 transition-colors"
+              className="text-xs text-white/30 hover:text-auth-accent/70 transition-colors"
             >
               {isRtl ? 'English' : 'العربية'}
             </button>
@@ -529,7 +530,7 @@ export default function AdminLoginPage() {
         }
       `}</style>
 
-      <PwaInstallPrompts isRtl={isRtl} appName={t('common.appName')} accentColor="#06b6d4" logoInitial="ج" />
+      <PwaInstallPrompts isRtl={isRtl} appName={t('common.appName')} accentColor={AUTH_ACCENT} logoInitial="ج" />
     </div>
   );
 }

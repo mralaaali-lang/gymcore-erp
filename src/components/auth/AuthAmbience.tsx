@@ -10,10 +10,14 @@ const PARTICLE_COUNT = 8;
 
 function randomBetween(min: number, max: number) { return Math.random() * (max - min) + min; }
 
-/** Root paint for any screen using <AuthAmbience />. Apply to the same element. */
-export const AUTH_ROOT_BG = 'linear-gradient(135deg, #0a1628 0%, #0f1a2e 30%, #13203a 60%, #0d1f2c 100%)';
+/** Root paint for every unauthenticated screen (both logins + password flow). */
+export const AUTH_ROOT_BG = 'var(--auth-root-bg)';
 
-/** Single accent for the whole unauthenticated area. */
+/**
+ * Single accent for the whole unauthenticated area. This is the one raw hex
+ * left in the auth layer: `<PwaInstallPrompts accentColor>` needs a literal
+ * string, not a `var()`. Keep it equal to `--auth-accent` in tokens.css.
+ */
 export const AUTH_ACCENT = '#06b6d4';
 
 export default function AuthAmbience() {
@@ -37,9 +41,9 @@ export default function AuthAmbience() {
         className="absolute inset-0"
         style={{
           background: `
-            radial-gradient(ellipse at 15% 20%, rgba(6,182,212,0.12) 0%, transparent 55%),
-            radial-gradient(ellipse at 85% 15%, rgba(245,158,11,0.08) 0%, transparent 45%),
-            radial-gradient(ellipse at 50% 80%, rgba(6,182,212,0.06) 0%, transparent 50%)
+            radial-gradient(ellipse at 15% 20%, hsl(var(--auth-accent) / 0.12) 0%, transparent 55%),
+            radial-gradient(ellipse at 85% 15%, hsl(var(--auth-amber) / 0.08) 0%, transparent 45%),
+            radial-gradient(ellipse at 50% 80%, hsl(var(--auth-accent) / 0.06) 0%, transparent 50%)
           `,
         }}
       />
@@ -48,15 +52,15 @@ export default function AuthAmbience() {
       <div
         className="absolute inset-0 opacity-[0.04]"
         style={{
-          backgroundImage: `linear-gradient(rgba(110,231,183,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(110,231,183,0.15) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(hsl(var(--auth-grid-line) / 0.15) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--auth-grid-line) / 0.15) 1px, transparent 1px)`,
           backgroundSize: '48px 48px',
         }}
       />
 
       {/* 3. Animated glow orbs */}
-      <div className="absolute top-[15%] right-[20%] w-[500px] h-[500px] rounded-full bg-[#06b6d4]/8 blur-[120px] animate-pulse" style={{ animationDuration: '6s' }} />
-      <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] rounded-full bg-[#f59e0b]/6 blur-[100px] animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
-      <div className="absolute top-[40%] left-[40%] w-[300px] h-[300px] rounded-full bg-[#06b6d4]/5 blur-[90px] animate-pulse" style={{ animationDuration: '10s', animationDelay: '4s' }} />
+      <div className="absolute top-[15%] right-[20%] w-[500px] h-[500px] rounded-full bg-auth-accent/8 blur-[120px] animate-pulse" style={{ animationDuration: '6s' }} />
+      <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] rounded-full bg-auth-amber/6 blur-[100px] animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
+      <div className="absolute top-[40%] left-[40%] w-[300px] h-[300px] rounded-full bg-auth-accent/5 blur-[90px] animate-pulse" style={{ animationDuration: '10s', animationDelay: '4s' }} />
 
       {/* 4. Floating sport icons */}
       {particles.map((p) => (
@@ -77,7 +81,7 @@ export default function AuthAmbience() {
 
       {/* 5. Subtle vignette */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        background: 'radial-gradient(ellipse at center, transparent 50%, rgba(10,22,40,0.6) 100%)',
+        background: 'radial-gradient(ellipse at center, transparent 50%, hsl(var(--auth-bg-1) / 0.6) 100%)',
       }} />
 
       <style>{`

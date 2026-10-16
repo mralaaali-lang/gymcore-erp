@@ -87,7 +87,7 @@ export default function ResetPasswordPage() {
 
       <div className="relative w-full max-w-md z-10">
         {/* Animated border glow behind card */}
-        <div className="absolute -inset-[2px] rounded-3xl bg-gradient-to-br from-[#06b6d4]/40 via-[#f59e0b]/20 to-[#06b6d4]/40 blur-sm" />
+        <div className="absolute -inset-[2px] rounded-3xl bg-gradient-to-br from-auth-accent/40 via-auth-amber/20 to-auth-accent/40 blur-sm" />
 
         <div
           className="relative backdrop-blur-2xl rounded-3xl border border-white/10 p-8"
@@ -118,8 +118,8 @@ export default function ResetPasswordPage() {
                 <label className="block text-sm font-semibold text-white/70 mb-2">
                   {isRtl ? 'كلمة المرور الجديدة' : 'New password'}
                 </label>
-                <div className="group flex items-center gap-3 px-4 py-3.5 rounded-xl border border-white/10 bg-white/5 transition-all duration-200 hover:border-white/20 focus-within:border-[#06b6d4] focus-within:bg-[#06b6d4]/5 focus-within:ring-1 focus-within:ring-[#06b6d4]/30">
-                  <Lock size={18} className="text-white/30 transition-colors duration-200 group-focus-within:text-[#06b6d4]" />
+                <div className="group flex items-center gap-3 px-4 py-3.5 rounded-xl border border-white/10 bg-white/5 transition-all duration-200 hover:border-white/20 focus-within:border-auth-accent focus-within:bg-auth-accent/5 focus-within:ring-1 focus-within:ring-auth-accent/30">
+                  <Lock size={18} className="text-white/30 transition-colors duration-200 group-focus-within:text-auth-accent" />
                   <input
                     type="password"
                     value={password}
@@ -138,8 +138,8 @@ export default function ResetPasswordPage() {
                 <label className="block text-sm font-semibold text-white/70 mb-2">
                   {isRtl ? 'تأكيد كلمة المرور' : 'Confirm password'}
                 </label>
-                <div className="group flex items-center gap-3 px-4 py-3.5 rounded-xl border border-white/10 bg-white/5 transition-all duration-200 hover:border-white/20 focus-within:border-[#06b6d4] focus-within:bg-[#06b6d4]/5 focus-within:ring-1 focus-within:ring-[#06b6d4]/30">
-                  <Lock size={18} className="text-white/30 transition-colors duration-200 group-focus-within:text-[#06b6d4]" />
+                <div className="group flex items-center gap-3 px-4 py-3.5 rounded-xl border border-white/10 bg-white/5 transition-all duration-200 hover:border-white/20 focus-within:border-auth-accent focus-within:bg-auth-accent/5 focus-within:ring-1 focus-within:ring-auth-accent/30">
+                  <Lock size={18} className="text-white/30 transition-colors duration-200 group-focus-within:text-auth-accent" />
                   <input
                     type="password"
                     value={confirmPassword}
@@ -158,9 +158,9 @@ export default function ResetPasswordPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="relative w-full py-3.5 rounded-2xl text-white font-bold text-base tracking-wide overflow-hidden transition-all duration-200 active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06b6d4]"
+                className="relative w-full py-3.5 rounded-2xl text-white font-bold text-base tracking-wide overflow-hidden transition-all duration-200 active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent"
                 style={{
-                  background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 50%, #0e7490 100%)',
+                  background: 'var(--auth-cta-bg)',
                   boxShadow: '0 4px 20px rgba(6,182,212,0.3)',
                 }}
               >

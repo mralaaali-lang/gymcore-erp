@@ -38,11 +38,23 @@
   /* Geometry */
   --radius: 1rem;
 
-  /* Auth console identity (login / team-login / forgot / reset) */
-  --auth-accent: 188.7 94.5% 42.7%; /* #06b6d4 */
-  --auth-accent-strong: 191.6 91.4% 36.5%; /* #0891b2 */
-  --auth-amber: 37.7 92.1% 50.2%; /* #f59e0b */
-  --auth-root-bg: linear-gradient(135deg, #0a1628 0%, #0f1a2e 30%, #13203a 60%, #0d1f2c 100%);
+  /* Auth console identity — the whole unauthenticated area (login, team-login,
+     forgot/reset) paints from these and nothing else. */
+  --auth-accent: 188.7 94.5% 42.7%;                 /* #06b6d4 */
+  --auth-accent-strong: 191.6 91.4% 36.5%;          /* #0891b2 */
+  --auth-accent-deep: 192.9 82.3% 31%;            /* #0e7490 */
+  --auth-amber: 37.7 92.1% 50.2%;                  /* #f59e0b */
+  --auth-grid-line: 156.2 71.6% 66.9%;              /* #6ee7b7 */
+  --auth-bg-1: 216 60% 9.8%;                    /* #0a1628 */
+  --auth-bg-2: 218.7 50.8% 12%;                    /* #0f1a2e */
+  --auth-bg-3: 220 50.6% 15.1%;                    /* #13203a */
+  --auth-bg-4: 205.2 54.4% 11.2%;                    /* #0d1f2c */
+  --auth-root-bg: linear-gradient(135deg,
+    hsl(var(--auth-bg-1)) 0%, hsl(var(--auth-bg-2)) 30%,
+    hsl(var(--auth-bg-3)) 60%, hsl(var(--auth-bg-4)) 100%);
+  --auth-cta-bg: linear-gradient(135deg,
+    hsl(var(--auth-accent)) 0%, hsl(var(--auth-accent-strong)) 50%,
+    hsl(var(--auth-accent-deep)) 100%);
 
   /* Obsidian scale (raw hex for gradients/shadows that need literal stops) */
   --obsidian-950: #070a0f;

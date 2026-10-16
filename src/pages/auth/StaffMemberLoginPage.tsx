@@ -22,6 +22,7 @@ import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import Spinner from '../../components/ui/Spinner';
 import PwaInstallPrompts from '../../components/auth/PwaInstallPrompts';
+import { AUTH_ACCENT } from '../../components/auth/AuthAmbience';
 import { login as apiStaffLogin, memberLogin as apiMemberLogin, logout as apiLogout } from '../../services/api';
 import { ROLE_MAP } from '../../types';
 
@@ -43,7 +44,7 @@ function randomBetween(min: number, max: number) { return Math.random() * (max -
 function fieldBox(active: boolean, bad: boolean) {
   const base = 'group flex items-center gap-3 px-4 min-h-[54px] rounded-xl border transition-all duration-200 ';
   if (bad) return base + 'border-rose-400/70 bg-rose-500/10 ring-1 ring-rose-400/30';
-  if (active) return base + 'border-[#06b6d4] bg-[#06b6d4]/5 ring-1 ring-[#06b6d4]/30 shadow-sm shadow-[#06b6d4]/10';
+  if (active) return base + 'border-auth-accent bg-auth-accent/5 ring-1 ring-auth-accent/30 shadow-sm shadow-auth-accent/10';
   return base + 'border-white/10 bg-white/5 hover:border-white/20';
 }
 
@@ -172,7 +173,7 @@ export default function StaffMemberLoginPage() {
       className="team-fx relative min-h-[100dvh] flex items-center justify-center overflow-hidden px-margin-mobile py-8 select-none"
       dir={isRtl ? 'rtl' : 'ltr'}
       style={{
-        background: 'linear-gradient(135deg, #0a1628 0%, #0f1a2e 30%, #13203a 60%, #0d1f2c 100%)',
+        background: 'var(--auth-root-bg)',
       }}
     >
       {/* ═══════════ AMBIENT BACKGROUND LAYERS (identical to the admin console) ═══════════ */}
@@ -182,9 +183,9 @@ export default function StaffMemberLoginPage() {
         className="absolute inset-0"
         style={{
           background: `
-            radial-gradient(ellipse at 15% 20%, rgba(6,182,212,0.12) 0%, transparent 55%),
-            radial-gradient(ellipse at 85% 15%, rgba(245,158,11,0.08) 0%, transparent 45%),
-            radial-gradient(ellipse at 50% 80%, rgba(6,182,212,0.06) 0%, transparent 50%)
+            radial-gradient(ellipse at 15% 20%, hsl(var(--auth-accent) / 0.12) 0%, transparent 55%),
+            radial-gradient(ellipse at 85% 15%, hsl(var(--auth-amber) / 0.08) 0%, transparent 45%),
+            radial-gradient(ellipse at 50% 80%, hsl(var(--auth-accent) / 0.06) 0%, transparent 50%)
           `,
         }}
       />
@@ -193,15 +194,15 @@ export default function StaffMemberLoginPage() {
       <div
         className="absolute inset-0 opacity-[0.04]"
         style={{
-          backgroundImage: `linear-gradient(rgba(110,231,183,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(110,231,183,0.15) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(hsl(var(--auth-grid-line) / 0.15) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--auth-grid-line) / 0.15) 1px, transparent 1px)`,
           backgroundSize: '48px 48px',
         }}
       />
 
       {/* 3. Animated glow orbs */}
-      <div className="absolute top-[15%] right-[20%] w-[500px] h-[500px] rounded-full bg-[#06b6d4]/8 blur-[120px] animate-pulse" style={{ animationDuration: '6s' }} />
-      <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] rounded-full bg-[#f59e0b]/6 blur-[100px] animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
-      <div className="absolute top-[40%] left-[40%] w-[300px] h-[300px] rounded-full bg-[#06b6d4]/5 blur-[90px] animate-pulse" style={{ animationDuration: '10s', animationDelay: '4s' }} />
+      <div className="absolute top-[15%] right-[20%] w-[500px] h-[500px] rounded-full bg-auth-accent/8 blur-[120px] animate-pulse" style={{ animationDuration: '6s' }} />
+      <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] rounded-full bg-auth-amber/6 blur-[100px] animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
+      <div className="absolute top-[40%] left-[40%] w-[300px] h-[300px] rounded-full bg-auth-accent/5 blur-[90px] animate-pulse" style={{ animationDuration: '10s', animationDelay: '4s' }} />
 
       {/* 4. Floating sport icons */}
       {particles.map((p) => (
@@ -222,14 +223,14 @@ export default function StaffMemberLoginPage() {
 
       {/* 5. Subtle vignette */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        background: 'radial-gradient(ellipse at center, transparent 50%, rgba(10,22,40,0.6) 100%)',
+        background: 'radial-gradient(ellipse at center, transparent 50%, hsl(var(--auth-bg-1) / 0.6) 100%)',
       }} />
 
       {/* ═══════════ LOGIN CARD ═══════════ */}
       <div className="relative w-full max-w-[440px] z-10">
 
         {/* Animated border glow */}
-        <div className={`absolute -inset-[2px] rounded-3xl bg-gradient-to-br from-[#06b6d4]/40 via-[#f59e0b]/20 to-[#06b6d4]/40 blur-sm transition-all duration-1000 ${
+        <div className={`absolute -inset-[2px] rounded-3xl bg-gradient-to-br from-auth-accent/40 via-auth-amber/20 to-auth-accent/40 blur-sm transition-all duration-1000 ${
           showCard ? 'opacity-100' : 'opacity-0'
         }`} />
 
@@ -255,7 +256,7 @@ export default function StaffMemberLoginPage() {
                 border: '1px solid rgba(6,182,212,0.25)',
               }}
             >
-              <Users size={32} strokeWidth={1.5} className="text-[#06b6d4]" />
+              <Users size={32} strokeWidth={1.5} className="text-auth-accent" />
             </div>
 
             <h1 className={`text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent transition-all duration-700 ${
@@ -268,7 +269,7 @@ export default function StaffMemberLoginPage() {
               {t('auth.teamSubtitle')}
             </p>
 
-            <div className={`mx-auto mt-4 h-[3px] w-12 rounded-full bg-gradient-to-r from-[#06b6d4] to-[#f59e0b] transition-all duration-700 ${
+            <div className={`mx-auto mt-4 h-[3px] w-12 rounded-full bg-gradient-to-r from-auth-accent to-auth-amber transition-all duration-700 ${
               showCard ? 'opacity-100 scale-100' : 'opacity-0 scale-0'
             }`} style={{ transitionDelay: '150ms' }} />
           </div>
@@ -289,7 +290,7 @@ export default function StaffMemberLoginPage() {
               onClick={() => setLoginType('member')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${
                 loginType === 'member'
-                  ? 'bg-gradient-to-r from-[#06b6d4] to-[#0891b2] text-white shadow-lg shadow-[#06b6d4]/25 scale-105'
+                  ? 'bg-gradient-to-r from-auth-accent to-auth-accent-strong text-white shadow-lg shadow-auth-accent/25 scale-105'
                   : 'text-white/50 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -304,7 +305,7 @@ export default function StaffMemberLoginPage() {
               onClick={() => setLoginType('staff')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${
                 loginType === 'staff'
-                  ? 'bg-gradient-to-r from-[#06b6d4] to-[#0891b2] text-white shadow-lg shadow-[#06b6d4]/25 scale-105'
+                  ? 'bg-gradient-to-r from-auth-accent to-auth-accent-strong text-white shadow-lg shadow-auth-accent/25 scale-105'
                   : 'text-white/50 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -326,7 +327,7 @@ export default function StaffMemberLoginPage() {
                   </label>
                   <div className={fieldBox(focusedField === 'phone', phoneBad)}>
                     <Phone size={18} className={`transition-colors duration-200 ${
-                      phoneBad ? 'text-rose-300' : focusedField === 'phone' ? 'text-[#06b6d4]' : 'text-white/30 group-hover:text-white/50'
+                      phoneBad ? 'text-rose-300' : focusedField === 'phone' ? 'text-auth-accent' : 'text-white/30 group-hover:text-white/50'
                     }`} />
                     <input
                       id="member-phone"
@@ -364,7 +365,7 @@ export default function StaffMemberLoginPage() {
                   </label>
                   <div className={fieldBox(focusedField === 'code', pinBad)}>
                     <KeyRound size={18} className={`transition-colors duration-200 ${
-                      pinBad ? 'text-rose-300' : focusedField === 'code' ? 'text-[#06b6d4]' : 'text-white/30 group-hover:text-white/50'
+                      pinBad ? 'text-rose-300' : focusedField === 'code' ? 'text-auth-accent' : 'text-white/30 group-hover:text-white/50'
                     }`} />
                     <input
                       id="member-pin"
@@ -386,7 +387,7 @@ export default function StaffMemberLoginPage() {
                     <button
                       type="button"
                       onClick={() => setShowMemberPin(!showMemberPin)}
-                      className="text-white/30 hover:text-white/60 transition-colors p-1.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06b6d4]"
+                      className="text-white/30 hover:text-white/60 transition-colors p-1.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent"
                       aria-pressed={showMemberPin}
                       aria-label={showMemberPin ? 'Hide PIN' : 'Show PIN'}
                     >
@@ -412,7 +413,7 @@ export default function StaffMemberLoginPage() {
                   </label>
                   <div className={fieldBox(focusedField === 'email', false)}>
                     <Mail size={18} className={`transition-colors duration-200 ${
-                      focusedField === 'email' ? 'text-[#06b6d4]' : 'text-white/30 group-hover:text-white/50'
+                      focusedField === 'email' ? 'text-auth-accent' : 'text-white/30 group-hover:text-white/50'
                     }`} />
                     <input
                       id="staff-email"
@@ -440,7 +441,7 @@ export default function StaffMemberLoginPage() {
                   </label>
                   <div className={fieldBox(focusedField === 'password', false)}>
                     <Lock size={18} className={`transition-colors duration-200 ${
-                      focusedField === 'password' ? 'text-[#06b6d4]' : 'text-white/30 group-hover:text-white/50'
+                      focusedField === 'password' ? 'text-auth-accent' : 'text-white/30 group-hover:text-white/50'
                     }`} />
                     <input
                       id="staff-password"
@@ -459,7 +460,7 @@ export default function StaffMemberLoginPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="text-white/30 hover:text-white/60 transition-colors p-1.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06b6d4]"
+                      className="text-white/30 hover:text-white/60 transition-colors p-1.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent"
                       aria-pressed={showPassword}
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
@@ -475,7 +476,7 @@ export default function StaffMemberLoginPage() {
                     <div
                       onClick={() => handleRememberMeChange(!rememberMe)}
                       className={`w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center transition-all duration-150 ${
-                        rememberMe ? 'bg-[#06b6d4] border-[#06b6d4] shadow-sm shadow-[#06b6d4]/30' : 'border-white/20 group-hover:border-white/40'
+                        rememberMe ? 'bg-auth-accent border-auth-accent shadow-sm shadow-auth-accent/30' : 'border-white/20 group-hover:border-white/40'
                       }`}
                     >
                       {rememberMe && <Check size={12} className="text-white" strokeWidth={3} />}
@@ -485,7 +486,7 @@ export default function StaffMemberLoginPage() {
                       {t('auth.rememberMe')}
                     </span>
                   </label>
-                  <Link to="/forgot-password?area=team" className="text-xs text-white/40 hover:text-[#06b6d4] transition-colors">
+                  <Link to="/forgot-password?area=team" className="text-xs text-white/40 hover:text-auth-accent transition-colors">
                     {t('auth.forgotPassword')}
                   </Link>
                 </div>
@@ -498,9 +499,9 @@ export default function StaffMemberLoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="relative w-full py-4 rounded-2xl font-bold text-base tracking-wide text-white overflow-hidden transition-all duration-200 active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06b6d4]"
+                className="relative w-full py-4 rounded-2xl font-bold text-base tracking-wide text-white overflow-hidden transition-all duration-200 active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent"
                 style={{
-                  background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 50%, #0e7490 100%)',
+                  background: 'var(--auth-cta-bg)',
                   boxShadow: '0 4px 20px rgba(6,182,212,0.3)',
                 }}
               >
@@ -523,14 +524,14 @@ export default function StaffMemberLoginPage() {
               to="/login"
               className="group inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
             >
-              <ShieldCheck size={14} className="transition-colors group-hover:text-[#06b6d4]" />
+              <ShieldCheck size={14} className="transition-colors group-hover:text-auth-accent" />
               {t('auth.adminLinkFromTeam')}
               <ArrowIcon size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
             <button
               type="button"
               onClick={() => setLanguage(isRtl ? 'en' : 'ar')}
-              className="text-xs text-white/30 hover:text-[#06b6d4]/80 transition-colors"
+              className="text-xs text-white/30 hover:text-auth-accent/80 transition-colors"
             >
               {isRtl ? 'English' : 'العربية'}
             </button>
@@ -560,7 +561,7 @@ export default function StaffMemberLoginPage() {
         }
       `}</style>
 
-      <PwaInstallPrompts isRtl={isRtl} appName={t('auth.teamTitle')} accentColor="#06b6d4" logoInitial="ج" />
+      <PwaInstallPrompts isRtl={isRtl} appName={t('auth.teamTitle')} accentColor={AUTH_ACCENT} logoInitial="ج" />
     </div>
   );
 }

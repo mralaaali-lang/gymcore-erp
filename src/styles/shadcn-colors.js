@@ -25,4 +25,12 @@ export const shadcnColors = {
   border: v('border'),
   input: v('input'),
   ring: v('ring'),
+
+  // Auth console identity. Not shadcn names — these are the project's own,
+  // exposed the same way so `bg-auth-accent/5` and `from-auth-accent/40`
+  // work with correct alpha instead of `bg-[#06b6d4]/5`.
+  'auth-accent': v('auth-accent'),
+  'auth-accent-strong': v('auth-accent-strong'),
+  'auth-accent-deep': v('auth-accent-deep'),
+  'auth-amber': v('auth-amber'),
 };
