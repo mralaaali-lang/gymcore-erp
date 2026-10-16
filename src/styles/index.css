@@ -4,6 +4,22 @@
 
 :root {
   --color-card: #ffffff;
+  --bg-page: #f8f9ff;
+  --bg-surface: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-subtle: #e2e8f0;
+  --primary-accent: #10b981;
+}
+
+.dark {
+  --color-card: #111827;
+  --bg-page: #0b0f17;
+  --bg-surface: #111827;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-subtle: #1f2937;
+  --primary-accent: #10b981;
 }
 
 /* Be Vietnam Pro — self-hosted (public/fonts), works offline */
@@ -73,11 +89,49 @@
 }
 
 .font-arabic {
-  font-family: 'Be Vietnam Pro', Tahoma, 'Segoe UI', system-ui, sans-serif;
+  font-family: 'IBM Plex Sans Arabic', 'Cairo', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
 }
 
 .font-sans {
-  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+  font-family: 'Be Vietnam Pro', 'IBM Plex Sans Arabic', 'Cairo', system-ui, -apple-system, sans-serif;
+}
+
+/* Tabular Numbers for accounting/financial tables */
+.tabular-nums, .font-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Every data table here is financial or roster-like, so digits should stay
+   aligned in columns instead of jittering while values change. Opt a table out
+   with className="no-tabular" if a cell ever needs proportional digits. */
+table:not(.no-tabular) td,
+table:not(.no-tabular) th {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Glassmorphism & Modern Card Primitives */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.dark .glass-panel {
+  background: rgba(17, 24, 39, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(55, 65, 81, 0.6);
+}
+
+.emerald-glow {
+  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
+}
+
+.dark .emerald-glow {
+  box-shadow: 0 0 35px -5px rgba(16, 185, 129, 0.35);
 }
 
 /* Material Symbols: pinned settings + filled variant + offline fallback */

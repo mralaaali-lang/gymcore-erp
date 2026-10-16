@@ -19,12 +19,15 @@ export function printDocument(opts: { title: string; innerHtml: string }): boole
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(opts.title)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
   * { box-sizing: border-box; }
-  body { font-family: "Segoe UI", Tahoma, Arial, sans-serif; color: #111827; margin: 24px; }
+  body { font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif; color: #111827; margin: 24px; }
   h1 { font-size: 20px; margin: 0 0 4px; }
   .muted { color: #6b7280; font-size: 12px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; font-variant-numeric: tabular-nums; }
   th, td { border: 1px solid #e5e7eb; padding: 7px 9px; text-align: right; }
   th { background: #f3f4f6; }
   .box { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; margin-top: 14px; }

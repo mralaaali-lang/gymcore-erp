@@ -21,7 +21,7 @@ export function printMemberCard(c: MemberCardData): boolean {
   );
   const inner = `
   <div style="display:flex;justify-content:center;padding:18px 0">
-    <div style="width:360px;border-radius:18px;overflow:hidden;border:1px solid #d1d5db;font-family:'Segoe UI',Tahoma,Arial,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,0.08)">
+    <div style="width:360px;border-radius:18px;overflow:hidden;border:1px solid #d1d5db;font-family:'IBM Plex Sans Arabic','Segoe UI',Tahoma,Arial,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,0.08)">
       <div style="background:linear-gradient(135deg,#065f46 0%,#059669 100%);padding:14px 20px;display:flex;justify-content:space-between;align-items:center">
         <b style="font-size:16px;color:#ffffff">${escapeHtml(c.gymName || '—')}</b>
         <span style="font-size:10px;color:#d1fae5;letter-spacing:2px">بطاقة عضوية</span>
