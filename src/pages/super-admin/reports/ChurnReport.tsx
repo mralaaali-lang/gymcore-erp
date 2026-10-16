@@ -79,7 +79,7 @@ export default function ChurnReport({ data, isLoading, t }: Props) {
             height={288}
             categories={churnRateData.map(d => d.month)}
             series={[{ name: t('المتبعدين', 'Churned'), data: churnRateData.map(d => d.churned) }]}
-            colors={['#ef4444']}
+            palette="negative"
             barRadius={3}
           />
         </div>
@@ -119,7 +119,6 @@ export default function ChurnReport({ data, isLoading, t }: Props) {
                 height={288}
                 series={churn.churn_reasons.map((r: any) => r.count)}
                 categories={churn.churn_reasons.map((r: any) => r.reason)}
-                colors={['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899']}
                 showLegend
                 extraOptions={{
                   plotOptions: {

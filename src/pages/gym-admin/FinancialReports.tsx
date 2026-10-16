@@ -279,7 +279,7 @@ export default function FinancialReports() {
                 <Chart
                   type="line"
                   height={280}
-                  colors={['#f97316']}
+                  palette="brass"
                   categories={daily.map((d) => dayLabel(d.date))}
                   series={[{ name: rtl ? 'الإيراد' : 'Revenue', data: daily.map((d) => d.amount) }]}
                   currency={currency || undefined}

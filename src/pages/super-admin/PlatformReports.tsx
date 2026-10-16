@@ -15,8 +15,6 @@ import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
 import { formatCurrency, formatNumber, tr } from './superAdminUtils';
 
-const COLORS = ['#10b981', '#059669', '#f97316', '#22c55e', '#8b5cf6', '#ef4444'];
-const PIE_COLORS = ['#114b5f', '#22c55e', '#10b981', '#8b5cf6'];
 
 type TabKey = 'overview' | 'revenue' | 'gyms' | 'members' | 'advanced';
 
@@ -163,7 +161,7 @@ export default function PlatformReports() {
             <h3 className="text-sm font-bold text-gray-900 mb-4">{T('Plan Distribution', 'توزيع الباقات')}</h3>
             <div className="h-48">
               <Chart type="donut" height={192} series={planDistribution.map(d => d.value)}
-                categories={planDistribution.map(d => d.name)} colors={PIE_COLORS} showLegend />
+                categories={planDistribution.map(d => d.name)} showLegend />
             </div>
           </div>
 
@@ -192,7 +190,7 @@ export default function PlatformReports() {
             <Chart type="bar" height={224}
               categories={overview.monthly_gyms.map((d: any) => d.month)}
               series={[{ name: T('Gyms', 'صالات'), data: overview.monthly_gyms.map((d: any) => d.count) }]}
-              colors={['#114b5f']} barRadius={4} />
+              palette="brass" barRadius={4} />
           </div>
         </div>
       </div>
@@ -223,7 +221,7 @@ export default function PlatformReports() {
                 { name: T('Paid', 'مدفوع'), data: monthly_revenue.map((d: any) => d.paid_amount) },
                 { name: T('Total', 'الإجمالي'), data: monthly_revenue.map((d: any) => d.total_amount) },
               ]}
-              colors={['#22c55e', '#114b5f']} showLegend />
+              palette={['positive', 'pine']} showLegend />
           </div>
         </div>
 
@@ -296,7 +294,7 @@ export default function PlatformReports() {
             <h3 className="text-sm font-bold text-gray-900 mb-4">{T('Currency Distribution', 'توزيع العملات')}</h3>
             <div className="h-48">
               <Chart type="pie" height={192} series={gyms_by_currency.map((d: any) => d.count)}
-                categories={gyms_by_currency.map((d: any) => d.currency)} colors={COLORS} showLegend />
+                categories={gyms_by_currency.map((d: any) => d.currency)} showLegend />
             </div>
           </div>
         </div>

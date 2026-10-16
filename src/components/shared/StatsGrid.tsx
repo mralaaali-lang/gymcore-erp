@@ -1,5 +1,6 @@
 
 import { useApp } from '../../context/GymBrandContext';
+import { CARD_CLASS, CARD_CLICKABLE_CLASS } from '../dashboard/tokens';
 
 export interface StatItem {
   /** Unique key */
@@ -27,12 +28,18 @@ interface StatsGridProps {
   className?: string;
 }
 
+/**
+ * KPI chip tints, named by MEANING and resolved from the Chalk & Brass series
+ * ladder in `tokens.css` — no hex here. Every icon colour clears 3:1 on its own
+ * wash (the ladder is measured at 3.39–12.14 against `--card`), which the old
+ * `#10b981` on `#d1fae5` did not.
+ */
 const colorMap: Record<string, { bg: string; icon: string }> = {
-  primary: { bg: '#d1fae5', icon: '#10b981' },
-  secondary: { bg: '#d1fae5', icon: '#059669' },
-  error: { bg: '#ffe4e6', icon: '#f43f5e' },
-  warning: { bg: '#fef3c7', icon: '#f59e0b' },
-  info: { bg: '#e0f2fe', icon: '#0ea5e9' },
+  primary: { bg: 'bg-series-3/10', icon: 'text-series-3' },
+  secondary: { bg: 'bg-series-2/10', icon: 'text-series-2' },
+  error: { bg: 'bg-series-6/10', icon: 'text-series-6' },
+  warning: { bg: 'bg-series-1/10', icon: 'text-series-1' },
+  info: { bg: 'bg-series-8/10', icon: 'text-series-8' },
 };
 
 const gridCols: Record<number, string> = {
@@ -74,25 +81,23 @@ export default function StatsGrid({
           <div
             key={stat.key}
             onClick={stat.onClick}
-            className={`bg-white border border-gray-100 rounded-3xl p-5 md:p-6 flex flex-col gap-3 shadow-sm ${
-              stat.onClick ? 'hover:shadow-md transition-shadow duration-300 cursor-pointer' : ''
-            }`}
+            className={`${stat.onClick ? CARD_CLICKABLE_CLASS : CARD_CLASS} flex flex-col gap-3`}
           >
             <div className="flex items-center gap-3">
               {stat.icon && (
-                <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: c.bg }}>
-                  <span className="material-symbols-outlined text-2xl" style={{ color: c.icon }}>
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${c.bg}`}>
+                  <span className={`material-symbols-outlined text-2xl ${c.icon}`}>
                     {stat.icon}
                   </span>
                 </div>
               )}
-              <span className="text-sm font-medium text-gray-500">{stat.label}</span>
+              <span className="text-sm font-medium text-muted-foreground">{stat.label}</span>
             </div>
 
             <div className="flex items-start justify-between gap-2">
-              <span className="text-2xl md:text-3xl text-gray-900 font-bold tracking-tight">{stat.value}</span>
+              <span className="text-2xl md:text-3xl text-foreground font-bold tracking-tight tabular-nums">{stat.value}</span>
               {stat.trend && (
-                <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${stat.trend.positive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+                <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${stat.trend.positive ? 'bg-series-3/10 text-series-3' : 'bg-series-6/10 text-series-6'}`}>
                   <span className="material-symbols-outlined text-base">
                     {stat.trend.positive ? 'trending_up' : 'trending_down'}
                   </span>

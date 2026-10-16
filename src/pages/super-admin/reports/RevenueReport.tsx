@@ -109,7 +109,7 @@ export default function RevenueReport({ data, isLoading, period, onPeriodChange,
               { name: t('الحالي', 'Current'), data: comparisonData.map(d => d.current) },
               { name: t('السابق', 'Previous'), data: comparisonData.map(d => d.previous) },
             ]}
-            colors={['#114b5f', '#06b6d4']}
+            palette={['brass', 'neutral']}
             barRadius={3}
             showLegend
           />
@@ -128,7 +128,7 @@ export default function RevenueReport({ data, isLoading, period, onPeriodChange,
               { name: t('الإيرادات', 'Revenue'), data: revenue.current_period.map((r: any) => r.revenue) },
               { name: t('معلق', 'Pending'), data: revenue.current_period.map((r: any) => r.pending) },
             ]}
-            colors={['#114b5f', '#f97316']}
+            palette={['positive', 'warning']}
             showLegend
           />
         </div>

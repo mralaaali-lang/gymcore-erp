@@ -35,6 +35,17 @@ export const shadcnColors = {
   'table-fg': v('table-fg'),
   'table-head': v('table-head'),
 
+  // Data-series ladder: utilities for DOM chips (`bg-series-3/15`), and the
+  // single source apexcharts reads through `chartTheme.ts`.
+  'series-1': v('series-1'),
+  'series-2': v('series-2'),
+  'series-3': v('series-3'),
+  'series-4': v('series-4'),
+  'series-5': v('series-5'),
+  'series-6': v('series-6'),
+  'series-7': v('series-7'),
+  'series-8': v('series-8'),
+
   // Re-points for the MD3-era names that `tailwind-tokens.js` defines as cold
   // hex literals. Spreading this file last in tailwind.config.js means the hex
   // values become fallbacks that no class can reach: `bg-surface-container-high`

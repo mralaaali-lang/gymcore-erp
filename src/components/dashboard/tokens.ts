@@ -42,3 +42,7 @@ export const CARD_CLASS =
 
 export const CARD_HOVER_CLASS =
   'bg-card rounded-shell border border-hairline p-5 md:p-6 hover:border-brass-soft transition-colors duration-200';
+
+/** A card that IS the button (KPI tiles, action panels): hover states + pointer. */
+export const CARD_CLICKABLE_CLASS =
+  'bg-card rounded-shell border border-hairline p-5 md:p-6 cursor-pointer hover:border-brass-soft transition-colors duration-200';

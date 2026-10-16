@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
+import { useShellPalette, type ChartColorName } from './chartTheme';
 
 /* ------------------------------------------------------------------ */
 /*  Unified Chart wrapper – replaces recharts with apexcharts         */
@@ -13,7 +14,13 @@ interface ChartProps {
   series: ApexOptions['series'];
   /** X-axis categories (bar/line) */
   categories?: string[];
-  /** Colour palette – defaults to platform palette */
+  /**
+   * Series colours BY MEANING — the Chalk & Brass ladder read from tokens.css,
+   * so a chart retints itself with the shell and never ships a raw hex.
+   * A string is used for every series; an array maps series by position.
+   */
+  palette?: ChartColorName | ChartColorName[];
+  /** Raw hex override. Prefer `palette`; this exists for one-off experiments. */
   colors?: string[];
   /** Bar border radius (default 4) */
   barRadius?: number;
@@ -33,13 +40,12 @@ interface ChartProps {
   extraOptions?: ApexOptions;
 }
 
-const DEFAULT_COLORS = ['#10b981', '#059669', '#f97316', '#22c55e', '#8b5cf6', '#ef4444', '#eab308', '#ec4899'];
-
 export default function Chart({
   type = 'bar',
   series,
   categories,
-  colors = DEFAULT_COLORS,
+  palette,
+  colors,
   barRadius = 4,
   height = 280,
   showLegend,
@@ -52,6 +58,19 @@ export default function Chart({
   const isPie = type === 'pie' || type === 'donut';
   const legendVisible = showLegend ?? isPie;
 
+  // Live shell palette: eight hues + ink + surfaces, re-read when `.dark` moves.
+  const shell = useShellPalette();
+  const resolvedColors = useMemo(() => {
+    if (colors && colors.length) return colors;
+    if (!palette) return shell.series;
+    const names = Array.isArray(palette) ? palette : [palette];
+    const mapped = names.map((name) => shell.named[name]);
+    // A single meaning on a multi-series chart keeps one hue; a partial list
+    // falls back to the ladder for the series it did not name.
+    if (names.length === 1) return mapped;
+    return [...mapped, ...shell.series.slice(mapped.length)];
+  }, [colors, palette, shell]);
+
   const apexType = type === 'donut' ? 'donut' : type === 'pie' ? 'pie' : type === 'line' ? 'line' : 'bar';
   const options: ApexOptions = useMemo(() => {
     // NOTE: never pass explicit `undefined` values — apexcharts' internal
@@ -62,11 +81,11 @@ export default function Chart({
         type: apexType,
         toolbar: { show: false },
         fontFamily: 'inherit',
-        foreColor: '#584237',
+        foreColor: shell.foreColor,
         sparkline: { enabled: false },
         stacked,
       },
-      colors,
+      colors: resolvedColors,
       dataLabels: { enabled: false },
       legend: {
         show: legendVisible,
@@ -78,6 +97,13 @@ export default function Chart({
         enabled: true,
         shared: false,
         intersect: true,
+        // The popup is shell paper, not apexcharts' default white card. This
+        // apexcharts build types `style` as { fontSize, fontFamily, background }
+        // only, so the ink and border come from `theme` and the surface from us.
+        theme: shell.mode,
+        style: {
+          background: shell.surfaceColor,
+        },
         y: {
           formatter: (val: number) => {
             if (currency) {
@@ -98,7 +124,7 @@ export default function Chart({
       base.labels = categories;
     }
     if (!isPie) {
-      base.grid = { borderColor: '#f0f0f0', strokeDashArray: 3 };
+      base.grid = { borderColor: shell.gridColor, strokeDashArray: 3 };
       base.plotOptions = { bar: { borderRadius: barRadius, columnWidth: '60%', distributed: false } };
       base.xaxis = {
         categories,
@@ -129,7 +155,7 @@ export default function Chart({
       return deepMerge(base, extraOptions);
     }
     return base;
-  }, [type, categories, colors, barRadius, legendVisible, currency, suffix, stacked, yFormatter, isPie, extraOptions]);
+  }, [type, categories, resolvedColors, shell, barRadius, legendVisible, currency, suffix, stacked, yFormatter, isPie, extraOptions, apexType]);
 
   return (
     <ReactApexChart

@@ -243,7 +243,7 @@ export default function AttendanceReport() {
                 <Chart
                   type="line"
                   height={260}
-                  colors={['#f97316']}
+                  palette="brass"
                   categories={data.daily.map((d) => d.date.slice(5))}
                   series={[{ name: rtl ? 'عدد الحضور' : 'Visits', data: data.daily.map((d) => d.count) }]}
                   extraOptions={{
@@ -278,7 +278,7 @@ export default function AttendanceReport() {
               <Chart
                 type="bar"
                 height={260}
-                colors={['#f97316']}
+                palette="brass"
                 categories={hours.map((_, h) => String(h).padStart(2, '0'))}
                 series={[{ name: rtl ? 'الحضور' : 'Visits', data: hours }]}
                 showLegend

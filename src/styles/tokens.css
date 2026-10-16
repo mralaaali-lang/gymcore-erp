@@ -71,6 +71,21 @@
   --outline: 40.0 20.0% 79.4%;                    /* #d5cec0 */
   --outline-variant: 40.0 36.0% 90.2%;            /* #efe9dd = hairline */
 
+  /* Data-series ladder for charts and KPI chips (Chalk & Brass).
+     Ordered by semantic weight, not by hue spread: brass is the meta accent,
+     pine/turf carry growth, clay/oxblood carry loss, sage/graphite/slate are
+     the neutral tail. Every value clears 3:1 against `--card` (measured:
+     3.39–12.14), which is what SVG marks need under WCAG 1.4.11 — apexcharts
+     is handed resolved hex, read back from these vars at runtime. */
+  --series-1: 39.0 56.6% 41.6%;   /* #a67c2e brass   3.73 */
+  --series-2: 153.3 30.3% 17.5%;  /* #1f3a2e pine   12.14 */
+  --series-3: 156.9 45.3% 33.7%;  /* #2f7d5f turf    4.90 */
+  --series-4: 17.6 58.6% 44.5%;   /* #b4562f clay    4.79 */
+  --series-5: 98.4 10.0% 51.2%;   /* #7f8f76 sage    3.39 */
+  --series-6: 352.9 49.7% 36.7%;  /* #8c2f3a oxblood 8.00 */
+  --series-7: 31.8 13.0% 25.7%;   /* #4a4239 graphite 9.71 */
+  --series-8: 208.8 12.7% 38.6%;  /* #56636f slate   6.06 */
+
   /* Geometry — 10px is the Chalk & Brass radius (2px = Score Sheet, 18px = Clay).
      Only the new shadcn primitives read this; the legacy `rounded-3xl` classes on
      60+ pages keep their own scale until each page is migrated. */
@@ -152,4 +167,16 @@
   --inverse-on-surface: 156.7 33.3% 10.6%;        /* #12241d */
   --outline: 150.0 19.4% 28.2%;                   /* #3a5648 */
   --outline-variant: 152.5 22.2% 21.2%;           /* #2a4237 */
+
+  /* Series ladder lifted for the dark surface (measured 5.60–8.87 on #172c24).
+     Same eight hues in the same order, so a chart keeps its identity across
+     themes — only the lightness moves. */
+  --series-1: 39.3 58.5% 63.1%;   /* #d8b26a */
+  --series-2: 147.7 21.1% 63.7%;  /* #8fb6a1 */
+  --series-3: 154.8 42.6% 50.8%;  /* #4cb78a */
+  --series-4: 20.0 67.5% 62.5%;   /* #e08a5f */
+  --series-5: 100.0 14.5% 67.5%;  /* #a8b8a0 */
+  --series-6: 352.3 58.1% 71.0%;  /* #e08a95 */
+  --series-7: 40.9 18.6% 76.9%;   /* #cfc8b9 */
+  --series-8: 210.0 24.1% 65.9%;  /* #93a8bd */
 }

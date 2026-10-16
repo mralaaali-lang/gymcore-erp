@@ -96,7 +96,7 @@ export default function MarketingReportsTab() {
               { name: t('الوصول', 'Reach'), data: campaignChartData.reach },
               { name: t('التحويلات', 'Conversions'), data: campaignChartData.conversions },
             ]}
-            colors={['#3b82f6', '#22c55e']}
+            palette={['neutral', 'positive']}
             barRadius={4}
             showLegend
           />

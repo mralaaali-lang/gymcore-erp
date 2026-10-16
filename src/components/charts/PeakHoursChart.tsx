@@ -14,18 +14,18 @@ export default function PeakHoursChart({ data }: Props) {
   });
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-      <h3 className="text-sm font-bold text-gray-900 mb-1">{t('dashboard.peakHoursTitle')}</h3>
-      <p className="text-xs text-gray-400 mb-4">{t('dashboard.peakHoursSubtitle')}</p>
+    <div className="bg-card rounded-shell border border-hairline p-6">
+      <h3 className="text-sm font-bold text-foreground mb-1">{t('dashboard.peakHoursTitle')}</h3>
+      <p className="text-xs text-muted-foreground mb-4">{t('dashboard.peakHoursSubtitle')}</p>
       {data.length === 0 ? (
-        <div className="flex items-center justify-center h-64 text-sm text-gray-400">{t('dashboard.noData')}</div>
+        <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">{t('dashboard.noData')}</div>
       ) : (
         <Chart
           type="bar"
           height={280}
           categories={chartData.map(d => d.hour)}
           series={[{ name: t('dashboard.attendanceCount'), data: chartData.map(d => d.check_ins) }]}
-          colors={['#f97316']}
+          palette="brass"
           barRadius={4}
         />
       )}

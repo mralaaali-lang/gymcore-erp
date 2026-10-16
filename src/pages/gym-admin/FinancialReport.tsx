@@ -199,7 +199,7 @@ export default function FinancialReport() {
               <Chart
                 type="bar"
                 height={280}
-                colors={['#10b981', '#ef4444']}
+                palette={['positive', 'negative']}
                 categories={data.daily.map((d) => d.date.slice(5))}
                 series={[
                   { name: rtl ? 'الإيرادات' : 'Revenue', data: data.daily.map((d) => d.revenue) },

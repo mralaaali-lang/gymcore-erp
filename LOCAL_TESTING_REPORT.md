@@ -2364,3 +2364,32 @@ endpoint العقود، بلا أي بيانات وهمية.
   `git status` أكّد أن عمل `server/*` و`ToastContext`/`routes`/`api.ts` غير الخاص بي ظل خارج الـ commit.
 - **حد التحقق:** لا اختبار runtime — أداة المتصفح ارفضت من الـ classifier. والـ container على `:9000`
   لم يُعد بناؤه، فالمالك يرى الصورة القديمة لحد ما يشغّل `npm run dev` أو `docker compose build frontend`.
+
+### دفعة الرسوم والـKPI (نفس الجلسة، بعد `558589f`)
+
+- **المشكلة المتبقية:** الصدفة بقت دافيه بس الرسوم لسه ترسم بـ hex بارد (`#114b5f` بترولي + `#f97316`
+  برتقالي + `#ef4444`)، و`StatsGrid` كانت تحط `#10b981` فوق `#d1fae5` — وهو **2.27** للعلامة الرسومية،
+  أقل من حد 3:1 المطلوب في WCAG 1.4.11 للأشكال غير النصية.
+- **سُلّم سلاسل جديد في `tokens.css`:** `--series-1..8` = brass، pine، turf، clay، sage، oxblood،
+  graphite، slate. وكل قيمة مقيسة ضد `--card`: أقلها sage عند **3.39** وأعلاها pine عند **12.14**،
+  أي كلها فوق 3:1. ومعاها مرآة `.dark` بنفس الترتيب (5.60–8.87 فوق #172c24) — نفس الهويات،
+  اللي بنفس المعنى في الثيمين.
+- **`chartTheme.ts` (جديد):** apexcharts بيرسم SVG بكتابة اللون في presentation attribute، و
+  `fill="hsl(var(--series-1))"` **ما بيحُلش** هناك (المتغيرات مش متاحة في قيم الـ attributes). فالحل
+  إن المتغيرات تُقرا من `getComputedStyle` وتتحول hex وقت التشغيل، مع `MutationObserver` واحد على
+  `documentElement` لكل الرسميات — أي أن الداكن في المرحلة 3 هيلوّن كل رسم تلقائياً من غير لمس أي صفحة.
+  المكالمات تطلب **معنى** (`palette="positive"`) مش لون.
+- **`Chart.tsx`:** ألغيت `DEFAULT_COLORS`، والافتراضي بقى السُلّم، و`foreColor` من
+  `--muted-foreground`، و`gridColor` من `--hairline`، وpopup الـ tooltip بياخد `--card`.
+  ملاحظة types: هذا البناء من apexcharts يسمح في `tooltip.style` بـ `fontSize/fontFamily/background`
+  فقط — الحدود والحبر ييجوا من `tooltip.theme` (جرّبنا `borderColor` و`color` ورفضهما `tsc`).
+- **13 نداء + 3 ثوابت module اتحولت لأسماء معاني** في 7 ملفات + 3 مكوّنات رسوم مشتركة، وكروت
+  المكوّنات الثلاثة اتنقلت للصدفة (`bg-card rounded-shell border-hairline`).
+  `StatsGrid.colorMap` بقى كلاسات توكن (`bg-series-3/10` + `text-series-3`) بدل inline hex،
+  والكارت نفسه بياخد `CARD_CLASS`/`CARD_CLICKABLE_CLASS` من `dashboard/tokens.ts` بدل ما يعيد تعريفه.
+- **متعمّد ما اتلمستش:** `colors={packRows.map(p => p.color)}` في `FinancialReports.tsx` — دي ألوان
+  باقات بترجع من الـ endpoint (بيانات الصالة نفسها، مش هوية التطبيق)، وكروت الصفحات اللي لسه
+  `bg-white rounded-3xl` (دفعة الألوان المستقلة).
+- **تحقق:** `tsc` = 0 · `vite build` ✓ 4.66s · CSS الناتج فيه `--series-1` في `:root` **و** `.dark`،
+  و`.text-series-3`/`.bg-series-3\/10` بترجم للمتغيرات فعلاً. برضه اختبار numeric للسُلّم اتعمل
+  بسكربت قبل الكتابة، فالقيم مش متكتوبة بالعين.
