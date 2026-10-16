@@ -21,14 +21,11 @@ export default function EmptyState({
   const a = ACCENTS[accent];
   return (
     <div className="flex flex-col items-center justify-center text-center py-12 px-6">
-      <div
-        className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-        style={{ backgroundColor: a.soft }}
-      >
-        <Icon size={26} strokeWidth={1.75} style={{ color: a.solid }} />
+      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${a.chip}`}>
+        <Icon size={26} strokeWidth={1.75} className={a.icon} />
       </div>
-      <p className="text-base font-bold text-gray-900">{title}</p>
-      {description && <p className="text-sm text-gray-500 mt-1 max-w-md">{description}</p>}
+      <p className="text-base font-bold text-foreground">{title}</p>
+      {description && <p className="text-sm text-muted-foreground mt-1 max-w-md">{description}</p>}
       {actions && <div className="flex items-center gap-2 mt-4">{actions}</div>}
     </div>
   );

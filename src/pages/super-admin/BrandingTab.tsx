@@ -86,7 +86,7 @@ export default function BrandingTab() {
     if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <PageLoader />
+        <PageLoader variant="skeleton" />
       </div>
     );
   }

@@ -26,7 +26,7 @@ export default function ChurnReport({ data, isLoading, t }: Props) {
 
   if (isLoading) {
     return (
-      <PageLoader />
+      <PageLoader variant="skeleton" />
     );
   }
 

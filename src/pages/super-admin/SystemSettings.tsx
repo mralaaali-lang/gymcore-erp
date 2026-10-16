@@ -60,7 +60,7 @@ export default function SystemSettings() {
     return (
       <div className="p-6 bg-gray-50 min-h-screen" dir={language === 'ar' ? 'rtl' : 'ltr'}>
         <PageHeader title="الإعدادات" icon="settings" />
-        <PageLoader message="جاري التحميل..." />
+        <PageLoader variant="skeleton" message="جاري التحميل..." />
       </div>
     );
   }

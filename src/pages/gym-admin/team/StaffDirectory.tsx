@@ -151,7 +151,7 @@ export default function StaffDirectory() {
   const isPending = createMutation.isPending || updateMutation.isPending;
   const inputCls = 'w-full px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none bg-white';
 
-  if (isLoading) return <PageLoader message={rtl ? 'جاري التحميل...' : 'Loading...'} />;
+  if (isLoading) return <PageLoader variant="skeleton" message={rtl ? 'جاري التحميل...' : 'Loading...'} />;
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-3xl p-6 text-center text-red-700">

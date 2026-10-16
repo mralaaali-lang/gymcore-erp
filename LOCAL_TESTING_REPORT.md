@@ -2393,3 +2393,47 @@ endpoint العقود، بلا أي بيانات وهمية.
 - **تحقق:** `tsc` = 0 · `vite build` ✓ 4.66s · CSS الناتج فيه `--series-1` في `:root` **و** `.dark`،
   و`.text-series-3`/`.bg-series-3\/10` بترجم للمتغيرات فعلاً. برضه اختبار numeric للسُلّم اتعمل
   بسكربت قبل الكتابة، فالقيم مش متكتوبة بالعين.
+
+### المرحلة 2 — سكيلتون بدل السبينر + عدّاد للـKPI (2026-10-16)
+
+الحاجة الأصلية كانت «استبدال الـ31 `animate-spin` بسكيلتون». الجرد طلع تاني: الـ31 دول
+**معظمهم مؤشر انتظار جوه زرار** (`progress_activity` جنب أيقونة حفظ، أو داخل `Button` أثناء
+`isPending`) — والسبينر هو التوكن الصحيح هناك، لأنه بيقول «العملية لسه شغالة» مش «محتى
+لسه مجاش». اللي اتحوّل فعلاً هو مناطق المحتوى:
+
+- **`src/components/shared/Skeleton.tsx` (جديد):** `Skeleton` + `SkeletonText` + `SkeletonStats`
+  + `SkeletonCard` + `SkeletonChart` + `SkeletonTable({rows, cols})` + `SkeletonRows`.
+  كلهم `bg-muted` + `animate-pulse` + `motion-reduce:animate-none` و`aria-hidden`، والأشكال
+  بتطابق هندسة القشرة الحقيقية (`bg-card rounded-shell border border-hairline` ونفس أبعاد
+  كارت الـKPI وارتفاع صف الجدول) عشان التخطيط ما يقفزش لما البيانات تيجي. Fill توكن،
+  فالداكن في المرحلة 3 هيعيد تلوينهم لوحده.
+- **`PageLoader.tsx`:** فرع الـskeleton بقى بيرسم `SkeletonTable` بدل 5 أعمدة رمادية
+  معرّفة باليد، وبيعرض الرسالة فوقها لو اتبعتت.
+- **كودمود:** ~28 شاشة اتصلّبت `<PageLoader variant="skeleton" rows={n} />` حيث الحارس
+  `isLoading/summaryLoading` موجود فوقها — العداد دلوقتي **61** موضع skeleton في `src`.
+  الدفعة الأولانية اترفضت (`0` مواضع) لأن نافذة الحارس كانت `slice(i-4, i)` وبتستثني
+  السطور اللي الحارس فيها وبينها في سطر واحد (`if (isLoading) return <PageLoader />`)؛
+  اتصلّحت لـ `slice(i-4, i+1)`. diffs الناتجة اتراجعت يدويًا وتأكدنا إنها زيادة attribute
+  بس.
+- **`BillingOverview.tsx`:** الجلايف الدوّار اللي كان راس كارت «الإيرادات الشهرية» بقى
+  `Skeleton` بمقدار الرقم نفسه (`h-8 w-28`) — ده كان الموضع الوحيد المتبقي اللي هو
+  «محتوى لسه مجاش» مش «زرار مستني».
+- **`CountUp.tsx` (جديد):** rAF + easeOutCubic من **آخر قيمة معروضة** (مش من صفر) فإعادة
+  الجلب متربطاش الرقم، `prefers-reduced-motion` يطلّع القيمة النهائية فورًا، وقيمة
+  غير محدّدة (`NaN`/`null`) تمشي على fallback المُنسِّق بدل ما تتحرك ناحيته.
+  الافتراضي `fmtNum` (أرقام غربية بتفريق) والoutput ملفوف `tabular-nums`.
+- **`StatCard` / `StatsGrid`:** `value` بقى يستقبل `number` + `format?: (n)=>string`، فالعدّاد
+  بيشتغل على الرقم الحقيقي والمُخرَج في آخر فريم هو بالضبط نفس السترنج اللي الصفحة كانت
+  هتطبعه. `countUp?: false` للتحكم الفردي. السترنجات اللي منسّقة عند نداء المكوّن فضلت
+  بتترسم حرفيًا (12 شاشة بتعمل كده) — مافيش تغيير في سلوكهم.
+- **`GymAdminDashboard.tsx`:** ست أرقام اتحوّلت من سترنج منسّك لـ number + formatter
+  (`value={todayRevenue}` + `format={(n) => formatMoney(n, currency)}`). الأرقام كلها من
+  endpoints فعلية (`fin?.today_sales_sum`، `biz.mrr`، `membersRes?.total`) — مافيش ولا
+  قيمة mock.
+- **`Sparkline`:** الخط بقى بياخد `colorVar` ويتترسم بـ `style={{ stroke: hsl(var(--series-N)) }}`
+  بدل attribute — لأن CSS بيحل `var()` بس SVG presentation attribute لأ، فالكارت ده كمان
+  بيعيد تلوينه مع الثيم من غير تعديلات صفحات.
+- **تحقق:** `tsc` = 0 · `vite build` ✓ 4.75s · CSS الناتج فيه `animate-pulse` و`motion-reduce`
+  و`rounded-shell` و`border-hairline`. اللي متحقّقش منه: الشكل في المتصفح — لسه محتاج
+  إعادة بناء الكونتينر (`docker compose build frontend && docker compose up -d frontend`)
+  أو `npm run dev`.

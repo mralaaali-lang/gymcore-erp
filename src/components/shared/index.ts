@@ -63,8 +63,19 @@ export { default as PageLoader } from './PageLoader';
 export { default as StatsGrid } from './StatsGrid';
 export { default as FilterBar } from './FilterBar';
 export { default as ExportButton } from './ExportButton';
+export {
+  default as Skeleton,
+  SkeletonText,
+  SkeletonStats,
+  SkeletonCard,
+  SkeletonChart,
+  SkeletonTable,
+  SkeletonRows,
+} from './Skeleton';
+export { default as CountUp } from './CountUp';
 
 export type { Tab } from './UnifiedTabs';
 export type { StatItem } from './StatsGrid';
 export type { FilterOption, FilterGroup } from './FilterBar';
 export type { ExportColumn } from './ExportButton';
+export type { SkeletonProps } from './Skeleton';

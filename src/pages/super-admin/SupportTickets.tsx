@@ -62,7 +62,7 @@ export default function SupportTickets() {
         variant="pills"
       />
 
-      {isLoading && <PageLoader message={isRtl ? 'جاري التحميل...' : 'Loading...'} />}
+      {isLoading && <PageLoader variant="skeleton" message={isRtl ? 'جاري التحميل...' : 'Loading...'} />}
 
       <div className="space-y-3">
         {tickets.length === 0 && !isLoading && (

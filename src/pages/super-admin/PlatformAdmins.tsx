@@ -271,7 +271,7 @@ export default function PlatformAdmins() {
       {/* Admins Table */}
       <Card>
         {isLoading ? (
-          <PageLoader message={isRtl ? 'جاري التحميل...' : 'Loading...'} />
+          <PageLoader variant="skeleton" message={isRtl ? 'جاري التحميل...' : 'Loading...'} />
         ) : isError ? (
           <div className="p-8 text-center text-tertiary">{isRtl ? 'تعذّر تحميل قائمة المشرفين' : 'Failed to load admins'}</div>
         ) : (

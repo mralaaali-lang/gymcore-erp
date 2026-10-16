@@ -8,6 +8,7 @@ import { listPayments, getFinanceSummary, listExpenses, listCashboxSessions, lis
 import StatsGrid from '../../components/shared/StatsGrid';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
+import Skeleton from '../../components/shared/Skeleton';
 import Card from '../../components/ui/Card';
 import StatusBadge from '../../components/ui/StatusBadge';
 
@@ -133,7 +134,7 @@ export default function BillingOverview() {
             <p className="text-xs text-gray-500 mt-1">{isoMonth()}</p>
           </div>
           {summaryLoading ? (
-            <span className="material-symbols-outlined text-2xl text-gray-300 animate-spin">progress_activity</span>
+            <Skeleton className="h-8 w-28 rounded-lg" />
           ) : (
             <p className="text-2xl font-extrabold text-emerald-600">{money(monthlyRevenue)}</p>
           )}

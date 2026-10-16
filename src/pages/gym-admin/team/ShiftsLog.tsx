@@ -32,7 +32,7 @@ export default function ShiftsLog() {
 
   const shifts = shiftsData?.data || [];
 
-  if (isLoading) return <PageLoader message={rtl ? 'جاري التحميل...' : 'Loading...'} />;
+  if (isLoading) return <PageLoader variant="skeleton" message={rtl ? 'جاري التحميل...' : 'Loading...'} />;
 
   return (
     <div className="space-y-4">

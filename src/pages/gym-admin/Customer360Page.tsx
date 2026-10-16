@@ -67,7 +67,7 @@ export default function Customer360Page() {
               placeholder={isRtl ? 'ابحث بالاسم أو رقم الجوال...' : 'Search by name or phone...'}
               className="w-full px-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400 mb-4 text-center"
             />
-            {searchResults.isFetching && <PageLoader />}
+            {searchResults.isFetching && <PageLoader variant="skeleton" />}
             {searchHits.length > 0 && (
               <div className="border border-gray-100 rounded-2xl divide-y divide-gray-100 max-h-64 overflow-y-auto text-right">
                 {searchHits.map((m: any) => (
@@ -99,7 +99,7 @@ export default function Customer360Page() {
   if (memberData.isLoading) {
     return (
       <div className="max-w-4xl mx-auto space-y-6">
-        <PageLoader message={isRtl ? 'جاري التحميل...' : 'Loading...'} />
+        <PageLoader variant="skeleton" message={isRtl ? 'جاري التحميل...' : 'Loading...'} />
       </div>
     );
   }

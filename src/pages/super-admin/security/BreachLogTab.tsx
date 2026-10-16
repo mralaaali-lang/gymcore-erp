@@ -63,7 +63,7 @@ export default function BreachLogTab() {
 
   if (isLoading) {
     return (
-      <PageLoader />
+      <PageLoader variant="skeleton" />
     );
   }
 

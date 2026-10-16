@@ -107,7 +107,7 @@ export default function LeadKanban() {
   };
 
   if (isLoading) {
-    return <PageLoader message={language === 'ar' ? 'جاري التحميل...' : 'Loading...'} />;
+    return <PageLoader variant="skeleton" message={language === 'ar' ? 'جاري التحميل...' : 'Loading...'} />;
   }
 
   if (error) {

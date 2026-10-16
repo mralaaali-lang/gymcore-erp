@@ -129,7 +129,7 @@ export default function AuditLogs() {
 
       <Card>
         {isLoading ? (
-          <PageLoader message={t('Loading...', 'جارٍ التحميل...')} />
+          <PageLoader variant="skeleton" message={t('Loading...', 'جارٍ التحميل...')} />
         ) : error ? (
           <div className="text-center py-12 text-red-500 text-sm">{t('Failed to load audit log', 'فشل تحميل السجل')}</div>
         ) : logs.length === 0 ? (

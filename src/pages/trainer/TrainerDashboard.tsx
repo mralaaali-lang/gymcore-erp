@@ -103,7 +103,7 @@ export default function TrainerDashboard() {
   const timeOf = (iso: string) => formatTime(iso);
   const dateSubtitle = formatDate(now);
 
-  if (isLoading) return <PageLoader />;
+  if (isLoading) return <PageLoader variant="skeleton" />;
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 space-y-6" dir={isRtl ? 'rtl' : 'ltr'}>

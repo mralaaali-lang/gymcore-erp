@@ -123,7 +123,7 @@ export default function TrainerMobileDashboard() {
 
       {isLoading ? (
         <div className="px-4 mt-4">
-          <PageLoader message={isRtl ? 'جاري التحميل...' : 'Loading...'} />
+          <PageLoader variant="skeleton" message={isRtl ? 'جاري التحميل...' : 'Loading...'} />
         </div>
       ) : tab === 'today' ? (
         <div className="px-4 mt-4 space-y-2">

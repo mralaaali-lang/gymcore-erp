@@ -30,7 +30,7 @@ export default function AthleteProgress() {
   if (visits.isLoading || points.isLoading || subscription.isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
-        <PageLoader message={isRtl ? 'جاري التحميل...' : 'Loading...'} />
+        <PageLoader variant="skeleton" message={isRtl ? 'جاري التحميل...' : 'Loading...'} />
       </div>
     );
   }

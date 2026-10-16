@@ -229,7 +229,7 @@ export default function OnboardingWizard() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <PageLoader message={t('جاري تحميل الإعدادات...', 'Loading setup...')} />
+        <PageLoader variant="skeleton" message={t('جاري تحميل الإعدادات...', 'Loading setup...')} />
       </div>
     );
   }

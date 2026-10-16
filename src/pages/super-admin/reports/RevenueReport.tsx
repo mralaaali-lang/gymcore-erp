@@ -30,7 +30,7 @@ export default function RevenueReport({ data, isLoading, period, onPeriodChange,
 
   if (isLoading) {
     return (
-      <PageLoader />
+      <PageLoader variant="skeleton" />
     );
   }
 

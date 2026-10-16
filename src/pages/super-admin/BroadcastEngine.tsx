@@ -80,7 +80,7 @@ export default function BroadcastEngine() {
       )}
 
       <div className="space-y-3">
-        {isLoading && <PageLoader message={isRtl ? 'جاري التحميل...' : 'Loading...'} />}
+        {isLoading && <PageLoader variant="skeleton" message={isRtl ? 'جاري التحميل...' : 'Loading...'} />}
         {broadcasts.length === 0 && !isLoading && (
           <Card>
             <p className="text-center text-gray-500 py-8">{isRtl ? 'لا توجد بثوث سابقة' : 'No previous broadcasts'}</p>

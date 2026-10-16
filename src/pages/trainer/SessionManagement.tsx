@@ -129,7 +129,7 @@ export default function SessionManagement() {
 
       <Card>
         {isLoading ? (
-          <PageLoader message={isRtl ? 'جاري التحميل...' : 'Loading...'} />
+          <PageLoader variant="skeleton" message={isRtl ? 'جاري التحميل...' : 'Loading...'} />
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-gray-100">
             <table className="w-full">

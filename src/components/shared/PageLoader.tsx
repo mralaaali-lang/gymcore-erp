@@ -1,6 +1,7 @@
 
 import { useApp } from '../../context/GymBrandContext';
 import Spinner from '../ui/Spinner';
+import { SkeletonTable } from './Skeleton';
 
 interface PageLoaderProps {
   /** Optional loading message */
@@ -44,22 +45,18 @@ export default function PageLoader({
   const { language } = useApp();
   const isRtl = language === 'ar';
 
-  // Skeleton variant
+  // Skeleton variant — delegates to the shared skeleton so a table-shaped
+  // loading state looks identical whether it came from <SkeletonTable/> or here.
   if (variant === 'skeleton') {
     return (
       <div
         className={`flex flex-col gap-3 ${fullPage ? 'p-6' : ''} ${className}`}
         dir={isRtl ? 'rtl' : 'ltr'}
       >
-        {Array.from({ length: rows }).map((_, i) => (
-          <div key={i} className="animate-pulse flex gap-4 items-center">
-            <div className="h-4 bg-surface-container-high rounded w-12" />
-            <div className="h-4 bg-surface-container-high rounded flex-1" />
-            <div className="h-4 bg-surface-container-high rounded w-24" />
-            <div className="h-4 bg-surface-container-high rounded w-20" />
-            <div className="h-4 bg-surface-container-high rounded w-16" />
-          </div>
-        ))}
+        {message && (
+          <p className="text-body-md text-on-surface-variant">{message}</p>
+        )}
+        <SkeletonTable rows={rows} />
       </div>
     );
   }

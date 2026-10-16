@@ -383,7 +383,7 @@ export default function BillingEngine() {
       {/* Table */}
       <div className="bg-white rounded-3xl border shadow-sm border-gray-200 overflow-hidden">
         {invoicesQuery.isLoading ? (
-          <PageLoader />
+          <PageLoader variant="skeleton" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -460,7 +460,7 @@ export default function BillingEngine() {
 
       <div className="bg-white rounded-3xl border shadow-sm border-gray-200 overflow-hidden">
         {couponsQuery.isLoading ? (
-          <PageLoader />
+          <PageLoader variant="skeleton" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -584,7 +584,7 @@ export default function BillingEngine() {
 
           {fawryMutation.isPending ? (
             <div className="flex flex-col items-center py-8">
-              <PageLoader />
+              <PageLoader variant="skeleton" />
               <p className="mt-3 text-sm text-gray-500">{t('Connecting to Fawry...', 'جاري الاتصال ببوابة فوري...')}</p>
             </div>
           ) : fawryResult ? (

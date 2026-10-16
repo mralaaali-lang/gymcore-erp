@@ -258,7 +258,7 @@ export default function GymAdminDashboard() {
           <StatCard
             icon={Users}
             label={t('dashboard.members', 'المشتركين')}
-            value={String(totalMembers)}
+            value={totalMembers}
             sub={biz ? `+${biz.new_this_month} ${t('dashboard.newThisMonth', 'جديد')}` : undefined}
             accent="emerald"
             onClick={() => navigate('/admin/members')}
@@ -266,7 +266,7 @@ export default function GymAdminDashboard() {
           <StatCard
             icon={CreditCard}
             label={t('dashboard.subscriptions', 'الاشتراكات')}
-            value={biz ? String(biz.active_members) : '—'}
+            value={biz ? Number(biz.active_members) : '—'}
             sub={`${expiring?.total ?? 0} ${t('dashboard.expiring7d', 'تنتهي')}`}
             subTone="red"
             accent="violet"
@@ -275,7 +275,8 @@ export default function GymAdminDashboard() {
           <StatCard
             icon={Wallet}
             label={t('dashboard.revenueTodayCard', 'إيراد اليوم')}
-            value={formatMoney(todayRevenue, currency)}
+            value={todayRevenue}
+            format={(n) => formatMoney(n, currency)}
             accent="amber"
             onClick={() => navigate(reportsTarget)}
           />
@@ -283,7 +284,8 @@ export default function GymAdminDashboard() {
             <StatCard
               icon={ShoppingCart}
               label={t('dashboard.sales', 'مبيعات المتجر')}
-              value={formatMoney(Number(fin?.today_sales_sum ?? 0), currency)}
+              value={Number(fin?.today_sales_sum ?? 0)}
+              format={(n) => formatMoney(n, currency)}
               sub={`${fin?.today_sales_count ?? 0} ${t('dashboard.ordersToday', 'طلب اليوم')}`}
               accent="sky"
               onClick={() => navigate('/admin/sales')}
@@ -342,7 +344,8 @@ export default function GymAdminDashboard() {
               <StatCard
                 icon={DollarSign}
                 label={t('dashboard.mrr', 'الإيراد الشهري المتكرر')}
-                value={formatMoney(biz.mrr, currency)}
+                value={Number(biz.mrr)}
+                format={(n) => formatMoney(n, currency)}
                 trend={`${biz.active_members} ${t('dashboard.activeSubsShort', 'اشتراك نشط')}`}
                 trendPositive
                 accent="emerald"
@@ -351,7 +354,8 @@ export default function GymAdminDashboard() {
               <StatCard
                 icon={Users}
                 label={t('dashboard.arpu', 'متوسط إيراد العضو')}
-                value={biz.arpu != null ? formatMoney(biz.arpu, currency) : '—'}
+                value={biz.arpu != null ? Number(biz.arpu) : '—'}
+                format={(n) => formatMoney(n, currency)}
                 accent="sky"
                 onClick={() => navigate('/admin/members')}
               />

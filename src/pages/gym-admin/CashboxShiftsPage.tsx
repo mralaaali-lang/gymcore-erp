@@ -147,7 +147,7 @@ export default function CashboxShiftsPage() {
   if (isLoading) {
     return (
       <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6">
-        <PageLoader message={rtl ? 'جاري التحميل...' : 'Loading...'} />
+        <PageLoader variant="skeleton" message={rtl ? 'جاري التحميل...' : 'Loading...'} />
       </div>
     );
   }

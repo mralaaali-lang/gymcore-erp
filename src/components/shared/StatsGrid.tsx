@@ -1,20 +1,28 @@
 
 import { useApp } from '../../context/GymBrandContext';
 import { CARD_CLASS, CARD_CLICKABLE_CLASS } from '../dashboard/tokens';
+import CountUp from './CountUp';
 
 export interface StatItem {
   /** Unique key */
   key: string;
   /** Display label */
   label: string;
-  /** Display value (formatted as string) */
-  value: string | number;
   /** Material Symbol icon name */
   icon?: string;
   /** Optional trend indicator */
   trend?: { value: string; positive: boolean };
   /** Color variant */
   color?: 'primary' | 'secondary' | 'error' | 'warning' | 'info';
+  /**
+   * A number animates up to its value (`countUp: false` opts out). A string is
+   * rendered verbatim — call sites that already formatted the figure keep doing
+   * exactly that.
+   */
+  value: string | number;
+  countUp?: boolean;
+  /** Decimal control for an animated number. */
+  digits?: { min?: number; max?: number };
   /** Optional click handler */
   onClick?: () => void;
 }
@@ -95,7 +103,13 @@ export default function StatsGrid({
             </div>
 
             <div className="flex items-start justify-between gap-2">
-              <span className="text-2xl md:text-3xl text-foreground font-bold tracking-tight tabular-nums">{stat.value}</span>
+              <span className="text-2xl md:text-3xl text-foreground font-bold tracking-tight">
+                {typeof stat.value === 'number' && stat.countUp !== false ? (
+                  <CountUp value={stat.value} digits={stat.digits} />
+                ) : (
+                  stat.value
+                )}
+              </span>
               {stat.trend && (
                 <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${stat.trend.positive ? 'bg-series-3/10 text-series-3' : 'bg-series-6/10 text-series-6'}`}>
                   <span className="material-symbols-outlined text-base">

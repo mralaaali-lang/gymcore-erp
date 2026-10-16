@@ -171,7 +171,7 @@ export default function TrainerProgress() {
       <Card>
         <h3 className="font-bold text-gray-900 mb-4">{isRtl ? 'آخر 30 يومًا' : 'Last 30 days'}</h3>
         {historyQuery.isLoading ? (
-          <PageLoader message={isRtl ? 'جاري التحميل...' : 'Loading...'} />
+          <PageLoader variant="skeleton" message={isRtl ? 'جاري التحميل...' : 'Loading...'} />
         ) : history.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-8">
             {isRtl ? 'لا توجد سجلات بعد — ابدأ بسجل اليوم' : 'No logs yet — start with today'}

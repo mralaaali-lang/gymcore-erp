@@ -34,7 +34,7 @@ export default function MemberProfile() {
   if (isLoading) {
     return (
       <div dir={rtl ? 'rtl' : 'ltr'} className="bg-gray-50 min-h-screen -m-6 p-6">
-        <PageLoader />
+        <PageLoader variant="skeleton" />
       </div>
     );
   }

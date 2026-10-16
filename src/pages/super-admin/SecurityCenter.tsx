@@ -214,7 +214,7 @@ export default function SecurityCenter() {
   const renderSessions = () => (
     <div className="space-y-4">
       {sessionsQuery.isLoading ? (
-        <PageLoader />
+        <PageLoader variant="skeleton" />
       ) : sessions.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
           <GlobeSimple size={48} className="mx-auto text-gray-300 mb-3" />

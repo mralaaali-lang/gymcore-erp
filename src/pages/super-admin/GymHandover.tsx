@@ -209,7 +209,7 @@ export default function GymHandover() {
     if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <PageLoader />
+        <PageLoader variant="skeleton" />
       </div>
     );
   }

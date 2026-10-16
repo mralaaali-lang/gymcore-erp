@@ -199,7 +199,7 @@ export default function PlatformMarketing() {
           </div>
 
           {campaignsQuery.isLoading ? (
-            <PageLoader />
+            <PageLoader variant="skeleton" />
           ) : campaigns.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-3xl border shadow-sm border-gray-100">
               <MegaphoneSimple size={48} className="mx-auto text-gray-500/40 mb-3" />
@@ -258,7 +258,7 @@ export default function PlatformMarketing() {
         <div className="space-y-4">
           <p className="text-sm text-gray-500">{isRtl ? `${referrals.length} إحالة` : `${referrals.length} referral(s)`}</p>
           {referralsQuery.isLoading ? (
-            <PageLoader />
+            <PageLoader variant="skeleton" />
           ) : referrals.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-3xl border shadow-sm border-gray-100">
               <Users size={48} className="mx-auto text-gray-500/40 mb-3" />
@@ -348,7 +348,7 @@ export default function PlatformMarketing() {
               {isRtl ? 'قوالب البريد الإلكتروني' : 'Email Templates'}
             </h3>
             {emailTemplatesQuery.isLoading ? (
-              <PageLoader />
+              <PageLoader variant="skeleton" />
             ) : emailTemplates.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-4">{isRtl ? 'لا توجد قوالب' : 'No templates'}</p>
             ) : (

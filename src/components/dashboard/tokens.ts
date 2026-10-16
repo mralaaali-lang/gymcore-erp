@@ -24,17 +24,32 @@
  * in the old palette.
  */
 
-/** Data-series palette for charts and KPI tints — identity-free, do not treat as brand. */
+/**
+ * Accent slots. The NAMES are a fixed vocabulary — 163 `accent="…"` props pass
+ * them — but each now resolves to a Chalk & Brass SERIES token rather than a
+ * literal hex, so icon chips, trend pills and sparklines retint with the theme
+ * instead of freezing the light-mode value.
+ *
+ * `chip`/`icon` are class pairs (they go through `bg-series-N/10`, so alpha
+ * works), and `seriesVar` is for the two places that must hand a colour to SVG:
+ * a CSS `stroke` accepts `hsl(var(…))`, an SVG attribute does not.
+ */
 export type AccentName = 'cyan' | 'emerald' | 'violet' | 'amber' | 'rose' | 'sky' | 'gray';
 
-export const ACCENTS: Record<AccentName, { solid: string; soft: string }> = {
-  cyan: { solid: '#06b6d4', soft: '#cffafe' },
-  emerald: { solid: '#10b981', soft: '#d1fae5' },
-  violet: { solid: '#8b5cf6', soft: '#ede9fe' },
-  amber: { solid: '#f59e0b', soft: '#fef3c7' },
-  rose: { solid: '#f43f5e', soft: '#ffe4e6' },
-  sky: { solid: '#0ea5e9', soft: '#e0f2fe' },
-  gray: { solid: '#6b7280', soft: '#f3f4f6' },
+export interface Accent {
+  chip: string;
+  icon: string;
+  seriesVar: string;
+}
+
+export const ACCENTS: Record<AccentName, Accent> = {
+  emerald: { chip: 'bg-series-3/10', icon: 'text-series-3', seriesVar: '--series-3' },
+  cyan: { chip: 'bg-series-8/10', icon: 'text-series-8', seriesVar: '--series-8' },
+  sky: { chip: 'bg-series-5/10', icon: 'text-series-5', seriesVar: '--series-5' },
+  violet: { chip: 'bg-series-2/10', icon: 'text-series-2', seriesVar: '--series-2' },
+  amber: { chip: 'bg-series-1/10', icon: 'text-series-1', seriesVar: '--series-1' },
+  rose: { chip: 'bg-series-6/10', icon: 'text-series-6', seriesVar: '--series-6' },
+  gray: { chip: 'bg-series-7/10', icon: 'text-series-7', seriesVar: '--series-7' },
 };
 
 export const CARD_CLASS =
