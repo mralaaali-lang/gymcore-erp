@@ -1,6 +1,9 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Phone, KeyRound, Mail, Lock, Users, ArrowLeft, ArrowRight, Flame, Eye, EyeOff, Check, ShieldCheck } from 'lucide-react';
+import {
+  Phone, KeyRound, Mail, Lock, Users, ArrowLeft, ArrowRight, Flame,
+  Eye, EyeOff, Check, ShieldCheck, Dumbbell, Activity, Target,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
@@ -16,6 +19,21 @@ const STAFF_ROLE_ROUTE: Record<string, string> = {
   reception: '/reception/dashboard',
 };
 
+// ─── Floating background particles (same language as the admin console) ───
+const BG_ICONS = [Dumbbell, Activity, Flame, Target];
+const PARTICLE_COUNT = 7;
+
+function randomBetween(min: number, max: number) { return Math.random() * (max - min) + min; }
+
+// Shared field chrome so every input on this screen behaves identically.
+function fieldBox(active: boolean, bad: boolean) {
+  const base = 'group flex items-center gap-3 px-4 rounded-2xl border transition-all duration-200 ';
+  const h = 'min-h-[54px] ';
+  if (bad) return base + h + 'border-rose-400/70 bg-rose-500/10 ring-1 ring-rose-400/30';
+  if (active) return base + h + 'border-[#f97316] bg-[#f97316]/5 ring-1 ring-[#f97316]/35 shadow-sm shadow-[#f97316]/10';
+  return base + h + 'border-white/10 bg-white/5 hover:border-white/20';
+}
+
 export default function StaffMemberLoginPage() {
   const navigate = useNavigate();
   const { language, login, setLanguage } = useApp();
@@ -30,10 +48,27 @@ export default function StaffMemberLoginPage() {
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showMemberPin, setShowMemberPin] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [showCard, setShowCard] = useState(false);
+  const [touched, setTouched] = useState<{ phone: boolean; code: boolean }>({ phone: false, code: false });
 
   const isRtl = language === 'ar';
   const ArrowIcon = isRtl ? ArrowLeft : ArrowRight;
+
+  // ── Random particles (stable across renders) ──────────────────
+  const particles = useMemo(() =>
+    Array.from({ length: PARTICLE_COUNT }, (_, i) => ({
+      id: i,
+      Icon: BG_ICONS[i % BG_ICONS.length],
+      x: randomBetween(4, 96),
+      y: randomBetween(4, 96),
+      size: randomBetween(26, 58),
+      delay: randomBetween(0, 8),
+      duration: randomBetween(12, 20),
+      opacity: randomBetween(0.03, 0.07),
+      rotation: randomBetween(-20, 20),
+    })), []);
 
   const handleRememberMeChange = (val: boolean) => {
     setRememberMe(val);
@@ -44,16 +79,21 @@ export default function StaffMemberLoginPage() {
     }
   };
 
-  // Restore remembered email on mount
+  // Restore remembered email on mount + trigger the entrance stagger.
   useEffect(() => {
     const saved = localStorage.getItem('team_email');
     if (saved) {
       setEmail(saved);
       setRememberMe(true);
     }
+    const timer = setTimeout(() => setShowCard(true), 80);
+    return () => clearTimeout(timer);
   }, []);
 
-  const [showMemberPin, setShowMemberPin] = useState(false);
+  // ── Non-blocking client hints (the server stays the source of truth) ──
+  const digits = phone.replace(/\D/g, '');
+  const phoneBad = touched.phone && digits.length > 0 && !/^05\d{8}$/.test(digits);
+  const pinBad = touched.code && code.length > 0 && code.length < 4;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,236 +141,412 @@ export default function StaffMemberLoginPage() {
     }
   };
 
-  return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#0f0f1a] p-margin-mobile" dir={isRtl ? 'rtl' : 'ltr'}>
+  // Keyboard support for the account-type control (radiogroup semantics).
+  const handleTabsKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const next: LoginType = loginType === 'member' ? 'staff' : 'member';
+    setLoginType(next);
+    const el = document.getElementById(`team-tab-${next}`);
+    if (el) el.focus();
+  };
 
-      {/* === AMBIENT BACKGROUND — energetic athletic orange === */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_center,#f9731620_0%,#f9731608_40%,transparent_70%)]" />
+  // ── Transition classes for staggered children ────────────────
+  const fadeDelay = (i: number) => ({ transitionDelay: `${120 + i * 80}ms` });
+
+  return (
+    <div
+      className="team-fx relative min-h-[100dvh] flex items-center justify-center overflow-hidden px-margin-mobile py-8 select-none"
+      dir={isRtl ? 'rtl' : 'ltr'}
+      style={{
+        background: 'linear-gradient(135deg, #17100c 0%, #1d1410 30%, #241a12 60%, #120d0a 100%)',
+      }}
+    >
+      {/* ═══════════ AMBIENT BACKGROUND LAYERS ═══════════ */}
+
+      {/* 1. Gradient mesh */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: `
+            radial-gradient(ellipse at 15% 18%, rgba(249,115,22,0.14) 0%, transparent 55%),
+            radial-gradient(ellipse at 85% 12%, rgba(245,158,11,0.09) 0%, transparent 45%),
+            radial-gradient(ellipse at 50% 85%, rgba(249,115,22,0.07) 0%, transparent 50%)
+          `,
+        }}
+      />
+
+      {/* 2. Grid overlay */}
       <div
         className="absolute inset-0 opacity-[0.04]"
         style={{
-          backgroundImage: `linear-gradient(#f97316 1px, transparent 1px), linear-gradient(90deg, #f97316 1px, transparent 1px)`,
-          backgroundSize: '32px 32px',
+          backgroundImage: `linear-gradient(rgba(253,186,116,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(253,186,116,0.18) 1px, transparent 1px)`,
+          backgroundSize: '40px 40px',
         }}
       />
-      <div className="absolute top-1/4 left-1/4 w-72 h-72 rounded-full bg-[#f97316]/10 blur-[100px] animate-pulse" />
-      <div className="absolute bottom-1/3 right-1/4 w-96 h-96 rounded-full bg-[#f97316]/5 blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
 
-      <div className="relative w-full max-w-md backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl shadow-2xl p-8">
+      {/* 3. Animated glow orbs */}
+      <div className="absolute top-[12%] right-[16%] w-[420px] h-[420px] rounded-full bg-[#f97316]/10 blur-[110px] animate-pulse" style={{ animationDuration: '7s' }} />
+      <div className="absolute bottom-[16%] left-[8%] w-[340px] h-[340px] rounded-full bg-[#f59e0b]/8 blur-[100px] animate-pulse" style={{ animationDuration: '9s', animationDelay: '2s' }} />
 
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-full bg-[#f97316]/20 flex items-center justify-center text-[#f97316] mx-auto mb-4 border border-[#f97316]/30">
-            <Flame size={26} strokeWidth={1.75} />
+      {/* 4. Floating sport icons */}
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="absolute pointer-events-none"
+          style={{
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            animation: `floatIcon ${p.duration}s ease-in-out ${p.delay}s infinite alternate`,
+            opacity: p.opacity,
+            transform: `rotate(${p.rotation}deg)`,
+          }}
+        >
+          <p.Icon size={p.size} strokeWidth={1} className="text-white" />
+        </div>
+      ))}
+
+      {/* 5. Vignette */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        background: 'radial-gradient(ellipse at center, transparent 50%, rgba(12,8,6,0.65) 100%)',
+      }} />
+
+      {/* ═══════════ LOGIN CARD ═══════════ */}
+      <div className="relative w-full max-w-[420px] z-10">
+
+        {/* Animated border glow */}
+        <div className={`absolute -inset-[2px] rounded-3xl bg-gradient-to-br from-[#f97316]/45 via-[#f59e0b]/20 to-[#f97316]/45 blur-sm transition-all duration-1000 ${
+          showCard ? 'opacity-100' : 'opacity-0'
+        }`} />
+
+        <div
+          className={`relative backdrop-blur-2xl rounded-3xl p-7 sm:p-9 border transition-all duration-700 ease-out ${
+            showCard ? 'opacity-100 translate-y-0 border-white/10' : 'opacity-0 translate-y-8 border-transparent'
+          }`}
+          style={{
+            background: 'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)',
+            boxShadow: showCard
+              ? '0 25px 60px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)'
+              : 'none',
+          }}
+        >
+          {/* ── HEADER ── */}
+          <div className="text-center mb-7" style={fadeDelay(0)}>
+            <div
+              className={`h-16 w-16 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-all duration-700 ${
+                showCard ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+              }`}
+              style={{
+                background: 'linear-gradient(135deg, rgba(249,115,22,0.22) 0%, rgba(245,158,11,0.10) 100%)',
+                border: '1px solid rgba(249,115,22,0.28)',
+              }}
+            >
+              <Flame size={30} className="text-[#f97316]" strokeWidth={1.6} />
+            </div>
+
+            <h1 className={`text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent transition-all duration-700 ${
+              showCard ? 'opacity-100' : 'opacity-0'
+            }`}>
+              {t('auth.teamTitle')}
+            </h1>
+            <p className={`text-sm text-white/50 mt-2 transition-all duration-700 ${showCard ? 'opacity-100' : 'opacity-0'}`}
+              style={{ transitionDelay: '100ms' }}>
+              {t('auth.teamSubtitle')}
+            </p>
+
+            <div className={`mx-auto mt-4 h-[3px] w-12 rounded-full bg-gradient-to-r from-[#f97316] to-[#f59e0b] transition-all duration-700 ${
+              showCard ? 'opacity-100 scale-100' : 'opacity-0 scale-0'
+            }`} style={{ transitionDelay: '150ms' }} />
           </div>
-          <h1 className="text-3xl font-bold text-white">
-            {isRtl ? 'GymCore' : 'GymCore'}
-          </h1>
-          <p className="text-sm text-white/50 mt-2">
-            {isRtl ? 'دخول المدربين وموظفي الاستقبال والمتدربين' : 'Trainer, reception & member sign-in'}
-          </p>
-        </div>
 
-        {/* Toggle: Member / Team */}
-        <div className="flex bg-white/5 rounded-xl p-1 mb-6 border border-white/5">
-          <button
-            type="button"
-            onClick={() => setLoginType('member')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-              loginType === 'member' ? 'bg-[#f97316] text-white shadow-lg shadow-[#f97316]/30' : 'text-white/60 hover:text-white'
-            }`}
+          {/* ── ACCOUNT TYPE TABS ── */}
+          <div
+            role="radiogroup"
+            aria-label={isRtl ? 'نوع الحساب' : 'Account type'}
+            onKeyDown={handleTabsKeyDown}
+            className={`flex rounded-xl p-1 mb-6 transition-all duration-500 ${showCard ? 'opacity-100' : 'opacity-0'}`}
+            style={{ ...fadeDelay(1), background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)' }}
           >
-            <Phone size={16} />
-            {isRtl ? 'متدرب' : 'Member'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setLoginType('staff')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-              loginType === 'staff' ? 'bg-[#f97316] text-white shadow-lg shadow-[#f97316]/30' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <Users size={16} />
-            {isRtl ? 'مدرب / استقبال' : 'Trainer / Reception'}
-          </button>
-        </div>
+            <button
+              id="team-tab-member"
+              type="button"
+              role="radio"
+              aria-checked={loginType === 'member'}
+              onClick={() => setLoginType('member')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${
+                loginType === 'member'
+                  ? 'bg-gradient-to-r from-[#f97316] to-[#ea580c] text-white shadow-lg shadow-[#f97316]/25 scale-105'
+                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Phone size={16} />
+              {t('auth.memberTab')}
+            </button>
+            <button
+              id="team-tab-staff"
+              type="button"
+              role="radio"
+              aria-checked={loginType === 'staff'}
+              onClick={() => setLoginType('staff')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${
+                loginType === 'staff'
+                  ? 'bg-gradient-to-r from-[#f97316] to-[#ea580c] text-white shadow-lg shadow-[#f97316]/25 scale-105'
+                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Users size={16} />
+              {t('auth.staffTab')}
+            </button>
+          </div>
 
-        <form onSubmit={handleSubmit} className="space-y-stack-md">
+          {/* ── FORM ── */}
+          <form onSubmit={handleSubmit} className="space-y-stack-md">
 
-          {loginType === 'member' && (
-            <>
-              <div>
-                <label className="block text-sm font-semibold text-white/70 mb-2">
-                  {isRtl ? 'رقم الهاتف' : 'Phone Number'}
-                </label>
-                <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
-                  focusedField === 'phone' ? 'border-[#f97316] bg-[#f97316]/5 ring-1 ring-[#f97316]/30' : 'border-white/10 bg-white/5'
-                }`}>
-                  <Phone size={18} className={focusedField === 'phone' ? 'text-[#f97316]' : 'text-white/30'} />
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    onFocus={() => setFocusedField('phone')}
-                    onBlur={() => setFocusedField(null)}
-                    className="flex-1 bg-transparent text-white text-base outline-none placeholder-white/30"
-                    placeholder="05xxxxxxxx"
-                    dir="ltr"
-                    required
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-white/70 mb-2">
-                  {isRtl ? 'الرمز السري' : 'PIN Code'}
-                </label>
-                <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
-                  focusedField === 'code' ? 'border-[#f97316] bg-[#f97316]/5 ring-1 ring-[#f97316]/30' : 'border-white/10 bg-white/5'
-                }`}>
-                  <KeyRound size={18} className={focusedField === 'code' ? 'text-[#f97316]' : 'text-white/30'} />
-                  <input
-                    type={showMemberPin ? 'text' : 'password'}
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    onFocus={() => setFocusedField('code')}
-                    onBlur={() => setFocusedField(null)}
-                    className="flex-1 bg-transparent text-white text-base outline-none placeholder-white/30"
-                    placeholder="****"
-                    dir="ltr"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowMemberPin(!showMemberPin)}
-                    className="text-white/40 hover:text-white/70 transition-colors p-1 focus:outline-none"
-                    tabIndex={-1}
-                    aria-label={showMemberPin ? 'Hide PIN' : 'Show PIN'}
-                  >
-                    {showMemberPin ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-
-          {loginType === 'staff' && (
-            <>
-              <div>
-                <label className="block text-sm font-semibold text-white/70 mb-2">
-                  {isRtl ? 'البريد الإلكتروني' : 'Email'}
-                </label>
-                <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
-                  focusedField === 'email' ? 'border-[#f97316] bg-[#f97316]/5 ring-1 ring-[#f97316]/30' : 'border-white/10 bg-white/5'
-                }`}>
-                  <Mail size={18} className={focusedField === 'email' ? 'text-[#f97316]' : 'text-white/30'} />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onFocus={() => setFocusedField('email')}
-                    onBlur={() => setFocusedField(null)}
-                    className="flex-1 bg-transparent text-white text-base outline-none placeholder-white/30"
-                    placeholder="coach@gymcore.app"
-                    dir="ltr"
-                    required
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-white/70 mb-2">
-                  {isRtl ? 'كلمة المرور' : 'Password'}
-                </label>
-                <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
-                  focusedField === 'password' ? 'border-[#f97316] bg-[#f97316]/5 ring-1 ring-[#f97316]/30' : 'border-white/10 bg-white/5'
-                }`}>
-                  <Lock size={18} className={focusedField === 'password' ? 'text-[#f97316]' : 'text-white/30'} />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onFocus={() => setFocusedField('password')}
-                    onBlur={() => setFocusedField(null)}
-                    className="flex-1 bg-transparent text-white text-base outline-none placeholder-white/30"
-                    placeholder="********"
-                    dir="ltr"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-white/40 hover:text-white/70 transition-colors p-1 focus:outline-none"
-                    tabIndex={-1}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <div
-                    onClick={() => handleRememberMeChange(!rememberMe)}
-                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                      rememberMe
-                        ? 'bg-[#f97316] border-[#f97316]'
-                        : 'border-white/20 group-hover:border-white/40'
-                    }`}
-                  >
-                    {rememberMe && <Check size={14} className="text-white" strokeWidth={3} />}
+            {loginType === 'member' && (
+              <>
+                {/* Phone */}
+                <div className={`transition-all duration-400 ${showCard ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'}`}
+                  style={{ transitionDelay: '200ms' }}>
+                  <label htmlFor="member-phone" className="block text-sm font-semibold text-white/70 mb-2">
+                    {t('auth.phoneNumber')}
+                  </label>
+                  <div className={fieldBox(focusedField === 'phone', phoneBad)}>
+                    <Phone size={18} className={`transition-colors duration-200 ${
+                      phoneBad ? 'text-rose-300' : focusedField === 'phone' ? 'text-[#f97316]' : 'text-white/30 group-hover:text-white/50'
+                    }`} />
+                    <input
+                      id="member-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      enterKeyHint="next"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      onFocus={() => setFocusedField('phone')}
+                      onBlur={() => { setFocusedField(null); setTouched((s) => ({ ...s, phone: true })); }}
+                      aria-invalid={phoneBad || undefined}
+                      aria-describedby="member-phone-hint"
+                      className="flex-1 min-w-0 bg-transparent text-white text-base outline-none placeholder-white/25"
+                      placeholder="05xxxxxxxx"
+                      dir="ltr"
+                      required
+                      autoFocus
+                    />
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => handleRememberMeChange(e.target.checked)}
-                    className="hidden"
-                  />
-                  <span className="text-sm text-white/60 group-hover:text-white/80 transition-colors cursor-pointer">
-                    {t('auth.rememberMe')}
-                  </span>
-                </label>
-                <Link to="/forgot-password?area=team" className="text-sm text-white/50 hover:text-white transition-colors">
-                  {isRtl ? 'نسيت كلمة المرور؟' : 'Forgot password?'}
-                </Link>
-              </div>
-            </>
-          )}
+                  <p id="member-phone-hint" aria-live="polite" className={`min-h-[18px] mt-1.5 text-xs transition-colors ${
+                    phoneBad ? 'text-rose-300' : 'text-white/35'
+                  }`}>
+                    {phoneBad
+                      ? (isRtl ? 'رقم الهاتف يبدأ بـ 05 ويتكوّن من ١٠ أرقام' : 'Phone must be 10 digits starting with 05')
+                      : (digits.length > 0 && digits.length < 10 && isRtl ? `${digits.length}/١٠ أرقام` : '')}
+                  </p>
+                </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3.5 rounded-2xl bg-[#f97316] text-white font-bold text-base hover:bg-[#e0660e] transition-all shadow-lg shadow-[#f97316]/30 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading && <Spinner size="sm" />}
-            {loading
-              ? (isRtl ? 'جاري تسجيل الدخول...' : 'Signing in...')
-              : (loginType === 'member' ? (isRtl ? 'دخول المتدرب' : 'Member Login') : (isRtl ? 'دخول الفريق' : 'Team Login'))}
-          </button>
-        </form>
+                {/* PIN */}
+                <div className={`transition-all duration-400 ${showCard ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}`}
+                  style={{ transitionDelay: '260ms' }}>
+                  <label htmlFor="member-pin" className="block text-sm font-semibold text-white/70 mb-2">
+                    {t('auth.pinCode')}
+                  </label>
+                  <div className={fieldBox(focusedField === 'code', pinBad)}>
+                    <KeyRound size={18} className={`transition-colors duration-200 ${
+                      pinBad ? 'text-rose-300' : focusedField === 'code' ? 'text-[#f97316]' : 'text-white/30 group-hover:text-white/50'
+                    }`} />
+                    <input
+                      id="member-pin"
+                      type={showMemberPin ? 'text' : 'password'}
+                      inputMode="numeric"
+                      autoComplete="current-password"
+                      enterKeyHint="go"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      onFocus={() => setFocusedField('code')}
+                      onBlur={() => { setFocusedField(null); setTouched((s) => ({ ...s, code: true })); }}
+                      aria-invalid={pinBad || undefined}
+                      aria-describedby="member-pin-hint"
+                      className="flex-1 min-w-0 bg-transparent text-white text-base tracking-[0.3em] outline-none placeholder-white/25"
+                      placeholder="••••"
+                      dir="ltr"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowMemberPin(!showMemberPin)}
+                      className="text-white/40 hover:text-white/70 transition-colors p-1.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f97316]"
+                      aria-pressed={showMemberPin}
+                      aria-label={showMemberPin ? 'Hide PIN' : 'Show PIN'}
+                    >
+                      {showMemberPin ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  <p id="member-pin-hint" aria-live="polite" className={`min-h-[18px] mt-1.5 text-xs transition-colors ${
+                    pinBad ? 'text-rose-300' : 'text-white/35'
+                  }`}>
+                    {pinBad ? (isRtl ? 'الرمز ٤ خانات على الأقل' : 'PIN must be at least 4 characters') : ''}
+                  </p>
+                </div>
+              </>
+            )}
 
-        <div className="mt-6 pt-6 border-t border-white/10 flex items-center justify-between">
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors group"
-          >
-            <ShieldCheck size={14} className="group-hover:text-[#f97316] transition-colors" />
-            <span>{t('auth.adminLinkFromTeam')}</span>
-            <ArrowIcon size={14} className="group-hover:translate-x-0.5 transition-transform" />
-          </Link>
-          <button
-            onClick={() => setLanguage(isRtl ? 'en' : 'ar')}
-            className="text-xs text-white/40 hover:text-white/70 transition-colors"
-          >
-            {isRtl ? 'English' : 'العربية'}
-          </button>
+            {loginType === 'staff' && (
+              <>
+                {/* Email */}
+                <div className={`transition-all duration-400 ${showCard ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'}`}
+                  style={{ transitionDelay: '200ms' }}>
+                  <label htmlFor="staff-email" className="block text-sm font-semibold text-white/70 mb-2">
+                    {t('auth.email')}
+                  </label>
+                  <div className={fieldBox(focusedField === 'email', false)}>
+                    <Mail size={18} className={`transition-colors duration-200 ${
+                      focusedField === 'email' ? 'text-[#f97316]' : 'text-white/30 group-hover:text-white/50'
+                    }`} />
+                    <input
+                      id="staff-email"
+                      type="email"
+                      autoComplete="username email"
+                      enterKeyHint="next"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      onFocus={() => setFocusedField('email')}
+                      onBlur={() => setFocusedField(null)}
+                      className="flex-1 min-w-0 bg-transparent text-white text-base outline-none placeholder-white/25"
+                      placeholder="coach@gymcore.app"
+                      dir="ltr"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div className={`transition-all duration-400 ${showCard ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}`}
+                  style={{ transitionDelay: '260ms' }}>
+                  <label htmlFor="staff-password" className="block text-sm font-semibold text-white/70 mb-2">
+                    {t('auth.password')}
+                  </label>
+                  <div className={fieldBox(focusedField === 'password', false)}>
+                    <Lock size={18} className={`transition-colors duration-200 ${
+                      focusedField === 'password' ? 'text-[#f97316]' : 'text-white/30 group-hover:text-white/50'
+                    }`} />
+                    <input
+                      id="staff-password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      enterKeyHint="go"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onFocus={() => setFocusedField('password')}
+                      onBlur={() => setFocusedField(null)}
+                      className="flex-1 min-w-0 bg-transparent text-white text-base outline-none placeholder-white/25"
+                      placeholder="••••••••"
+                      dir="ltr"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-white/40 hover:text-white/70 transition-colors p-1.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f97316]"
+                      aria-pressed={showPassword}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remember + forgot */}
+                <div className={`flex items-center justify-between transition-all duration-400 ${showCard ? 'opacity-100' : 'opacity-0'}`}
+                  style={{ transitionDelay: '340ms' }}>
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <div
+                      onClick={() => handleRememberMeChange(!rememberMe)}
+                      className={`w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center transition-all duration-150 ${
+                        rememberMe ? 'bg-[#f97316] border-[#f97316] shadow-sm shadow-[#f97316]/30' : 'border-white/20 group-hover:border-white/40'
+                      }`}
+                    >
+                      {rememberMe && <Check size={12} className="text-white" strokeWidth={3} />}
+                    </div>
+                    <input type="checkbox" checked={rememberMe} onChange={(e) => handleRememberMeChange(e.target.checked)} className="hidden" />
+                    <span className="text-xs text-white/50 group-hover:text-white/70 transition-colors select-none">
+                      {t('auth.rememberMe')}
+                    </span>
+                  </label>
+                  <Link to="/forgot-password?area=team" className="text-xs text-white/40 hover:text-[#f97316] transition-colors">
+                    {t('auth.forgotPassword')}
+                  </Link>
+                </div>
+              </>
+            )}
+
+            {/* Submit */}
+            <div className={`transition-all duration-400 ${showCard ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+              style={{ transitionDelay: '420ms' }}>
+              <button
+                type="submit"
+                disabled={loading}
+                className="relative w-full py-4 rounded-2xl font-bold text-base tracking-wide text-white overflow-hidden transition-all duration-200 active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f97316]"
+                style={{
+                  background: 'linear-gradient(135deg, #f97316 0%, #ea580c 50%, #c2410c 100%)',
+                  boxShadow: '0 4px 20px rgba(249,115,22,0.3)',
+                }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                <span className="relative flex items-center justify-center gap-2">
+                  {loading && <Spinner size="sm" />}
+                  {loading
+                    ? (isRtl ? 'جاري تسجيل الدخول...' : 'Signing in...')
+                    : (loginType === 'member' ? t('auth.memberLoginButton') : t('auth.teamLoginButton'))}
+                </span>
+              </button>
+            </div>
+          </form>
+
+          {/* ── FOOTER ── */}
+          <div className={`mt-7 pt-5 border-t border-white/5 flex items-center justify-between gap-3 transition-all duration-400 ${
+            showCard ? 'opacity-100' : 'opacity-0'
+          }`} style={{ transitionDelay: '500ms' }}>
+            <Link
+              to="/login"
+              className="group inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
+            >
+              <ShieldCheck size={14} className="transition-colors group-hover:text-[#f97316]" />
+              {t('auth.adminLinkFromTeam')}
+              <ArrowIcon size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+            </Link>
+            <button
+              type="button"
+              onClick={() => setLanguage(isRtl ? 'en' : 'ar')}
+              className="text-xs text-white/30 hover:text-[#f97316]/80 transition-colors"
+            >
+              {isRtl ? 'English' : 'العربية'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Watermark ── */}
+        <div className={`text-center mt-5 transition-all duration-700 ${showCard ? 'opacity-40' : 'opacity-0'}`} style={{ transitionDelay: '600ms' }}>
+          <p className="text-[10px] text-white/20 tracking-[0.2em] uppercase font-light">
+            {isRtl ? 'بوابة الأعضاء وفريق الصالة' : 'Member & Team Portal'}
+          </p>
         </div>
       </div>
 
-      <PwaInstallPrompts isRtl={isRtl} appName={isRtl ? 'GymCore' : 'GymCore'} accentColor="#f97316" logoInitial="ج" />
+      <style>{`
+        @keyframes floatIcon {
+          0%   { transform: translateY(0px) rotate(var(--rotation, 0deg)); }
+          50%  { transform: translateY(-18px) rotate(calc(var(--rotation, 0deg) + 5deg)); }
+          100% { transform: translateY(0px) rotate(var(--rotation, 0deg)); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .team-fx *, .team-fx *::before, .team-fx *::after {
+            animation-duration: .001ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: .001ms !important;
+          }
+        }
+      `}</style>
+
+      <PwaInstallPrompts isRtl={isRtl} appName={t('auth.teamTitle')} accentColor="#f97316" logoInitial="ج" />
     </div>
   );
 }
-
