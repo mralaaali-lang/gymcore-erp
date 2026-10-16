@@ -1,7 +1,11 @@
 export const theme = {
-  // ── Unified palette: Control-Center language (emerald + gray) ──
-  // Token NAMES are unchanged so every consumer keeps working;
-  // only the VALUES now match SuperAdminDashboard (the design reference).
+  // ── Legacy MD3-era palette (historical) ──
+  // The NAMES stay because ~75 call sites use them. The VALUES below are now
+  // unreachable for the shell names (`background, card, surface*, on-surface*,
+  // inverse-*, outline*`): `shadcn-colors.js` is spread AFTER this object in
+  // tailwind.config.js and re-points each one at a `tokens.css` variable, so
+  // Chalk & Brass is retinted there, not here. Do not add a colour here —
+  // add a variable in tokens.css and a one-line re-point in shadcn-colors.js.
   colors: {
     surface: '#f9fafb',
     'surface-dim': '#e5e7eb',

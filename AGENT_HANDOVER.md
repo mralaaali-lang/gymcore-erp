@@ -56,10 +56,12 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
 
 ## 5) الاتفاقيات (إلزامية)
 
-1. **التصميم:** لغة مركز التحكم (`bg-gray-50`، أبيض `rounded-3xl`، أساسي `emerald-500`) عبر المكوّنات المشتركة فقط (`shared/PageHeader,StatsGrid,FilterBar,UnifiedTabs,PageLoader,ExportButton` + `ui/Card,Button,StatusBadge` + `dashboard/*`). **ممنوع mocks جديدة** — أي بيانات تعرضها صفحة يجب أن تأتي من endpoint حقيقي (أو تُترك placeholder صريح).
+1. **التصميم:** لغة **Chalk & Brass** (انظر 1هـ) تُقرأ من التوكنات، وتُمرَّر عبر المكوّنات المشتركة فقط (`shared/PageHeader,StatsGrid,FilterBar,UnifiedTabs,PageLoader,ExportButton` + `ui/Card,Button,StatusBadge` + `dashboard/*`) — لا ألوان حرفية في الصفحات الجديدة. **ممنوع mocks جديدة** — أي بيانات تعرضها صفحة يجب أن تأتي من endpoint حقيقي (أو تُترك placeholder صريح).
 1ب. **التوكنات (من 2026-10-16):** مصدر الحقيقة الوحيد للألوان `src/styles/tokens.css` — ثلاثيات HSL عارية بأسماء shadcn (`--background, --foreground, --card, --popover, --primary, --secondary, --muted, --accent, --destructive, --border, --input, --ring`) + `.dark` بمقياس Obsidian. موصولة في `src/styles/shadcn-colors.js` ثم `tailwind.config.js`، فالكلاسات (`bg-primary/10`) تشتغل عليها مباشرة. أي لون جديد = متغير هناك، لا hex داخل كلاس. `cn()` في `src/lib/utils.ts` و`components.json` جاهزان لمكوّنات shadcn/Aceternity.
 1ج. **منطقة ما قبل الدخول:** هويتها كلها في متغيرات `--auth-*` (`tokens.css`) مكشوفة كألوان Tailwind باسم `auth-accent / auth-accent-strong / auth-accent-deep / auth-amber` + تدرّجان جاهزان `--auth-root-bg` و`--auth-cta-bg`. ممنوع كتابة `bg-[#06b6d4]` أو تدرّج حرفي في أي شاشة عامة — الاستثناء الوحيد `AUTH_ACCENT` في `components/auth/AuthAmbience.tsx` (نص حرفي لمكوّن الـ PWA).
 1د. **مكوّنات shadcn/Aceternity (من 2026-10-16):** تُنسخ في `src/components/shadcn/` بأسماء الملفات الرسمية (kebab: `button.tsx`, `card.tsx`, `dialog.tsx`) وتُستورد عبر البادئة `@/` (`@/components/shadcn/button`, `@/lib/utils`) — الـ alias معرّف في `tsconfig.json` و`vite.config.ts`. `components.json` يوجّه `ui` لهذا المجلد تحديداً: **ممنوع** أن تكتب `shadcn add` أو نسخة يدوية داخل `src/components/ui/` (أما `Button.tsx` و`Card.tsx` القديمة فواجهاتها مختلفة وتعتمد عليها 60+ صفحة، والترحيل خطوة خطوة بمرآة خصائص لا باستبدال). أي مكوّن منسوخ: ألوانه من التوكنات فقط، وحشو اتجاهي بخصائص منطقية (`text-start`، `[inset-inline-end:…]`) لأن المشروع RTL — لا `left-4/right-4` في مكوّن مشترك. الـ Dialog مركزي دائماً (اتفاقية المودال في الذاكرة). الاعتماديات المثبّتة: `@radix-ui/react-slot|react-dialog|react-label` + `lucide-react` + `class-variance-authority` + `tailwindcss-animate`.
+1هـ. **صدفة Chalk & Brass (من `af4a864`):** الثيم الفاتح = ورق عظمي `#f5f3ee` + حبر غرافيتي `#2b2620` + بطاقات `#fffdf9` + خطوط شعرية، بـ emerald للفعل فقط ونحاس كلون لمسة ثانوية (`--brass`/`--brass-soft`) و`--pine` للهوية. ممنوع أي `bg-white`/`text-gray-900`/`shadow-*` جديد في مكوّن مشترك — الكارت القياسي `CARD_CLASS` = `bg-card rounded-shell border border-hairline p-5 md:p-6` (بلا ظل: العمق من الحدود لا Blur). نصف القطر كله من `--radius` عبر `rounded-shell`، فيُغيَّر في سطر. **الخلايا الرقمية/الجداول لا تكون سوداء أبداً:** `--table-fg` و`--table-head`، ويغطيها `table:not(.no-shell-ink)` في `index.css` — أي جدول جديد يحتاج لوناً خاصاً على `<td>` يكتبه صراحة، والخروج من القاعدة بـ `no-shell-ink`.
+1و. **الخط (قاعدة بعد الانتكاسة):** `Be Vietnam Pro` أولاً دائماً لأنه المستضاف محلياً والحرف اللاتيني والأرقام، و`Alexandria` (woff2 في `public/fonts/`) بعده مباشرة للعربي، ثم سلسلة النظام. **ممنوع** وضع وجه عربي CDN-only في رأس أي سلسلة أو إضافة مفتاح `sans` في ثيم Tailwind (يستبدل خط `html` في preflight) — أي خط جديد يُجرَّب self-host ومقارنة مرئية قبل لمس `index.html`/الثيم. تفصيل الأدلة في `LOCAL_TESTING_REPORT.md` §الانتكاسة و§خطة البرميوم.
 2. **التحقق:** `npx tsc --noEmit` (أمامي وخلفي، `noUnusedLocals/Parameters` مفعّلة) + `npm run build` بعد أي تعديل واجهة.
 3. **i18n:** مفاتيح `ar.json/en.json` (تكافؤ 100% — حافظ عليه) للقوائم (`nav.*`) والهيدر واللوحات؛ بقية الصفحات ternaries داخلية (`isRtl ? ar : en`) — لا تخلط النظامين في ملف واحد بلا داعٍ. الافتراضي `ar` + `ar-EG` للتواريخ + `EGP/ج.م`.
 4. **الأيقونات:** محاكي `src/lib/lucide-react.ts` حُذف نهائياً (2026-10-16) ولا يُرجَع أبداً — أي استيراد من `lucide-react` اليوم يذهب للحزمة الحقيقية (مثبّتة الآن لأن مكوّنات Aceternity مكتوبة عليها). التوزيع الحالي: الصفحات الـ63 تستورد `@phosphor-icons/react` مباشرة، والمكوّنات المشتركة/المنسوخة من Aceternity تستخدم `lucide-react`، وMaterial Symbols باقٍ في الخطوط القديمة. لا مكتبة رابعة، وأي اسم phosphor متبقٍّ كاسم محلي (`CheckCircle as CheckCircle2`, `Warning as AlertTriangle`, `List as Menu`, `Pencil as Edit3`, `Gear as Settings`, `Envelope as Mail`, `EyeSlash as EyeOff`, `Barbell as Dumbbell`) مقصود لتقليل الدفوع — تحويلها لعملية لاحقة.
@@ -77,17 +79,29 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
 - **Vite:** ملف `.env` الجذري يُقرأ عند الإقلاع فقط — أعد تشغيل Vite بعد تغييره (HMR لا يكفي للمتغيرات).
 - **ApexCharts:** ممنوع تمرير `undefined` صريح في options (يمحو الافتراضيات وينهار `globalVars`) — احذف المفتاح. ومخطط `line` كان يُعرض أعمدة (مُصلح في `Chart.tsx`).
 - **ترتيب أعمدة INSERT:** عدّ القيم مقابل الأعمدة يدوياً — 3 انهيارات سيد سابقة من هذا.
+- **نص أبيض فوق `--primary` = 2.54 (مستند في §خطة البرميوم):** emerald-500 مع `#ffffff` لا يجتاز AA،
+  وهو عيب سابق للصدفة الجديدة وليس بسببها. أي قرار بتغميق `--primary` أو تغيير `--primary-foreground`
+  يمسّ 123 موضعاً + أزرار كل الشاشات، فلا يُتَّخذ ضمن دفعة ألوان — يُعرض على المالك برقمين قبله وبعده.
+- **1700+ كلاس حرفي في الصفحات:** `bg-white` (585) و`text-gray-900` (663) و`border-gray-100` (491)
+  ما زالت مكتوبة في `src/**/*.tsx`، فلا تتوقع أن تتبع صفحة قديمة التوكنات. دفعة الألوان المستقلة
+  (استبدال نصّي محكم + `tsc`/`build`) هي الحل؛ ومقياس `surface-container-*` في `tailwind-tokens.js`
+  hex بارد خارجها لأنه لا يقرأ المتغيرات (35 موضعاً).
 - **Railway staging (2026-10-12):** النشر بـ `railway up` من الجذر (سياق build = repo root). بروكسي Railway يوصل للـ replica على **منفذ 8080** إن لم يُضبط Application Port — nginx يlisten على 80+8080 معاً. بعد كل redeploy للـ backend **أعد نشر الـ frontend** (nginx يظلّم DNS لـ `backend.railway.internal` عند الإقلاع وإلا يجمّد البروكسي) — مع الرفع التلقائي (§29) كل push يبني الخدمةين معاً فتنتهي هذه المشكلة جانبياً؛ تبقى عند إعادة نشر backend وحده يدوياً. `railway service restart` يتعطّل أحياناً — `railway up -d` أضمن.
 
 ---
 
 ## 7) المتبقي (مرتب بالأولوية)
 
-1. **تبويبات `renderPlaceholder`** (فوترة/تقويم/موقع/تسويق/تقارير POS): الشكل موحّد والربط الخلفي ناقص — endpoints موجودة جزئياً (حصص/إحالات/مدفوعات).
-2. **فجوات EN** في صفحات (SetupChecklist/TrainerDashboard/FinancialReports/LeadKanban/useGymDashboard) — عربية فقط حالياً.
-3. **توحيد الأيقونات** لنظام واحد (13 ملفاً يخلط) + إزالة `Plus` المكرر مع `add`.
-4. **`DataTable` المشتركة** لا تدعم خلايا مخصصة — توسيعها أو توثيق الاستثناء.
-5. **Staging (Railway):** ✅ يعمل (2026-10-12 §21) — backend+frontend Online؛ الدومينات `frontend-production-abdd`/`backend-production-9b567`؛ **منذ §29: الرفع تلقائي — كل `git push origin main` يبني وينشر عبر GitHub App + Deployment Triggers (فرع main)**؛ إعدادات إلزامية: backend rootDirectory فارغ + dockerfilePath `/server/Dockerfile.prod`، frontend rootDirectory `.` (تفاصيل §29). `deploy.sh`/«ارفع» لم عادا لازمين إلا كطوارئ. **ديون دمج الصفحات: منتهية — اكتملت السلسلة بـ §27** (الفريق §22، المتجر §23، الديون/الإعلانات §26، backup/migration → تبويبات الإعدادات §27).
+1. **دفعة ألوان الصدفة (بموافقة المالك أولاً):** استبدال نصّي محكم في `src/**/*.tsx` —
+   `bg-white`→`bg-card`، `text-gray-900`→`text-foreground`، `border-gray-100`→`border-hairline` —
+   تحقّق بـ `tsc` + `build` وcommit مستقل. بعده دفعة الهندسة (`rounded-3xl`→`rounded-shell` وحذف
+   `shadow-sm`) ثم إعادة تلوين `StatsGrid.colorMap` ومخططات ApexCharts بلغة Chalk & Brass.
+   لم تُنفَّذ لأن النطاق المتفق عليه كان «توكنات + مكوّنات مشتركة» لا الـ60 صفحة.
+2. **تبويبات `renderPlaceholder`** (فوترة/تقويم/موقع/تسويق/تقارير POS): الشكل موحّد والربط الخلفي ناقص — endpoints موجودة جزئياً (حصص/إحالات/مدفوعات).
+3. **فجوات EN** في صفحات (SetupChecklist/TrainerDashboard/FinancialReports/LeadKanban/useGymDashboard) — عربية فقط حالياً.
+4. **توحيد الأيقونات** لنظام واحد (13 ملفاً يخلط) + إزالة `Plus` المكرر مع `add`.
+5. **`DataTable` المشتركة** لا تدعم خلايا مخصصة — توسيعها أو توثيق الاستثناء.
+6. **Staging (Railway):** ✅ يعمل (2026-10-12 §21) — backend+frontend Online؛ الدومينات `frontend-production-abdd`/`backend-production-9b567`؛ **منذ §29: الرفع تلقائي — كل `git push origin main` يبني وينشر عبر GitHub App + Deployment Triggers (فرع main)**؛ إعدادات إلزامية: backend rootDirectory فارغ + dockerfilePath `/server/Dockerfile.prod`، frontend rootDirectory `.` (تفاصيل §29). `deploy.sh`/«ارفع» لم عادا لازمين إلا كطوارئ. **ديون دمج الصفحات: منتهية — اكتملت السلسلة بـ §27** (الفريق §22، المتجر §23، الديون/الإعلانات §26، backup/migration → تبويبات الإعدادات §27).
 6. **مؤجل بقرار:** ZATCA، استشارة قانونية، بوابات دفع حقيقية (نقدي/يدوي أولاً — راجع `PAYMENT_COLLECTION_STRATEGY.md`).
 7. **ديون تقنية:** `routeConfigs/` قديم، `UIContext` غير مُmount، `superAdminUtils.tr` مكرر، تحذير حجم chunks في البناء.
 

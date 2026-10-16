@@ -35,6 +35,31 @@ export const shadcnColors = {
   'table-fg': v('table-fg'),
   'table-head': v('table-head'),
 
+  // Re-points for the MD3-era names that `tailwind-tokens.js` defines as cold
+  // hex literals. Spreading this file last in tailwind.config.js means the hex
+  // values become fallbacks that no class can reach: `bg-surface-container-high`
+  // and `text-on-surface` now follow the shell (warm bone/graphite) in both
+  // themes, with no edit at any of the ~75 call sites.
+  //
+  // Written FLAT, one key per legacy key, on purpose: nesting these as objects
+  // would make Tailwind flatten `surface.containerHigh` into `surface-container-*`
+  // too, and two spellings of the same utility resolve from two different sources.
+  surface: v('surface'),
+  'surface-dim': v('surface-dim'),
+  'surface-bright': v('surface-container-low'),
+  'surface-variant': v('surface-variant'),
+  'surface-container-lowest': v('surface-container-lowest'),
+  'surface-container-low': v('surface-container-low'),
+  'surface-container': v('surface-container'),
+  'surface-container-high': v('surface-container-high'),
+  'surface-container-highest': v('surface-container-highest'),
+  'on-surface': v('on-surface'),
+  'on-surface-variant': v('on-surface-variant'),
+  'inverse-surface': v('inverse-surface'),
+  'inverse-on-surface': v('inverse-on-surface'),
+  outline: v('outline'),
+  'outline-variant': v('outline-variant'),
+
   // Auth console identity. Not shadcn names — these are the project's own,
   // exposed the same way so `bg-auth-accent/5` and `from-auth-accent/40`
   // work with correct alpha instead of `bg-[#06b6d4]/5`.

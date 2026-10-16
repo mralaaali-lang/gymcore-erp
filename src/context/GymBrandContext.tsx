@@ -145,7 +145,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   if (!sessionReady) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#f8f9ff]">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
           <span className="material-symbols-outlined animate-spin text-4xl text-petrol">sync</span>
         </div>
