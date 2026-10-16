@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Mail, ArrowLeft, ArrowRight, KeyRound, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../../context/GymBrandContext';
 import Spinner from '../../components/ui/Spinner';
+import AuthAmbience, { AUTH_ACCENT, AUTH_ROOT_BG } from '../../components/auth/AuthAmbience';
 import { forgotPassword } from '../../services/api';
 
 export default function ForgotPasswordPage() {
@@ -25,8 +26,10 @@ export default function ForgotPasswordPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const accent = isPlatform ? '#06b6d4' : '#f97316';
-  const bg = isPlatform ? '#081b23' : '#0f0f1a';
+  // One identity for the whole unauthenticated area: the admin console's
+  // navy + cyan. `area` only decides which endpoint we call and where the
+  // back link goes — it no longer changes the theme.
+  const accent = AUTH_ACCENT;
   const backLink = isPlatform ? '/login' : '/team-login';
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,19 +56,26 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden p-margin-mobile" style={{ backgroundColor: bg }} dir={isRtl ? 'rtl' : 'ltr'}>
-      <div
-        className="absolute inset-0 opacity-40"
-        style={{ background: `radial-gradient(ellipse at top center, ${accent}20 0%, transparent 60%)` }}
-      />
+    <div className="auth-fx relative min-h-[100dvh] flex items-center justify-center overflow-hidden p-margin-mobile" style={{ background: AUTH_ROOT_BG }} dir={isRtl ? 'rtl' : 'ltr'}>
+      <AuthAmbience />
 
-      <div className="relative w-full max-w-md backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl shadow-2xl p-8">
+      <div className="relative w-full max-w-md z-10">
+        {/* Animated border glow behind card */}
+        <div className="absolute -inset-[2px] rounded-3xl bg-gradient-to-br from-[#06b6d4]/40 via-[#f59e0b]/20 to-[#06b6d4]/40 blur-sm" />
+
+        <div
+          className="relative backdrop-blur-2xl rounded-3xl border border-white/10 p-8"
+          style={{
+            background: 'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)',
+            boxShadow: '0 25px 60px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)',
+          }}
+        >
         {!submitted ? (
           <>
             <div className="text-center mb-8">
               <div
                 className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border"
-                style={{ backgroundColor: `${accent}22`, borderColor: `${accent}4d` }}
+                style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(245,158,11,0.1) 100%)', border: '1px solid rgba(6,182,212,0.25)' }}
               >
                 <KeyRound size={28} style={{ color: accent }} strokeWidth={1.75} />
               </div>
@@ -80,13 +90,15 @@ export default function ForgotPasswordPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-stack-md">
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-white/5 focus-within:ring-1" style={{ borderColor: undefined }}>
-                <Mail size={18} className="text-white/30" />
+              <div className="group flex items-center gap-3 px-4 py-3.5 rounded-xl border border-white/10 bg-white/5 transition-all duration-200 focus-within:border-[#06b6d4] focus-within:bg-[#06b6d4]/5 focus-within:ring-1 focus-within:ring-[#06b6d4]/30 hover:border-white/20">
+                <Mail size={18} className="text-white/30 transition-colors duration-200 group-focus-within:text-[#06b6d4]" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1 bg-transparent text-white text-base outline-none placeholder-white/30"
+                  autoComplete="username email"
+                  enterKeyHint="send"
+                  className="flex-1 min-w-0 bg-transparent text-white text-base outline-none placeholder-white/25"
                   placeholder={isRtl ? 'بريدك الإلكتروني' : 'Your email'}
                   dir="ltr"
                   required
@@ -94,16 +106,22 @@ export default function ForgotPasswordPage() {
                 />
               </div>
 
-              {error && <p className="text-sm text-red-400">{error}</p>}
+              {error && <p aria-live="polite" className="text-sm text-rose-300">{error}</p>}
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 rounded-2xl text-white font-bold text-base transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                style={{ backgroundColor: accent }}
+                className="relative w-full py-3.5 rounded-2xl text-white font-bold text-base tracking-wide overflow-hidden transition-all duration-200 active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06b6d4]"
+                style={{
+                  background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 50%, #0e7490 100%)',
+                  boxShadow: '0 4px 20px rgba(6,182,212,0.3)',
+                }}
               >
-                {loading && <Spinner size="sm" />}
-                {loading ? (isRtl ? 'جاري الإرسال...' : 'Sending...') : (isRtl ? 'إرسال رابط إعادة التعيين' : 'Send reset link')}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                <span className="relative flex items-center justify-center gap-2">
+                  {loading && <Spinner size="sm" />}
+                  {loading ? (isRtl ? 'جاري الإرسال...' : 'Sending...') : (isRtl ? 'إرسال رابط إعادة التعيين' : 'Send reset link')}
+                </span>
               </button>
             </form>
           </>
@@ -111,7 +129,7 @@ export default function ForgotPasswordPage() {
           <div className="text-center py-4">
             <div
               className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border"
-              style={{ backgroundColor: `${accent}22`, borderColor: `${accent}4d` }}
+              style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(245,158,11,0.1) 100%)', border: '1px solid rgba(6,182,212,0.25)' }}
             >
               <CheckCircle2 size={28} style={{ color: accent }} strokeWidth={1.75} />
             </div>
@@ -126,11 +144,12 @@ export default function ForgotPasswordPage() {
           </div>
         )}
 
-        <div className="mt-6 pt-6 border-t border-white/10 text-center">
-          <Link to={backLink} className="inline-flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors">
+        <div className="mt-6 pt-6 border-t border-white/5 text-center">
+          <Link to={backLink} className="inline-flex items-center gap-1.5 text-sm text-white/50 hover:text-[#06b6d4] transition-colors">
             <ArrowIcon size={14} />
             {isRtl ? 'العودة لتسجيل الدخول' : 'Back to sign in'}
           </Link>
+        </div>
         </div>
       </div>
     </div>
