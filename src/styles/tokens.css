@@ -23,6 +23,8 @@
    */
   --background: 42.9 25.9% 94.7%; /* #f5f3ee bone */
   --foreground: 32.7 14.7% 14.7%; /* #2b2620 warm graphite, not black */
+  /* Native chrome follows the shell: scrollbars, form widgets, date pickers. */
+  color-scheme: light;
   --card: 40 100% 98.8%;          /* #fffdf9 paper */
   --card-foreground: 32.7 14.7% 14.7%; /* #2b2620 */
   --popover: 40 100% 98.8%;       /* #fffdf9 */
@@ -53,6 +55,9 @@
   --pine: 153.3 30.3% 17.5%;     /* #1f3a2e */
   --table-fg: 31.8 13% 25.7%;    /* #4a4239 — cell body, never black */
   --table-head: 36.7 9.7% 36.5%; /* #665f54 — micro-labels, AA on the header wash */
+  /* Faint tertiary ink: hints, icons, placeholders. 3.42 on the card, so it is
+     only for non-essential type — body text keeps --muted-foreground (6.21). */
+  --ink-faint: 37.9 7.6% 50.8%;  /* #8b8478 */
 
   /* MD3-era names kept alive. `tailwind-tokens.js` still carries these as cold
      hex literals (#f9fafb/#e5e7eb/#111827…) at ~75 call sites, so re-pointing
@@ -125,6 +130,7 @@
 .dark {
   --background: 156.7 33.3% 10.6%; /* #12241d court */
   --foreground: 75 21.1% 92.5%;    /* #eef0e8 chalk */
+  color-scheme: dark;
   --card: 157.1 31.3% 13.1%;       /* #172c24 */
   --card-foreground: 75 21.1% 92.5%; /* #eef0e8 */
   --popover: 157.1 31.3% 13.1%;    /* #172c24 */
@@ -139,20 +145,24 @@
   --accent-foreground: 162.4 80.4% 10%; /* #052e22 */
   --destructive: 0 90.6% 70.8%; /* #f87171 */
   --destructive-foreground: 0 69.7% 6.5%; /* #1c0505 */
-  --border: 152.7 24.4% 17.6%;    /* #22382e */
-  --input: 152.7 24.4% 17.6%;     /* #22382e */
+  --border: 154.3 23.3% 23.5%;    /* #2e4a3e — lifted: at #22382e a card keyline
+     measured 1.18 against the surface, i.e. invisible on a projector */
+  --input: 154.3 23.3% 23.5%;     /* #2e4a3e */
   --ring: 160.1 84.1% 39.4%;   /* #10b981 */
   --surface: 157.1 31.3% 13.1%;  /* #172c24 */
   --surface-dim: 156.7 33.3% 10.6%; /* #12241d */
 
   /* Court Green reading of the shell extras. Brass lifts a step (#d8b26a) so it
      keeps contrast on the dark surface; cells stay chalk, never pure white. */
-  --hairline: 152.7 25.6% 16.9%; /* #20362c */
+  --hairline: 154.3 23.3% 23.5%; /* #2e4a3e — 1.52 against the card */
   --brass: 39.3 58.5% 63.1%;     /* #d8b26a */
-  --brass-soft: 152.7 25.6% 16.9%; /* #20362c */
+  --brass-soft: 41.8 35.4% 31.0%; /* #6b5a33 — warm hover keyline, 2.20 vs card */
   --pine: 148.6 10.8% 61.8%;     /* #93a89d — marks invert to chalk-green on dark */
   --table-fg: 75 21.1% 92.5%;    /* #eef0e8 */
   --table-head: 148.6 10.8% 61.8%; /* #93a89d */
+  --ink-faint: 140.8 12.0% 57.6%; /* #86a08f — 5.23 on the card; dark themes
+     compress the ink ladder, so faint stays AA rather than matching the
+     light-mode step-down */
 
   /* Court Green reading of the MD3-era ladder (mirrors the :root block above). */
   --surface-container-lowest: 157.1 31.3% 13.1%;  /* #172c24 */

@@ -15,6 +15,33 @@
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0,0" rel="stylesheet" />
     <title>جيم كور - GymCore ERP</title>
+    <!-- Theme boot: paint the stored preference BEFORE first paint so a dark
+         preference never flashes bone paper. Mirrors applyTheme() in
+         src/context/ThemeContext.tsx — the storage key, the `dark` class and the
+         theme-color values are the contract between the two. Default stays
+         light: the dark shell ships a group of screens at a time, so the OS
+         setting alone must never flip the app. -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('gymcore-theme');
+          if (pref !== 'light' && pref !== 'dark' && pref !== 'system') pref = 'light';
+          var dark =
+            pref === 'dark' ||
+            (pref === 'system' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', dark);
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+          if (dark) {
+            var m = document.querySelector('meta[name="theme-color"]');
+            if (m) m.setAttribute('content', '#12241d');
+          }
+        } catch (e) {
+          /* storage blocked (private mode) — light shell, no flash either way */
+        }
+      })();
+    </script>
   </head>
   <!-- bg-background reads --background from tokens.css, so the page colour BEFORE
        React mounts is the Chalk & Brass bone, not a hardcoded cool white. -->

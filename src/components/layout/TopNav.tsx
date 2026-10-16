@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { resolvePageHeading, resolvePageTitle } from './navConfig';
+import ThemeControl from './ThemeControl';
 import type { NavItem } from '../../types';
 import {
   getNotificationHistory,
@@ -163,6 +164,9 @@ export default function TopNav({ navItems }: { navItems: NavItem[] }) {
             <span className="material-symbols-outlined text-lg">language</span>
             <span>{language === 'ar' ? 'EN' : 'عربي'}</span>
           </button>
+          {/* Palette picker sits with the language toggle: both are "my view",
+              neither is a per-gym setting. */}
+          <ThemeControl />
         <div className="relative" ref={boxRef}>
           <button
             type="button"

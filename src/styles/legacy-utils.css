@@ -1,0 +1,185 @@
+/*
+ * legacy-utils.css — the bridge between the shell and the literal Tailwind
+ * colours the 60 pages still carry.
+ *
+ * WHY THIS FILE EXISTS
+ * The pre-redesign codebase paints its surfaces with raw utilities: 542
+ * `bg-white`, 656 `text-gray-900`, 896 `text-gray-500`, 487 `border-gray-100`…
+ * ~2.7k call sites in total. Converting them by hand is a month of diffs and
+ * would touch every screen the owner has already signed off, so instead:
+ *
+ *  - LIGHT MODE IS UNCHANGED except one deliberate refinement (the table-ink
+ *    block at the bottom) — these rules only ever *add* a `.dark` selector, so
+ *    the signed-off bone-paper rendering cannot regress from this file.
+ *  - DARK MODE REMAPS THE CLASS NAMES THEMSELVES. `.dark .bg-white` (0,2,0)
+ *    beats Tailwind's `.bg-white` (0,1,0) without `!important`, so a page that
+ *    still says `bg-white` gets the Court Green card, retints live, and needs
+ *    no edit. The day a screen is converted to `bg-card`, this rule simply stops
+ *    applying to it — the bridge is self-clearing, not a tax.
+ *
+ * WHAT IS DELIBERATELY NOT HERE
+ *  - `text-white` (257) — that is ink on a filled action button; `--primary`
+ *    keeps white in both themes.
+ *  - Alpha overlays (`bg-white/5`, `border-white/20`, `bg-black/50`) — they are
+ *    translucency by design and read correctly over a dark surface.
+ *  - `dark:` variants written by other components — those win on specificity
+ *    parity by being last; nothing here fights them.
+ *
+ * Escape hatches: a surface that must stay literal in dark mode can be marked
+ * `no-shell-bridge` and opted out per-element, or the whole rule can be deleted
+ * with the page conversion that replaces it.
+ */
+
+/* ── Grays → shell surfaces ─────────────────────────────────────────────── */
+.dark .bg-white              { background-color: hsl(var(--card)); }
+.dark .bg-gray-50            { background-color: hsl(var(--muted)); }
+.dark .bg-gray-100           { background-color: hsl(var(--surface-container)); }
+.dark .bg-gray-200           { background-color: hsl(var(--surface-container-high)); }
+.dark .bg-gray-900           { background-color: hsl(var(--surface-container-high)); }
+.dark .bg-gray-300           { background-color: hsl(var(--surface-container-highest)); }
+.dark .bg-gray-400,
+.dark .bg-gray-500           { background-color: hsl(var(--outline)); }
+.dark .bg-slate-100          { background-color: hsl(var(--surface-container)); }
+
+.dark .border-gray-50,
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300,
+.dark .border-gray-600,
+.dark .border-slate-100,
+.dark .border-slate-200      { border-color: hsl(var(--border)); }
+.dark .border-gray-700       { border-color: hsl(var(--outline)); }
+
+.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(var(--border)); }
+
+.dark .ring-gray-900          { --tw-ring-color: hsl(var(--border)); }
+
+.dark .placeholder-gray-400::placeholder { color: hsl(var(--ink-faint)); }
+
+/* Ink ladder: the shell compresses in dark mode, so several literal steps share
+   two tokens. Faint keeps AA (5.23 on the card) rather than a visual match
+   with the light-mode step-down, which would be unreadable here. */
+.dark .text-gray-900,
+.dark .text-gray-800          { color: hsl(var(--foreground)); }
+.dark .text-gray-700,
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-slate-600,
+.dark .text-slate-500         { color: hsl(var(--muted-foreground)); }
+.dark .text-gray-400,
+.dark .text-gray-300,
+.dark .text-slate-400         { color: hsl(var(--ink-faint)); }
+.dark .text-slate-100         { color: hsl(var(--foreground)); }
+
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-gray-100:hover { background-color: hsl(var(--surface-container)); }
+.dark .hover\:bg-white:hover    { background-color: hsl(var(--surface-container-high)); }
+.dark .hover\:border-gray-200:hover,
+.dark .hover\:border-gray-300:hover { border-color: hsl(var(--outline)); }
+.dark .hover\:text-gray-900:hover { color: hsl(var(--foreground)); }
+
+/* ── Semantic accents → the series ladder ─────────────────────────────────
+   Pastel chips (`bg-emerald-50` + `text-emerald-600`) are the one pattern that
+   genuinely breaks in dark mode: pale fill with dark-green ink. They map to the
+   same series hue the charts and KPI chips already use, so a status pill and
+   its chart agree. Filled actions (`bg-emerald-600`) are left alone — those
+   are the tenant's primary colour, and `--primary` is emerald in both themes. */
+.dark .bg-emerald-50,
+.dark .bg-emerald-100,
+.dark .bg-green-50,
+.dark .bg-green-100,
+.dark .bg-green-200          { background-color: hsl(var(--series-3) / 0.18); }
+.dark .text-emerald-600,
+.dark .text-emerald-700,
+.dark .text-green-600,
+.dark .text-green-700,
+.dark .text-green-800        { color: hsl(var(--series-3)); }
+.dark .border-emerald-100,
+.dark .border-emerald-200,
+.dark .border-green-200,
+.dark .border-green-300      { border-color: hsl(var(--series-3) / 0.4); }
+
+.dark .bg-red-50,
+.dark .bg-red-100,
+.dark .bg-rose-50,
+.dark .bg-rose-100           { background-color: hsl(var(--series-6) / 0.18); }
+.dark .text-red-500,
+.dark .text-red-600,
+.dark .text-red-700,
+.dark .text-rose-500,
+.dark .text-rose-600,
+.dark .text-rose-700         { color: hsl(var(--series-6)); }
+.dark .border-red-200,
+.dark .border-rose-100,
+.dark .border-rose-200       { border-color: hsl(var(--series-6) / 0.4); }
+
+.dark .bg-amber-50,
+.dark .bg-amber-100,
+.dark .bg-orange-50,
+.dark .bg-orange-100,
+.dark .bg-yellow-100         { background-color: hsl(var(--series-1) / 0.18); }
+.dark .text-amber-600,
+.dark .text-amber-700,
+.dark .text-orange-500,
+.dark .text-orange-600,
+.dark .text-orange-700,
+.dark .text-yellow-700,
+.dark .text-yellow-800       { color: hsl(var(--series-1)); }
+.dark .border-orange-100,
+.dark .border-orange-200,
+.dark .border-orange-300     { border-color: hsl(var(--series-1) / 0.4); }
+
+.dark .bg-sky-50,
+.dark .bg-sky-100,
+.dark .bg-blue-50,
+.dark .bg-blue-100,
+.dark .bg-cyan-50            { background-color: hsl(var(--series-8) / 0.18); }
+.dark .text-sky-700,
+.dark .text-sky-600,
+.dark .text-blue-600,
+.dark .text-blue-700,
+.dark .text-cyan-600,
+.dark .text-indigo-700       { color: hsl(var(--series-8)); }
+
+.dark .bg-violet-50,
+.dark .bg-violet-100,
+.dark .bg-purple-50,
+.dark .bg-purple-100,
+.dark .bg-indigo-50          { background-color: hsl(var(--series-2) / 0.18); }
+.dark .text-violet-600,
+.dark .text-violet-700,
+.dark .text-purple-600,
+.dark .text-purple-700,
+.dark .text-purple-800       { color: hsl(var(--series-2)); }
+.dark .border-violet-100,
+.dark .border-violet-200,
+.dark .border-purple-200     { border-color: hsl(var(--series-2) / 0.4); }
+
+/* Arbitrary hex the Aceternity copies and the old MD3 palette left behind. */
+.dark .text-\[\#584237\],
+.dark .text-\[\#121c2a\]     { color: hsl(var(--foreground)); }
+.dark .border-\[\#d9e3f6\]   { border-color: hsl(var(--border)); }
+
+/* ── Glass / glow live in index.css and are retinted there ───────────────── */
+
+/*
+ * ── Table ink, both themes ────────────────────────────────────────────────
+ * The shell rule `table:not(.no-shell-ink) { color: … }` only reaches cells that
+ * inherit. 27 tables pin `text-gray-900` (#111827) on the <td> itself, and a
+ * utility on the cell outranks the inherited colour — which is exactly the
+ * near-black body text in grids that started this redesign. This block pins the
+ * two literal utility names to `--table-fg` *inside a table only*, at
+ * specificity (0,2,1) / (0,3,1), so:
+ *   - outside a table, `text-gray-900` still means foreground ink;
+ *   - emphasis written with a token class (`text-primary`, `text-series-4`) is
+ *     never flattened, because those rules are not in this file;
+ *   - a table can opt out with className="no-shell-ink".
+ */
+table:not(.no-shell-ink) .text-gray-900,
+table:not(.no-shell-ink) .text-gray-800 { color: hsl(var(--table-fg)); }
+.dark table:not(.no-shell-ink) .text-gray-900,
+.dark table:not(.no-shell-ink) .text-gray-800 { color: hsl(var(--table-fg)); }

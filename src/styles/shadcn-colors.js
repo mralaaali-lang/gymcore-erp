@@ -34,6 +34,9 @@ export const shadcnColors = {
   pine: v('pine'),
   'table-fg': v('table-fg'),
   'table-head': v('table-head'),
+  // Tertiary ink for hints/placeholder icons — AA in both themes, but reserved
+  // for non-essential type (body text stays `muted-foreground`).
+  'ink-faint': v('ink-faint'),
 
   // Data-series ladder: utilities for DOM chips (`bg-series-3/15`), and the
   // single source apexcharts reads through `chartTheme.ts`.
