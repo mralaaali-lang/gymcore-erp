@@ -158,7 +158,14 @@ grep -rl "fixed inset-0" src/pages | wc -l ; grep -ro "fixed inset-0" src/pages 
 دي شاشة ملء الشاشة (`fixed inset-0 bg-gray-100` + هيدر sticky + عمود `max-w-2xl` + ~15 تحكم + مسار
 فلس «حفظ وطباعة الفاتورة»)، وتحويلها على `size="xl"` (42rem) هيفضّل قرار مالك مش إعادة تنسيق صامتة
 (§51 ز/يا). فالمتبقي من الترتيب ده بقى `super-admin/contracts/ContractDetailModal` و`ContractFormModal`
-و`BillingEngine` و`TenantDirectory` و`PlatformAdmins` و`PlatformMarketing`.
+و`TenantDirectory` و`PlatformAdmins` و`PlatformMarketing`.
+**تصحيح مقاس في §53:** السطر ده وقت كتابته كان مدرّج `BillingEngine` ضمن المتبقي، والقياس بـ`git grep`
+يرفض ده — `BillingEngine.tsx` مستخدِم `shared/Modal` فعلًا من قبل الموجة دي (سطر 27 + سبع لوحات في
+1187·1250·1427·1506·1795·1891) وفيه **0** `fixed inset-0`. المتبقي الحقيقي مقاس بعد دفعة 4 = **23 ملفًا /
+30 موضعًا** في `src/pages`، منها `gym-admin` **19/24** و`super-admin` **4/6**: `AddGymModal` (1) ·
+`PlatformAdmins` (2) · `PlatformMarketing` (1) · `TenantDirectory` (2).
+(الخطأ ده كان متعارض مع جدول الأساس نفسه في §1 اللي سجّل `shared/Modal` مستخدَم في **3** ملفات
+«ومنها `BillingEngine`» — فالتناقض كان في السرد مش في القياس.)
 
 **الحالة بعد دفعة 3 (2/ اتنين، §52):** `store/PurchasesPanel` → `Modal size="xl"` و`store/SuppliersPanel`
 → `Modal size="lg"`، والقياس الحيّ على `scratch/w3c` (اتمسح) طلع تكافؤ عقد كامل (672px و512px،
@@ -172,11 +179,34 @@ grep -rl "fixed inset-0" src/pages | wc -l ; grep -ro "fixed inset-0" src/pages 
 برّة الـdialog وهي جداول اللوحتين نفسها (`div.bg-white.rounded-3xl.border` = 516px، `table` = 474px)
 → ده بند **موجة 4** (الجداول على `DataTable`) و**موجة 5** (الألوان الحرفية)، ما يتحسبش على الموجة دي.
 
+**الحالة بعد دفعة 4 (2/ اتنين، §53):** `super-admin/contracts/ContractFormModal` → `Modal size="xl"`
+و`ContractDetailModal` → `Modal size="xl" className="max-w-4xl"`، والقياس الحيّ طلع تكافؤ كامل:
+**672px / 672px / 896px** بـ`centreDelta [0,0]` وradius 10px وحدّ `rgb(239,233,221)` وخلفية
+`rgb(255,253,249)` وحشو 24px و`maxHeight 868px`، و**مسارات قفل 7/7** مع فوكس راجع للفاتح، و`dir`
+بمصفوفة أربع حالات (ar/en × `<html dir>` ملزوق) واحتباس Tab = **صفر خروج** من 26 ضغطة على ثلاث لوحات.
+نقطة قرار: لو `size="xl"` اتحطّ لوحده كان بانل التفاصيل تقليّص من 896 لـ672 — يعني **إعادة تصميم
+داخل دفعة تحويل** — فتم الحفاظ على العقد بـ`className="max-w-4xl"` (`tailwind-merge` بيقدّم
+`max-w-*` على `size`). `disableDismiss` اتقاس على **POST حقيقي** (`/platform/billing/contracts`)
+نافذته 2203ms: اللوحة مقفولة في 140/140 عيّنة، Escape عند 619ms **مرفوض**، والزرار اتفعّل عند
+2271ms — والكتابة صفر متثبتة على مستوى الصفوف (الحارس `server/src/routes/platform.ts:128-132`:
+`platform_contracts=11` · `platform_contract_addons=2` · `billing_invoices=140` · صف جديد بعد
+14:00 UTC = 0 في خمسة جداول). المؤشر بعد الدفعة: `src/pages` **23 / 30** (`src/**` **28/36**).
+**معلَن للمتابعة:** جداول البنود/الفواتير جوّة `ContractDetailModal` ما اتقاستش على 390 — اللوحة
+بلا جلسة platform بترجع `isError` (184px / تحكّم واحد)، ومسارات النجاح (تجديد/إصدار/إلغاء/بنود)
+محتاجين نفس الجلسة؛ فالمتبقي من الموجة دي **مقاس** بعد دفعة 4: `src/pages` **23 / 30** — `gym-admin`
+**19/24** و`super-admin` **4/6** (`AddGymModal` · `PlatformAdmins` · `PlatformMarketing` ·
+`TenantDirectory`)، و**`BillingEngine` مش فيهم** (مقاس: مستخدِم `shared/Modal` من قبل الموجة، 0 مواضع).
+المتبقي بيستنى بوابة المالك «رجّع tenant حيّة». وبوابتان جديدتان
+اتفتحتا من القياس: **عرض زرار X بتاع القشرة 26px** (`shadcn/dialog.tsx:66` — ملف واحد = كل المودالات)
+و**6/11 حقل بلا اسم متاح** في استمارات العقد (نمط `LABEL_CLASS` من غير `htmlFor` في المنتج كله).
+
 **منهجية من دفعة 3 بتسري على كل قياس جاي (§52 ط):** (1) أي أمر CDP لازم يخلص بـtimeout — أمر
 `Emulation` اللي ما بيردّش علّق الطلق 13 دقيقة؛ (2) تحت `pointer: coarse` مؤشرات
 `Input.dispatchMouseEvent` ما بفتحتش المودال — الفتح بـ**Enter موثوق** على الزرار المركَّز؛
-(3) ما تربطش regex زرار الحفظ بـ`^…$` لأن الـspinner بيدخل جوه أول ما الـmutation تطلع
-(`«progress_activity إضافة»`) فالمطابقة المثبّتة بتبلّغ «نافذة pending فاضية» وهي كدابة؛
+(3) ما تربطش regex زرار الحفظ بـ`^…$` — ولا حتى بنص جزئي — لأن النص نفسه بيتحوّل أول ما
+الـmutation تطلع (`«progress_activity إضافة»` في §52, و«جارٍ الحفظ...» في §53 فمطابقة
+`/إبرام|Sign/` رجّعت `null` والعيّنات اتسجّلت `{txt:null,dis:null}`): **المقياس الصحيح حالة
+الزرار (آخر زرار في الفوتر) مش نصّه**، وده اللي بلّغ «Escape مرفوض عند 619ms» في §53;
 (4) شدّ `Fetch` ما يشتغلش إلا لو الراية اتشغّلت **قبل** الضغط؛ (5) أي «فشل وصول» في عدّادي
 يتشخّص بطلقة مخصصة قبل ما يننسَب للتطبيق (في §52 كان سببه `ENTER()` بدل `ESC()` في جدول المسارات).
 (6) **ستاجنج الملفات المشتركة:** `git add` لملف مشترك كامل بياخد معاه شغل الجلسات التانية
@@ -185,9 +215,15 @@ grep -rl "fixed inset-0" src/pages | wc -l ; grep -ro "fixed inset-0" src/pages 
 البروتوكول من هنا: بلوك الجلسة + `git show HEAD:<file>` → `git hash-object -w --stdin` →
 `git update-index --cacheinfo`، و`grep -c '^## §'` + `git diff --cached | grep` على علامات الجلسات
 التانية قبل كل commit، والتحقق إن الشجرة لسه فيها شغل الغيرين (`MM` في `git status`).
+(7) **ممنوع `String.prototype.replace` في تعديل الوثايق:** الـreplacement string بيفسّر `` $` `` و`$'`
+و`$&` كرموز مرجعية، فنص عربي أو كود فيه `` `^…$` `` بيلصق **نسخة كاملة من المستند** في منتصف السطر.
+ده **صار فعلًا** وقت §53: سكربت تصحيح بلع 215 سطرًا مكررًا وقطع عنوان «# خطة الفورنت-إند الكاملة» في
+الجوه. البروتوكول: `split(from).join(to)` أو أداة التحرير الحرفية، وبعدها `wc -l` + `grep -c '^# '`
+مقابل `git show HEAD:<file>`. لو الملف اتخرّب، إعادة البناء من `HEAD` + لصقات حرفية أأمن من الترقيع
+— والتحقق إن أسطر الشجرة اللي بقت لوحدها ملك الجلسة نفسها قبل الاستبدال.
 
 الهدف: تصفير `fixed inset-0` اليدوي في `src/pages` على `shared/Modal`.
-الترتيب (بدايةً من اللي هتنزلها موجة 4 و5 نفس الجلسة): `EditMemberModal` · `ImportMembersModal` · `subscriptions/AddSubscription` · `subscriptions/EditSubscription` · `team/StaffDirectory` · `store/PurchasesPanel` · `store/SuppliersPanel` — بعدين `super-admin/contracts/ContractDetailModal` و`ContractFormModal` و`BillingEngine` و`TenantDirectory` و`PlatformAdmins` و`PlatformMarketing`.
+الترتيب: `EditMemberModal` · `ImportMembersModal` · `subscriptions/EditSubscription` · `team/StaffDirectory` · `store/PurchasesPanel` · `store/SuppliersPanel` · `super-admin/contracts/ContractDetailModal` · `ContractFormModal` (**اتحوّلوا وقاسوا حيًّا — §49 §51 §52 §53**) و`subscriptions/AddSubscription` **مُرجَّع للمالك (D9)** — فالمتبقي **المقاس** = `super-admin/{AddGymModal,PlatformAdmins,PlatformMarketing,TenantDirectory}` (4 ملفات / 6 مواضع) + `gym-admin` (19 / 24)؛ و`BillingEngine` **مش مطلوب** لأنه على `shared/Modal` أصلًا (0 مواضع — تصحيح §53).
 الحاجة: كل مودال بيتحوّل = **مطابقة العقد القديم** (sizes 24/28/32/42rem) + `disableDismiss={busy}` لو فيه mutation + أزرار الأكشن برا `<form>` بـ`form="id"`.
 الخطورة: **متوسطة** (فخّ الـ`animate-out` في الـviewport بلا سطح — §6 بند 13 من الـhandover).
 بوابة القبول: لكل دفعة (3–5 ملفات): `tsc` + build + فتح/إغلاق حقيقي بالمتصفح بالـ`setTimeout` مش rAF + `role=dialog` مقروب + صفر `fixed inset-0` في الملفات المتحوّلة.

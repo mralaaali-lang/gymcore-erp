@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, ArrowsClockwise as RefreshCw, Receipt, Prohibit as Ban, Pencil, Plus, CheckCircle as CheckCircle2, FileText } from '@phosphor-icons/react';
+import { ArrowsClockwise as RefreshCw, Receipt, Prohibit as Ban, Pencil, Plus, CheckCircle as CheckCircle2 } from '@phosphor-icons/react';
 import { useToast } from '../../../context/ToastContext';
+import Modal from '../../../components/shared/Modal';
 import { useApiQuery } from '../../../hooks/useApiQuery';
 import {
   getContractFull,
@@ -132,31 +133,31 @@ export default function ContractDetailModal({ contractId, isRtl, t, onClose, onE
     onError: (e) => { setActionError(apiError(e)); },
   });
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} dir={isRtl ? 'rtl' : 'ltr'}>
-        <div className="flex items-center justify-between p-6 border-b border-gray-100 sticky top-0 bg-white rounded-t-3xl z-10">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0">
-              <FileText size={20} className="text-emerald-600" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-lg font-bold text-gray-900 truncate">
-                {contract ? `${contract.gym_name} — ${contract.plan_name}` : t('Contract details', 'تفاصيل العقد')}
-              </h2>
-              <p className="text-xs text-gray-400 truncate" dir="ltr">{contract?.subdomain}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 transition-colors shrink-0" aria-label="close">
-            <X size={18} className="text-gray-400" />
-          </button>
-        </div>
+  // موجة 3 / دفعة 4: نفس عرض اللوحة (max-w-4xl = size="xl" + className="max-w-4xl"
+  // لأن `Modal` بيوحّد `max-w-*` بـtailwind-merge) ونفس القراءة ونفس الأكشنات السبعة.
+  // الطبقة الثابتة والـscrim وزرار X والهيدر Sticky بقوا شغل القشرة، والارتفاع
+  // من `max-h-[92vh]` لـ`calc(100dvh-2rem)` (قيمة القشرة). الحبس محبوس لأي
+  // mutation من الستة الجايين.
+  const anyPending =
+    renewMut.isPending || issueMut.isPending || cancelMut.isPending ||
+    addItemMut.isPending || cancelItemMut.isPending || paidMut.isPending;
 
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="xl"
+      className="max-w-4xl"
+      dir={isRtl ? 'rtl' : 'ltr'}
+      disableDismiss={anyPending}
+      title={contract ? `${contract.gym_name} — ${contract.plan_name}` : t('Contract details', 'تفاصيل العقد')}
+      description={contract?.subdomain ? <span dir="ltr">{contract.subdomain}</span> : undefined}
+    >
         {isLoading && <div className="p-10 text-center text-sm text-gray-400 animate-pulse">{t('Loading contract...', 'جارٍ تحميل العقد...')}</div>}
         {isError && <div className="p-10 text-center text-sm text-red-500">{t('Failed to load contract', 'فشل تحميل العقد')}</div>}
 
         {contract && (
-          <div className="p-6 space-y-6">
+          <div className="space-y-6">
             {/* ═══ ملخص العقد ═══ */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
@@ -373,7 +374,6 @@ export default function ContractDetailModal({ contractId, isRtl, t, onClose, onE
             </p>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

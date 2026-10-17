@@ -29,7 +29,8 @@ export interface ModalProps {
    *
    * The panel is portalled to `<body>`, so the only thing that would otherwise
    * decide its direction is `<html dir>` — document state this component does
-   * not own. Measured in Chromium on 2026-10-17 (LOCAL_TESTING_REPORT §50): with
+   * not own. Measured in Chromium on 2026-10-17 (LOCAL_TESTING_REPORT §51, re-run as
+   * a four-row ar/en × forced-`<html dir>` matrix in §53): with
    * `<html dir="ltr">` forced while the app language was still `ar`, the panel
    * kept `direction: rtl` and `dir="rtl"` because of this prop; omit it and the
    * same panel flips with the document.
