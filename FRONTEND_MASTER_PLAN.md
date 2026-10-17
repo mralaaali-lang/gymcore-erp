@@ -46,7 +46,7 @@
 | توزيع الدين | gym-admin **1951** · super-admin **1637** · trainer 162 · dashboards 110 · settings 103 · auth 100 · components/dashboard 69 · player 43 · attendance 32 · layout 31 · ui 25 · auth comps 23 · marketing comps 22 · shared 11 · charts 8 · shadcn 3 |
 | أسوأ الملفات | `BillingEngine` 176 · `TenantDirectory` 119 · `CashboxShiftsPage` 116 · `CashboxPage` 105 · `PlatformReports` 97 · `OnboardingWizard` 95 |
 | جداول مكتوبة يدويًا | **49 صفحة جسدها `<table>` يدوي بالكامل** + 4 صفحات محوّلة فيها جدول تاني يدوي (`Payments`/`Expenses`/`MembersReport`/`Cashbox`) — مقابل `DataTable` في **9** صفحات بس |
-| منبثقات `fixed inset-0` يدوي | **32 ملف / 41 موضعًا** — مقابل `shared/Modal` في 14 ملف |
+| منبثقات `fixed inset-0` يدوي | **34 ملفًا / 41 موضعًا** (معاد قياسه 11:18 على `ace9306` — كان 32/41، والزيادة ملفين من شغل موازي) — و`shared/Modal` مستخدَم فعلًا في **3** ملفات بس (`CashboxPage` · `HrMainPage` · `BillingEngine`) وكلها بره الـ34 |
 | حقول الإدخال | 475 موضع `input/select/textarea` في `src/pages` — و**9 صفحات بس** فيها 10 حقول أو أكتر |
 | i18n | `ar.json`/`en.json` = 7 مفاتيح عليا / **218 ورقة لكل ملف** · **124 ملف** بيستخدم ternary `language === 'ar'` · **11 ملف** بس `useTranslation` |
 | الوصولية | `aria-*` 98 موضع في 47 ملف · `focus-visible` في 9 ملفات · `outline-none` في **75** ملف و`focus:ring` في 69 — **15 ملف بيطفّوا الفوكس من أي بديل** (كل شاشات الـauth + 4 مكوّنات shadcn) · **63 `<div onClick>`** · `prefers-reduced-motion` **صفر** · `@container` **صفر** · 7 من 12 `<img>` بلا `alt` |
@@ -141,7 +141,7 @@ CDP (المتصفح المدمج ما بيرفعش أحداث كيبورد وه�
 الحجم: commit واحد للموجة (`22f59dd`) + commit تاني للتحقق الحيّ والإصلاح اللي طلع منه
 (الموجة ما اتقسمتش أكتر من كده).
 
-### موجة 3 — المنبثقات المتبقية (32 ملف / 41 موضع)
+### موجة 3 — المنبثقات المتبقية (34 ملفًا / 41 موضعًا — معاد قياسه 11:18 على `ace9306`)
 
 الهدف: تصفير `fixed inset-0` اليدوي في `src/pages` على `shared/Modal`.
 الترتيب (بدايةً من اللي هتنزلها موجة 4 و5 نفس الجلسة): `EditMemberModal` · `ImportMembersModal` · `subscriptions/AddSubscription` · `subscriptions/EditSubscription` · `team/StaffDirectory` · `store/PurchasesPanel` · `store/SuppliersPanel` — بعدين `super-admin/contracts/ContractDetailModal` و`ContractFormModal` و`BillingEngine` و`TenantDirectory` و`PlatformAdmins` و`PlatformMarketing`.

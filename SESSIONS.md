@@ -16,6 +16,14 @@
 **المالك = C** للنشر: `git push` و`railway up` قرارين منفصلين وكل واحد بأمر صريح منه (راجع
 `AGENT_HANDOVER.md` §6د و§6ز). مفيش جلسة تانية تدفع أو تنشر.
 
+**تسجيل إسناد (المالك، 2026-10-17 — بأمر صريح: «هنطبق الكلام دا وهتبقا انتا الفرونت-إند
+والدمج + التحقق الحيّ»):** جلستا **A** و**C** اتوكّلوا لنفس الجلسة (المحادثة دي). فالملكيتين
+اتحدّتوا في إيد واحدة، والحدود بتتقرى كده: شغل الفرونت (`src/**`) بشروط A، والصور والحزم
+والوثايق والتحقق الحيّ بشروط C، و`server/src/**` و`server/tests/**` وmigrations `081–099`
+لسه لجلسة **B** وحدها. لما نفس الجلسة تشتغل بصفة C على `docker compose build` ده مش خرق
+لسطر A — ده دورها المعلَن؛ والواجب المقابل: إعلان أي ملفات غير مدفوعة اتخبّزت في الصورة كل
+بناء، وعدم لمس شجرة B وقت الشغل بصفة A. القياسات والتفاصيل في `LOCAL_TESTING_REPORT.md` §47.
+
 ---
 
 ## 2) الملفات الساخنة (مالك واحد، والباقي يقترح)
@@ -155,3 +163,15 @@ docker compose build frontend backend && docker compose up -d backend frontend
 > `docker-compose.yml` والـDockerfiles و`package.json` والوثايق الثلاثة وmigrations `100+`.
 > شغلك: قياس حيّ على `:9100` و`:9000` بنفسك، مراجعة كل milestone قبل الدمج، وتنفيذ أمر المالك
 > للدفع/النشر بس. كل إعادة بناء صور تُعلن فيها أي ملفات غير مدفوعة دخلت الصورة.
+
+**للجلسة A+C (الأسناد الجاري — 2026-10-17):**
+> أنت **A + C** في GymCore ERP. اقرأ `SESSIONS.md` كامل ثم skill `gymcore-shell` ثم
+> `AUDIT_REPORT_2026-10-17.md` §10 و§11. ملكيتك = نطاق A (`src/pages|components|styles|hooks`
+> + `src/services/api.ts` و`src/routes/index.tsx` وتوكنات اللون) **زائد** نطاق C
+> (`docker-compose.yml`، الـDockerfiles، `package.json` والـlockfiles، `TODO.md` و
+> `AGENT_HANDOVER.md` و`LOCAL_TESTING_REPORT.md` إضافةً فقط، `server/migrations/100+`).
+> ممنوع `server/src/**` و`server/tests/**` وmigrations `081–099`. طقس A: `npx tsc --noEmit -p
+> tsconfig.json` = 0 ثم `npx vite build` ثم `audit-shell-colors.mjs` ثم قياس حيّ على
+> `127.0.0.1:9100`. طقس C قبل أي add: `git status --short` + `git log --oneline -3` (HEAD
+> بيتحرّك)، تجزئة إلزامية لو الملف فيه تعديل جلسة تانية، وإعلان صريح لأي شجرة غير مدفوعة
+> اتخبّزت في صورة. الدفع والنشر بأمر المالك لوحده، وكل مرة بأمر جديد.

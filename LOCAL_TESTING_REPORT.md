@@ -3372,3 +3372,74 @@ first-gym` حالتها `is_active = f, tenant_status = active, deleted = t`. ي
 واحد في البند فوق)، و`gyms` ما اتلمستش. التحقق اللي كان مفروض يتعمل جوه التطبيق اتعمل على
 `/login` الحقيقية + مكوّنات المنتج الحقيقية في harness، والفرق المتبقي (skip link جنب
 الـSidebar) معلَن.
+
+---
+
+## §47 — اعتماد بروتوكول `SESSIONS.md`: نفس الجلسة = **A (الفرونت-إند) + C (الدمج والتحقق الحيّ)** (2026-10-17)
+
+**الأمر:** المالك — «هنطبق الكلام دا وهتبقا انتا الفرونت-إند والدمج + التحقق الحيّ».
+**المصدر:** `SESSIONS.md` §1 و§2 و§5 و§6 و§8 (اتعتمد في commit `ace9306`).
+
+**الملكيات بعد الاعتماد (مقيسة من `SESSIONS.md` §1/§2):**
+
+- **A:** `src/pages/**` · `src/components/**` · `src/styles/**` · `src/hooks/**` + الملفات
+  الساخنة `src/services/api.ts` و`src/routes/index.tsx` و`src/styles/tokens.css` و
+  `tailwind-tokens.js` و`shadcn-colors.js`. السطح: Vite على `http://127.0.0.1:9100`.
+- **C:** `docker-compose.yml` · `Dockerfile` · `server/Dockerfile` · `package.json` و
+  `server/package.json` والـlockfiles · الوثايق المشتركة (add-only) · `server/migrations/100+`.
+- **مش ليّا:** `server/src/**` و`server/tests/**` وmigrations `081–099` (جلسة B). أي endpoint
+  جديد أو schema جديد يتكتب في الشات ويُحوَّل لـB.
+- **الدفع والنشر:** `git push` و`railway up` أمرين منفصلين بأمر صريح لكل مرة — وده شغلي كـC
+  بس بعد الأمر، ومش جزء من طقس أي دفعة.
+
+**تأثير الدمج:** الجلسة الواحدة بتبقى A وC معًا، فمنع «ممنوع تلمس `docker-compose.yml` والصور»
+الخاص بـA بيطبَّق وقت الشغل بصفة A بس؛ ولما نفس الجلسة تشتغل بصفة C على الصور والحزم ده شغلها
+المعلَن — وكل `docker compose build` يُعلن فيه أنه خبّز شجرة عمل فيها ملفات جلسة تانية
+(الحالة دي موجودة حاليًا، تحت).
+
+**خط الأساس المُقاس على الشجرة الحالية (قبل أي شغل A):**
+
+| الفحص | الأمر | الناتج |
+|---|---|---|
+| أنواع الواجهة | `npx tsc --noEmit -p tsconfig.json` | **0** أخطاء (`noUnusedLocals` مفعّل) |
+| بناء الإنتاج | `npx vite build` | ✓ **5.79s** — `index-BYpuf07M.js` **902.57KB** (271.12 gzip) · `Chart` **808.55** (230.41) · `csv` **425.33** (142.27) · `CheckInCard` 147.63 · `MemberProfileView` 107.48 · `BillingEngine` 80.69 |
+| ألوان الصدفة | `node .qoder/skills/gymcore-shell/scripts/audit-shell-colors.mjs --counts` | **4275** finding في **152** ملفًا من 215 · 397 class مختلف · top: `text-gray-500` 797 · `text-gray-900` 605 · `bg-white` 515 · `border-gray-100` 465 · `bg-gray-50` 368 |
+| المنافذ | `curl` على `127.0.0.1` | `:9100` = **200** · `:9000` = **200** · `:4000/health` = **200** |
+| git | `git log --oneline -1` · `git rev-list --count origin/main..HEAD` | HEAD = **`ace9306`** · غير مدفوع = **9 عملات** |
+
+**لمحة عن الأرقام اللي تحرّكت:** أحجام الـchunks رجعت لـ**902/808/425** بعد ما كانت متقاسة
+**887/789/415** الساعة 10:37 — الفرق راجع لشغل الفرونت غير المؤدَّم اللي في الشجرة (تحت)،
+و`§10` و`P1#7` في `AUDIT_REPORT_2026-10-17.md` اتحدثّوا بالرقم الجديد في نفس الدور.
+
+**معلَن — شغل غير مؤدَّم في الشجرة (معدود 11:22):** جلسة B عليها **11** ملف `server/src/**`
+معدّل + **2** ملفات جديدة غير متتبَّعة (`server/migrations/081_scrub_onboarding_data_secrets.sql`
+· `server/src/utils/scrubSecrets.ts`) — لأسامهم بيدلّوا على بند §34ج-أ (تنقية
+`platform_admins.onboarding_data`)، و**ما قريتهومش** لأن سياسة الاعتماديات فوق كل اعتبار.
+و`git status --short` بيّن تلات ملفات في نطاق A عليها تعديلات من جلسة تانية ومش مؤدَّمة:
+
+- `src/context/ToastContext.tsx` — +50/−25 سطر (ترحيل `sonner` ورا `showToast` = بند #3 في
+  متتبع الموجات، متسلَّم لجلسة تانية من قبل).
+- `src/routes/index.tsx` — +6/−2: حذف إعلان `/admin/reports/subscriptions` المكرر، وإزالة
+  `Navigate` من `/admin/hr` كان بيحجب `HrMainPage` للأبد (React Router بياخد أول مطابقة).
+- `src/pages/settings/SettingsPage.tsx` — −3 سطور.
+
+البروتوكول §5/§6 بيمنعني أعمل `git add` على ملف فيه تعديلات جلسة تانية، وأمنع `git stash` أو
+`checkout --` على مش ملفي — فالشغل ده **سايب زي ما هو** لحد المالك يقول: إما الجلسة دي
+تخلّصه وتؤدّمه باسمها، أو أنا بصفة الدمج (C) أراجعه وأؤدّمه كـmilestone متحقق. **الأهم:**
+`npx tsc` و`vite build` فوق اتقاسوا على الشجرة دي بحالتها — فالأرقام مش نقيّة لحد ما المسألة تُحسم.
+
+**معلَن تاني:** `report-site/` (غير متتبَّع، 3 ملفات: `index.html` · `serve.cjs` · `steps.json`)
+مش من الجلسة دي ولا من أي commit — جردته بـ`ls` بس، وما اتلمستش.
+
+**معلَن تالت — استعداد موجة 3 (النطاق أُعيد عدّه قبل البدء):** `fixed inset-0` يدوي في
+**34 ملفًا / 41 موضعًا** (بعد استثناء `src/components/shadcn/dialog.tsx` لأنه الأصل،
+و`src/components/shared/Modal.tsx` لأن موضعها سطر تعليق في الوثاقي مش كود) — كان متسجل
+32/41 في `FRONTEND_MASTER_PLAN.md`، فالزيادة ملفين من شغل موازي. والأهم: **صفر** ملف من
+الـ34 بيستورد `shared/Modal` حاليًا (`comm -12` على القائمتين = 0)، والمستخدمين التلاتة
+الحاليين (`CashboxPage` · `HrMainPage` · `BillingEngine`) كلها بره النطاق — يعني كل تحويل
+داخل الموجة دي داخل عليه الحبس + استرجاع الفاتح بعقد `78718c2` مرة واحدة، ومفيش ملف هيتم
+لمسه مرتين.
+
+**الوثايق اللي اتحدّثت في الدور ده (add-only، بروتوكول §5):** `SESSIONS.md` §1 (تسجيل
+الإسناد)، `TODO.md` سطر 2026-10-17، `LOCAL_TESTING_REPORT.md` (البند ده)،
+`AUDIT_REPORT_2026-10-17.md` §10 (عدد العملات غير المدفوعة).
