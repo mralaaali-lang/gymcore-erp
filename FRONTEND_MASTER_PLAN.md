@@ -148,14 +148,29 @@ CDP (المتصفح المدمج ما بيرفعش أحداث كيبورد وه�
 كانت بتقول 34/41 و9 قبل كده ما بقيتش متطابقة مع التعريف ده — الأرقام فوق من `git grep` على نفس
 الـglob، تتعاد قبل أي دفعة.
 
+**الحالة بعد دفعة 2 (3/ تلاتة، §51):** `ImportMembersModal` · `subscriptions/EditSubscription` ·
+`team/StaffDirectory` اتحوّلوا واتقاسوا حيًّا على الـharness (`scratch/w3b`، اتمسح) → المتبقي
+`src/pages` **27 ملفًا / 34 موضعًا** (`src/**` **32/40**)، مقاس بالأمر اللي تحت على `589eee4`+شجرة العمل:
+```bash
+grep -rl "fixed inset-0" src/pages | wc -l ; grep -ro "fixed inset-0" src/pages | wc -l ; grep -rl "fixed inset-0" src | wc -l ; grep -ro "fixed inset-0" src | wc -l
+```
+`subscriptions/AddSubscription` **اتسحبت من الدفعة بقرار معروض على المالك**: مش منبثقة متوسّطة،
+دي شاشة ملء الشاشة (`fixed inset-0 bg-gray-100` + هيدر sticky + عمود `max-w-2xl` + ~15 تحكم + مسار
+فلس «حفظ وطباعة الفاتورة»)، وتحويلها على `size="xl"` (42rem) هيفضّل قرار مالك مش إعادة تنسيق صامتة
+(§51 ز/يا). فالدُفعات الجايّة تبدأ من `store/PurchasesPanel` · `store/SuppliersPanel`.
+
 الهدف: تصفير `fixed inset-0` اليدوي في `src/pages` على `shared/Modal`.
 الترتيب (بدايةً من اللي هتنزلها موجة 4 و5 نفس الجلسة): `EditMemberModal` · `ImportMembersModal` · `subscriptions/AddSubscription` · `subscriptions/EditSubscription` · `team/StaffDirectory` · `store/PurchasesPanel` · `store/SuppliersPanel` — بعدين `super-admin/contracts/ContractDetailModal` و`ContractFormModal` و`BillingEngine` و`TenantDirectory` و`PlatformAdmins` و`PlatformMarketing`.
 الحاجة: كل مودال بيتحوّل = **مطابقة العقد القديم** (sizes 24/28/32/42rem) + `disableDismiss={busy}` لو فيه mutation + أزرار الأكشن برا `<form>` بـ`form="id"`.
 الخطورة: **متوسطة** (فخّ الـ`animate-out` في الـviewport بلا سطح — §6 بند 13 من الـhandover).
 بوابة القبول: لكل دفعة (3–5 ملفات): `tsc` + build + فتح/إغلاق حقيقي بالمتصفح بالـ`setTimeout` مش rAF + `role=dialog` مقروب + صفر `fixed inset-0` في الملفات المتحوّلة.
 **أربع حاجات طلعت من دفعة الاستكشاف وبتسري على كل دفعة جايّة (§49):**
-(أ) `dir` بقى prop في `shared/Modal` — اللوحة بتتعمل portal على `<body>` خارج `AppLayout`
-و`index.html` مثبّت `dir="rtl"`، فأي مودال في صفحة إنجليزي لازم يمرّي `dir={rtl ? 'rtl' : 'ltr'}`؛
+(أ) `dir` بقى prop في `shared/Modal` — اللوحة بتتعمل portal على `<body>` برّه أي حاوية صفحة،
+فلازم يمرّي `dir={rtl ? 'rtl' : 'ltr'}` عشان اتجاهها ما يعتمدش على `<html>`. **تصحيح premise
+(§51 د):** `index.html` مش ماسك `dir="rtl"` للأبد — `AppProvider` بيكتب `document.documentElement.dir`/`.lang`
+مع كل تغيير لغة (`src/context/GymBrandContext.tsx:103-106`، من `ccc7287`)، فالواجهة الإنجليزيّة
+بتعيد تلوين اللوحة Portaled لوحدها. مقياس المismatch (لغة ar + `<html dir="ltr">`مصنوعة): اللوحة
+فضلت `rtl` بفضل الخاصية. القاعدة كسلوك ما اتغيّرتش: **كل مودال متحوَّل يمرّر `dir`**.
 (ب) مقروب الـdialog يتاخد بـ`[...querySelectorAll('[role="dialog"]')].pop()` — أول مطابقة بترجع
 عقدة الـexit animation وبتطلّع أرقام مقلوبة (45.6px، scrim «مبيقفلش»، فوكس BODY)؛
 (ج) استرجاع الفوكس يتقاس على **كل** مسارات القفل وفي نمطَي التركيب

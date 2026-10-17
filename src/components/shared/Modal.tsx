@@ -25,15 +25,27 @@ export interface ModalProps {
   /** Merged with `tailwind-merge`, so `max-w-*` here overrides `size`. */
   className?: string;
   /**
-   * Text direction of the panel. Omit it only when the surrounding page already
-   * drives direction through the document.
+   * Text direction of the panel, passed explicitly instead of inherited.
    *
-   * Needed because the panel is portalled to `<body>`, outside `AppLayout`, and
-   * `index.html` pins `<html dir="rtl">` permanently — `AppLayout` flips `dir`
-   * on its own inner containers, never on `<html>`. Without this prop a dialog
-   * opened from the English UI still renders RTL (keyline, close-button corner,
-   * label alignment), and the hand-rolled panels it replaces each carried an
-   * explicit `dir={rtl ? 'rtl' : 'ltr'}` to work around exactly that.
+   * The panel is portalled to `<body>`, so the only thing that would otherwise
+   * decide its direction is `<html dir>` — document state this component does
+   * not own. Measured in Chromium on 2026-10-17 (LOCAL_TESTING_REPORT §50): with
+   * `<html dir="ltr">` forced while the app language was still `ar`, the panel
+   * kept `direction: rtl` and `dir="rtl"` because of this prop; omit it and the
+   * same panel flips with the document.
+   *
+   * Correction to what an earlier revision of this comment claimed: `<html dir>`
+   * is NOT pinned by `index.html` forever, and `AppLayout` is not the only writer
+   * — `AppProvider` rewrites `document.documentElement.dir`/`.lang` on every
+   * language change (`src/context/GymBrandContext.tsx:103-106`, since `ccc7287`),
+   * so ar/en does retint portalled panels on its own. The prop stays necessary for
+   * the other half of the problem: the panel is outside every page container, so
+   * its direction is decided by a value no component in the dialog's own render
+   * tree owns — the pre-hydration value from `index.html` and whatever
+   * `AppProvider` last wrote. Pinning it from the same `rtl` flag that picks the
+   * panel's strings keeps direction and copy from ever disagreeing.
+   * The hand-rolled panels this replaced each carried an explicit
+   * `dir={rtl ? 'rtl' : 'ltr'}` for the same reason; the conversion keeps parity.
    */
   dir?: 'rtl' | 'ltr';
 }

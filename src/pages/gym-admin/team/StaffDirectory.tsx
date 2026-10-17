@@ -5,8 +5,8 @@ import { useApp } from '../../../context/GymBrandContext';
 import { formatMoney } from '../../../utils/currency';
 import { listStaff, createStaff, updateStaff, type StaffData } from '../../../services/api';
 import PageLoader from '../../../components/shared/PageLoader';
+import Modal from '../../../components/shared/Modal';
 import Button from '../../../components/ui/Button';
-import Card from '../../../components/ui/Card';
 import StatusBadge from '../../../components/ui/StatusBadge';
 
 const roleLabels: Record<string, string> = {
@@ -259,50 +259,18 @@ export default function StaffDirectory() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={resetForm}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
-          <Card className="shadow-xl">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">
-              {editingUser ? (rtl ? 'تعديل موظف' : 'Edit staff') : (rtl ? 'إضافة موظف' : 'Add staff')}
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الاسم' : 'Name'}</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'البريد الإلكتروني' : 'Email'}</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
-              </div>
-              {!editingUser && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'كلمة المرور' : 'Password'}</label>
-                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} />
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الدور' : 'Role'}</label>
-                <select value={role} onChange={(e) => setRole(e.target.value)} className={inputCls}>
-                  {roleOptions.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الجوال' : 'Phone'}</label>
-                <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الراتب' : 'Salary'}</label>
-                <input type="number" value={salary} onChange={(e) => setSalary(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'نسبة العمولة %' : 'Commission %'}</label>
-                <input type="number" min={0} max={100} step="0.5" value={commission} onChange={(e) => setCommission(e.target.value)}
-                  placeholder="0" className={inputCls} />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
+        <Modal
+          open
+          onClose={resetForm}
+          size="lg"
+          // الصدفة القديمة ما كانتش بتتحكم `dir` خالص — وده بالنبط في الواجهة
+          // الإنجليزي لأن الـpanel بيتعمل portal على <body> و`index.html` مثبّت
+          // `dir="rtl"`. (نفس الفجوة اللي سدّها `ModalProps.dir` في §49.)
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={isPending}
+          title={editingUser ? (rtl ? 'تعديل موظف' : 'Edit staff') : (rtl ? 'إضافة موظف' : 'Add staff')}
+          footer={
+            <div className="flex w-full gap-3">
               <Button variant="outline" fullWidth onClick={resetForm} className="px-4 py-2 text-sm">
                 {rtl ? 'إلغاء' : 'Cancel'}
               </Button>
@@ -310,9 +278,46 @@ export default function StaffDirectory() {
                 {isPending ? '...' : (editingUser ? (rtl ? 'حفظ' : 'Save') : (rtl ? 'إضافة' : 'Add'))}
               </Button>
             </div>
-          </Card>
+          }
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الاسم' : 'Name'}</label>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'البريد الإلكتروني' : 'Email'}</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
+            </div>
+            {!editingUser && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'كلمة المرور' : 'Password'}</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الدور' : 'Role'}</label>
+              <select value={role} onChange={(e) => setRole(e.target.value)} className={inputCls}>
+                {roleOptions.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الجوال' : 'Phone'}</label>
+              <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الراتب' : 'Salary'}</label>
+              <input type="number" value={salary} onChange={(e) => setSalary(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'نسبة العمولة %' : 'Commission %'}</label>
+              <input type="number" min={0} max={100} step="0.5" value={commission} onChange={(e) => setCommission(e.target.value)}
+                placeholder="0" className={inputCls} />
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

@@ -8,9 +8,10 @@ import { listTrainers, updateSubscription, type SubscriptionRow } from '../../..
 import { formatDate } from '../../../utils/date';
 import { SPORTS, WEEK_DAYS, sportName, useSportsCatalog } from './shared';
 import { printSubscriptionInvoice } from './invoice';
+import Modal from '../../../components/shared/Modal';
 
 const inputCls =
-  'w-full min-h-[48px] md:min-h-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/40';
+  'w-full min-h-[48px] md:min-h-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-ring';
 const labelCls = 'block text-sm font-semibold text-gray-700 mb-1';
 
 function apiError(e: unknown, fallback: string): string {
@@ -23,6 +24,11 @@ function apiError(e: unknown, fallback: string): string {
  * النطاق عمدًا: الرياضة/المدرب/أيام الحضور فقط (بلا أثر مالي).
  * الباقة والتواريخ والمبالغ لا تُعدَّل (مرتبطة بالديون والمدفوعات)،
  * والاشتراك الملغي نهائي لا يُعدَّل (يرفضه السيرفر برسالة صادقة).
+ *
+ * موجة 3 (دفعة 2): الصدفة اليدوية → `shared/Modal` بنفس العرض (`max-w-lg`)
+ * وبنفس ترتيب الأزرار (سطر تراجع/حفظ فوق سطر طباعة الفاتورة + طلب الإلغاء)،
+ * وEscape/scrim بقوا شغالين ومحبوسين وقت الحفظ (`disableDismiss`). الألوان
+ * الحرفية داخل الحقول وشيبات الأيام سايباها لموجة 5 (D1/D2 مفتوح).
  */
 export default function EditSubscription({
   sub,
@@ -72,18 +78,65 @@ export default function EditSubscription({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
-      <div dir={rtl ? 'rtl' : 'ltr'} className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div>
-          <h3 className="font-bold text-lg text-gray-900">
-            {rtl ? `تعديل اشتراك ${sub.member_name}` : `Edit ${sub.member_name}'s subscription`}
-          </h3>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {sub.offer_title} · {formatDate(sub.start_date)} ← {formatDate(sub.end_date)}
-          </p>
-        </div>
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      dir={rtl ? 'rtl' : 'ltr'}
+      disableDismiss={save.isPending}
+      title={rtl ? `تعديل اشتراك ${sub.member_name}` : `Edit ${sub.member_name}'s subscription`}
+      description={
+        <>{sub.offer_title} · {formatDate(sub.start_date)} ← {formatDate(sub.end_date)}</>
+      }
+      footer={
+        <div className="flex w-full flex-col gap-2">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
+              onClick={onClose}
+            >
+              {rtl ? 'تراجع' : 'Back'}
+            </button>
+            {!cancelled && (
+              <button
+                type="button"
+                disabled={save.isPending}
+                className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                onClick={() => save.mutate()}
+              >
+                {save.isPending ? (rtl ? 'جارٍ الحفظ…' : 'Saving…') : (rtl ? 'حفظ التعديل' : 'Save changes')}
+              </button>
+            )}
+          </div>
 
+          {/* إجراءات الاشتراك (نُقلت من عمود الجدول): طباعة الفاتورة + طلب الإلغاء */}
+          <div className="flex gap-2 border-t border-gray-100 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                const ok = printSubscriptionInvoice(gymName, currency, { ...sub, sport_label: sportName(sub.sport, catalogSports, rtl) });
+                if (!ok) showToast(rtl ? 'المتصفح منع نافذة الطباعة' : 'Print popup blocked', 'error');
+              }}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
+            >
+              <Receipt size={16} />
+              {rtl ? 'طباعة الفاتورة' : 'Print invoice'}
+            </button>
+            {sub.status === 'active' && (
+              <button
+                type="button"
+                onClick={onRequestCancel}
+                className="flex-1 rounded-xl border border-rose-200 py-2.5 text-sm font-bold text-rose-600 hover:bg-rose-50"
+              >
+                {rtl ? 'إلغاء الاشتراك' : 'Cancel subscription'}
+              </button>
+            )}
+          </div>
+        </div>
+      }
+    >
+      <div className="space-y-4">
         {cancelled ? (
           <p className="text-sm text-gray-500 bg-gray-50 rounded-xl p-3">
             {rtl ? 'لا يمكن تعديل اشتراك ملغي.' : 'A cancelled subscription cannot be edited.'}
@@ -147,51 +200,7 @@ export default function EditSubscription({
             </div>
           </>
         )}
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
-            onClick={onClose}
-          >
-            {rtl ? 'تراجع' : 'Back'}
-          </button>
-          {!cancelled && (
-            <button
-              type="button"
-              disabled={save.isPending}
-              className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
-              onClick={() => save.mutate()}
-            >
-              {save.isPending ? (rtl ? 'جارٍ الحفظ…' : 'Saving…') : (rtl ? 'حفظ التعديل' : 'Save changes')}
-            </button>
-          )}
-        </div>
-
-        {/* إجراءات الاشتراك (نُقلت من عمود الجدول): طباعة الفاتورة + طلب الإلغاء */}
-        <div className="flex gap-2 pt-1 border-t border-gray-100">
-          <button
-            type="button"
-            onClick={() => {
-              const ok = printSubscriptionInvoice(gymName, currency, { ...sub, sport_label: sportName(sub.sport, catalogSports, rtl) });
-              if (!ok) showToast(rtl ? 'المتصفح منع نافذة الطباعة' : 'Print popup blocked', 'error');
-            }}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
-          >
-            <Receipt size={16} />
-            {rtl ? 'طباعة الفاتورة' : 'Print invoice'}
-          </button>
-          {sub.status === 'active' && (
-            <button
-              type="button"
-              onClick={onRequestCancel}
-              className="flex-1 rounded-xl border border-rose-200 py-2.5 text-sm font-bold text-rose-600 hover:bg-rose-50"
-            >
-              {rtl ? 'إلغاء الاشتراك' : 'Cancel subscription'}
-            </button>
-          )}
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

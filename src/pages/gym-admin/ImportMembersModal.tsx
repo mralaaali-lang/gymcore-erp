@@ -4,6 +4,7 @@ import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { importCsv, type ImportResult } from '../../services/api';
 import { downloadMatrixXlsx } from '../../utils/csv';
+import Modal from '../../components/shared/Modal';
 
 const TEMPLATE_HEADERS = ['full_name', 'phone_number', 'email', 'birth_date', 'medical_notes'];
 const TEMPLATE_SAMPLE = ['أحمد محمد', '01000000001', 'ahmed@example.com', '1995-04-12', ''];
@@ -12,6 +13,11 @@ const TEMPLATE_SAMPLE = ['أحمد محمد', '01000000001', 'ahmed@example.com'
  * مودال استيراد المشتركين من Excel — نفس endpoint الاستيراد الحقيقي
  * (POST /api/import/members): الملف يُقرأ في المتصفح وتُرسل الصفوف normalized،
  * وكل صف يُكتب فعلًا ويُبلَّغ بنتيجته (ناجح/فاشل/لماذا)، بلا نجاح معمّم.
+ *
+ * موجة 3 (دفعة 2): الصدفة اليدوية اتحوّلت على `shared/Modal` — نفس العرض
+ * (`max-w-lg` = 32rem) ونفس الأزرار بنفس الترتيب، وEscape/الضغط على الـscrim
+ * بقوا شغالين ومحبوسين طالما الاستيراد جارٍ (`disableDismiss={busy}`).
+ * الألوان الحرفية جوه الحقول والنتايج لسه سايبة لموجة 5 (D1/D2 مفتوح).
  */
 export default function ImportMembersModal({ onClose, onImported }: {
   onClose: () => void;
@@ -89,16 +95,43 @@ export default function ImportMembersModal({ onClose, onImported }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
-      <div dir={rtl ? 'rtl' : 'ltr'} className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div>
-          <h3 className="font-bold text-lg text-gray-900">{rtl ? 'استيراد مشتركين' : 'Import members'}</h3>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {rtl ? 'ملف Excel: الاسم، الهاتف، البريد، تاريخ الميلاد، الملاحظات الطبية. كل صف يُسجَّل فعلًا.' : 'Excel file: name, phone, email, birth date, medical notes. Every row is really inserted.'}
-          </p>
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      dir={rtl ? 'rtl' : 'ltr'}
+      // الاستيراد رحلة واحدة طويلة (حتى 2000 صف) — نفس باب موجة 3: القفل يتعطل
+      // لحد ما الرد ييجي، والنتيجة فضلت معروضة بعد الفشل يتعاود.
+      disableDismiss={busy}
+      title={rtl ? 'استيراد مشتركين' : 'Import members'}
+      description={
+        rtl
+          ? 'ملف Excel: الاسم، الهاتف، البريد، تاريخ الميلاد، الملاحظات الطبية. كل صف يُسجَّل فعلًا.'
+          : 'Excel file: name, phone, email, birth date, medical notes. Every row is really inserted.'
+      }
+      footer={
+        <div className="flex w-full gap-2">
+          <button
+            type="button"
+            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
+            onClick={onClose}
+          >
+            {rtl ? 'إغلاق' : 'Close'}
+          </button>
+          {rows.length > 0 && !result && (
+            <button
+              type="button"
+              disabled={busy}
+              className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+              onClick={run}
+            >
+              {busy ? (rtl ? 'جاري الاستيراد…' : 'Importing…') : (rtl ? `استيراد ${rows.length} صفًا` : `Import ${rows.length} rows`)}
+            </button>
+          )}
         </div>
-
+      }
+    >
+      <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <input
             ref={fileRef}
@@ -151,27 +184,7 @@ export default function ImportMembersModal({ onClose, onImported }: {
             )}
           </div>
         )}
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
-            onClick={onClose}
-          >
-            {rtl ? 'إغلاق' : 'Close'}
-          </button>
-          {rows.length > 0 && !result && (
-            <button
-              type="button"
-              disabled={busy}
-              className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
-              onClick={run}
-            >
-              {busy ? (rtl ? 'جاري الاستيراد…' : 'Importing…') : (rtl ? `استيراد ${rows.length} صفًا` : `Import ${rows.length} rows`)}
-            </button>
-          )}
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

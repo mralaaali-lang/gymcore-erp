@@ -3674,4 +3674,155 @@ probes #3/#4/#6/#7 بعد التصحيح؛ أرقام #1 و#2 متلوّيه و�
 (`ImportMembersModal` · `subscriptions/AddSubscription` · `subscriptions/EditSubscription` ·
 `team/StaffDirectory`) ولا أوقف/أعدّل النهج في ضوء اللي طلع من الدفعة الأولى.
 **`git push` ما عملتش** (D7 = **11** عملة غير مدفوعة) و`:9000` ما اتبناطش (D8)، والنشر قرار
-منفصل.
+منفصل.---
+
+## §51 — موجة 3 / دفعة 2: `ImportMembersModal` + `subscriptions/EditSubscription` + `team/StaffDirectory` على `shared/Modal`، و`AddSubscription` مُرجَّع للمالك (2026-10-17 — جلسة A+C)
+
+**تصادم أرقام معلن:** الجلسة دي كانت هتكتب **§50**، بس جلسة C لساعتها أخذت §50 (توحيد شجرتَي
+الاختبار على `vitest`) — فالقياسات هنا اتحوّلت على **§51**. رقم القسم في السجل الحيّ مش محجوز،
+وأي جلسة تانية تكتب لازم تعمل `grep -n '^## §' LOCAL_TESTING_REPORT.md | tail -3` أول ما.
+
+### أ) تلات صدفيات اتحوّلت — والرابعة لا
+
+| الملف | الصدفة القديمة | الجديدة | `fixed inset-0` بعد التحويل |
+|---|---|---|---|
+| `src/pages/gym-admin/ImportMembersModal.tsx` | div يدوي `max-w-lg` | `Modal size="lg"` + `disableDismiss={busy}` | **0** |
+| `src/pages/gym-admin/subscriptions/EditSubscription.tsx` | div يدوي `max-w-lg` | `Modal size="lg"` + footer فيه (تراجع/حفظ) + (طباعة/إلغاء) | **0** |
+| `src/pages/gym-admin/team/StaffDirectory.tsx` | `Card` داخل طبقة `fixed inset-0` | `Modal size="lg"` (الـ`Card` كان الاستعمال الوحيد له في الملف) | **0** |
+| `src/pages/gym-admin/subscriptions/AddSubscription.tsx` | `fixed inset-0 bg-gray-100` + هيدر sticky + عمود `max-w-2xl` | **ما اتحوّلتش** — قرار مالك (§و) | 4 مواضع سايبين |
+
+منطق الملفات التلاتة ما اتغيّرش: `handleFile`/`run` في الاستيراد، و`updateSubscription` في
+التعديل، و`createStaff`/`updateStaff` في الموظفين — اللي اتغيّر الصدفة الصرفة + `focus:ring-emerald-500/*`
+→ `focus:ring-ring` في `EditSubscription`. **ولا `mock` اتحطّ** في كود المنتج.
+
+### ب) الـharness الحيّ (مؤقّت، تمّ حذفه)
+
+الدخول الحيّ مقفول محليًا (كل الأندية `deleted_at` → `403 GYM_SUSPENDED`)، فالقياس اتعمل على
+**المكوّنات الحقيقية نفسها** تحت الـproviders الحقيقية، من غير ملف route في `src`:
+`scratch/w3b/index.html` + `scratch/w3b/main.tsx` بيت SERV بـVite على `:9100`،
+وبيفتّل `MemoryRouter > QueryClientProvider > AppProvider > ToastProvider > {زرارب فتح + StaffDirectory}`.
+البيانات المتخصّطة كلها صفوف حقيقية من القاعدة المحلية، بنفس SQL الحسابي في
+`server/src/controllers/subscriptions.ts:93-109`، و**بلا عمود `decrypt_sensitive(m.phone_encrypted)`**
+(`member_phone: null`) — ما قريناش ولا فكّكنا أي بي حسّاس:
+
+```bash
+docker exec gymcore-db psql -U gymcore -d gymcore -t -A -F'|' -c "SELECT s.id, s.status, s.start_date, s.end_date, s.sport, s.weekly_days, s.price_paid, s.coach_id, s.member_id, s.offer_id, m.full_name, m.card_code, o.title, o.duration_days, o.price, (s.end_date - CURRENT_DATE)::int, CASE WHEN s.price_paid >= o.price THEN 'paid' ELSE 'unpaid' END, GREATEST(o.price - s.price_paid, 0) FROM member_subscriptions s JOIN members m ON m.id=s.member_id JOIN membership_offers o ON o.id=s.offer_id WHERE s.id='adcf64b0-ceb7-40e9-a52a-ad9caf0c8102';"
+```
+الصف: `…|active|2026-10-11|2027-10-11|||252.00||…|إبراهيم حسن|100233|سنة كاملة|365|252.00|359|paid|0.00`
+و`StaffDirectory` بيطلب `['staff']` بنفسه وشريط خطؤه بيمنع الوصول للمودال، فالكاش اتبذّر بثلاث صفوف
+حقيقية من `staff_users` (بلا `password_hash`/`pin_hash`/`national_id`) — قراءة بس، بلا كتابة.
+
+**سنخة قياس اتصحّح من أول طلق:** حقل `count` في القياس كان بيطلع **0** دايمًا — لأن
+`ds.pop()` بيقصر المصفوفة قبل ما `.length` يتقرا. الرقم الصحيح هو عدد العقد المتبقي بعد شل
+الأخيرة، فالصفر = عقدة dialog واحدة صحيحة. الأرقام اللي تحت مقاسه بـ`[...document.querySelectorAll('[role="dialog"]')].pop()` (§49ب).
+
+### ج) تكافؤ العقد — مقاس (1280×900، Chromium 155، pointer ناعم)
+
+| المودال | عرض اللوحة | `centreDelta` | `#root aria-hidden` | `aria-modal` | `data-state` | مسار القفل → تركيز الفاتح |
+|---|---|---|---|---|---|---|
+| `ImportMembersModal` | **512px** (= `max-w-lg` 32rem) | **[0, 0]** | `true` | `null` | `open` | Escape → `#harness-import` ✓ |
+| `EditSubscription` | **512px** | **[0, 0]** | `true` | `null` | `open` | Escape / X / scrim-mouse / scrim-touch → `#harness-editsub` ✓ (٤/٤) |
+| `StaffDirectory` | **512px** | **[0, 0]** | `true` | `null` | `open` | Escape → زرار `person_add إضافة موظف` ✓ |
+
+العزل الجانبي وصل كـ`aria-hidden="true"` على `#root` مش كـ`aria-modal` — نفس نتيجة §49، وده سبب
+إن `aria-modal` لازم ما يتبحثش عند تدقيق أي dialog. بعد كل قفل: عقد dialog **0** و`aria-hidden` رجعت
+`null`. التركيز بعد الفتح جوه اللوحة في التلاتة (على `INPUT` في الاستيراد والموظفين، وعلى `select`
+الرياضة في التعديل).
+
+### د) تصحيح premise اتكتب في §49 — `dir`
+
+`Modal.tsx` كان بيسوّغ خاصية `dir` بإن `index.html` بيمسّك `<html dir="rtl">` للأبد وإن `AppLayout`
+بيقلب `dir` على حاوياته الداخلية و«عمره على `<html>`». **ده غلط:** `AppProvider` نفسه بيكتب
+`document.documentElement.dir`/`.lang` مع كل تغيير لغة (`src/context/GymBrandContext.tsx:103-106`،
+من `ccc7287` — `git blame -L 103,107 src/context/GymBrandContext.tsx`). القياس الحيّ:
+
+| الحالة | `<html dir>` | `dir` على اللوحة | `direction` المحسوبة |
+|---|---|---|---|
+| `ar` (افتراضي) | `rtl` | `rtl` | `rtl` |
+| بعد `useApp().setLanguage('en')` | `ltr` | `ltr` + النصوص إنجليزي | `ltr` |
+| `ar` + `<html dir>` اتلصق `ltr` يدويًا | `ltr` | **`rtl`** | **`rtl`** |
+
+فالخاصية مش بتعالج «تسرّب RTL من English UI» (اللغة بتاعته بتتعدّل فعلًا على `<html>`)، بس بتعالج
+إن اللوحة portal برّه أي حاوية صفحة: اتجاهها بييتحدّد من قيمة ما بتملكها أي مكوّن في شجرة رسمها —
+قيمة `index.html` قبل الـhydration وآخر حاجة `AppProvider` كتبها. التوضيح ده اتكتب في مكانه في
+`Modal.tsx` (تعليق بس، بلا تغيير سلوك).
+
+### هـ) §34و على لمس خشن — 390×844، `deviceScaleFactor 2`، `mobile: true`
+
+| المودال | عناصر تفاعلية | تحت 48px | التفاصيل |
+|---|---|---|---|
+| `StaffDirectory` | 10 | **0** ✓ | الـinputs بتاخد `min-h-[48px] md:min-h-0` فاللمس تمام |
+| `ImportMembersModal` | 5 | 1 | `input[type=file]` بس `className="hidden"` (h=0) — مش هدف لمس؛ الأزرار الظاهرة كلها ≥48 |
+| `EditSubscription` | 15 | **7** | الـ7 checkboxes أيام الحضور **13px**، والـ`label` اللي حوّلها **40px** = هدف اللمس الحقيقي، أقل من الحد بـ8px. الـ`selects` والـbuttons كلها **48px** ✓ |
+
+(كمان 3 `label` نصّية بتاعة العناوين عندها 20px — دي مش أهداف لمس ومحسوبешا في الرقم فوق.)
+**ماصلحناش** — قرار مالك (§ي).
+
+### و) `disableDismiss` على الملف المتحوَّل نفسه (بمشد الطلب، بلا أي تلفيق)
+
+زرار «حفظ التعديل» اتفعّل بـEnter موثوق، و`Fetch.enable({patterns:[{urlPattern:'*4000*',requestStage:'Request'}]})`
+شدّ الطلب 1600ms (توقيت بس)، والنتايج:
+
+| اللحظة | `data-state` | الزرار | بعد Escape |
+|---|---|---|---|
+| 650ms (جوه الشدّ) | `open` | `جارٍ الحفظ…` + `disabled=true` | — |
+| +220ms بعد **Escape** | **`open`** | — | القفل اترفض ✓ |
+| +1700ms بعد الإفلات | `open` | — | اللوحة فضلت مفتوحة لأن الطلب فشل (401) و`onError` بيطبّع توست بس |
+
+**صفر كتابة على القاعدة:** اللي شدّه CDP كان `OPTIONS /api/v1/api/subscriptions/adcf64b0…` (preflight)
+والجلسة مالهاش token/cookie فالـPUT الحقيقي اترفض عند `authenticateAndIsolateTenant` — ما وصلش stage
+الكتابة. ولا استيراد ملفات اتنفّذ ولا موظف اتأنشأ (الـmutations دي ما اتضغطتش عليها خالص).
+**ملاحظة وصول اتعلّنت ومابنصلحهاش دلوقتي:** لحظة ما الزرار بقى `disabled` والتركيز عليه، المتصفح
+شالة منه وراحت `<body>` (`focusInside: false`) — فـEscape بعد الشدّ رجّع للوحة لكن نقطة البداية
+كانت برّها؛ السلوك ده بتاع Radix/HTML مش تسهيلنا.
+
+### ز) `AddSubscription` — مرجوعة للمالك قبل أي تحويل
+
+السطر 165 مش صدفة متوسّطة: `<div dir=… className="fixed inset-0 z-50 bg-gray-100 overflow-y-auto">`
++ هيدر sticky بزرار رجوع + عمود `max-w-2xl` + ~15 تحكم + «حفظ وطباعة الفاتورة». دي شاشة ملء الشاشة
+(form-surface) مش popup، وتحويلها على `size="xl"` (42rem = 672px) هيقفل مسار فلوس في مكان ضيّق.
+اتاركت زي ما هي لحد قرار المالك (§يا).
+
+### ح) البوابات والأرقام
+
+```bash
+cd /d/_proj/gymcore-erp && npx tsc --noEmit ; npm run build 2>&1 | grep -E "built in|assets/index-" ; grep -rl "fixed inset-0" src/pages | wc -l ; grep -ro "fixed inset-0" src/pages | wc -l ; grep -rl "fixed inset-0" src | wc -l ; grep -ro "fixed inset-0" src | wc -l
+```
+| الفحص | الناتج | الفرق |
+|---|---|---|
+| `npx tsc --noEmit` | **0** أخطاء | ثابت |
+| `npm run build` | ✓ **5.64s** — `index-a6wntyW7.js` **902.58KB** (271.14 gzip) · `csv` 425.33 · `Chart` 808.55 | **+0.01KB** عن لقطة §49 على ثلاثة ملفات متحوَّلة = ما زودناش dependency |
+| `src/pages` مواضع يدوية | **27 ملفًا / 34 موضعًا** | كان 30/37 → **−3 / −3** |
+| `src/**` مواضع يدوية | **32 ملفًا / 40 موضعًا** | كان 35/43 → **−3 / −3** |
+| التلاتة المتحوّلين `grep -c 'fixed inset-0'` | 0 / 0 / 0 | — |
+
+### ط) مخلفات معلنة وحذف
+
+`scratch/w3b/` **اتم حذفه** بعد القياس، والتأكد إن ما كانش متتبَّع: `git ls-files scratch | wc -l` = **0** قبل الحذف و`git status --porcelain scratch | wc -l` = **0** بعده.
+مخلفات برّه المستودع في `%TEMP%` (لازم تتحذف يدويًا لأن خارج الـrepo): البروبت `cdp-w3h.mjs` · `cdp-w3i.mjs` (سابقين: `cdp-w3.mjs`…`cdp-w3g.mjs` + `cdp-w3-diag.mjs`)،
+القياسات `gymcore-a11y/w3h.json` · `w3i.json`، سكرونشوتس `w3h-import-ar.png` · `w3h-editsub-ar.png` · `w3h-staff-ar.png` · `w3h-editsub-en.png` · `w3h-import-390.png` · `w3h-editsub-390.png` · `w3h-staff-390.png`،
+وبروفيل كروم `cdp-w3b-profile/`.
+**الحاجة اللي اختلفت عن §49:** كروم السير-headless اتقفل بالـPID اللي بيطابق `--user-data-dir=…cdp-w3b-profile` بس
+(`Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" | ? { $_.CommandLine -like '*cdp-w3b-profile*' } | % { Stop-Process -Id $_.ProcessId -Force }`)
+— ونفّذت `Stop-Process` على PID واحد (2092)، فنوافذ المتصفح الحقيقية للمالك فضلت شغّالة.
+الحقنة اللي فاتت كانت `taskkill //IM chrome.exe //F` ودي كانت بتقفل كل حاجة (`:9333` رجّعت 000 بعدها).
+
+### ي) فجوات معلنة (مش متسكّكة)
+
+1. **`aria-label="إغلاق"` متخشّبة في قشرة شادكن** (`src/components/shadcn/dialog.tsx:67`) — زرار الـX
+   بيقول «إغلاق» بالعربي في الواجهة الإنجليزيّة؛ القياس: `closeBtn.label` طلع `إغلاق` في حالة `w3h-editsub-en`.
+   مكان الإصلاح الصحيح توكن/prop، وده نطاق ألوان/قشرة (D1/D2) مش موجة 3.
+2. **رقائق الأيام 40px** (§هـ) في `EditSubscription` و`AddSubscription` — مصلحتش نصلحها في الدفعة دي عشان §34و
+   ليه باب لوحده في الخطة.
+3. **الفوكس بيقع على `<body>`** لما الزرار المركّز عليه يتعمله `disabled` وقت الـmutation (§و).
+4. **`AddSubscription`** لسه على صدفتها اليدوية بـ4 مواضع `fixed inset-0` — مستنية قرار المالك.
+5. **الداكن ما اتقاسش هنا** — القشرة المشتركة نفسها اللي اتقاست في §49 (dark)؛ ماكرناش القياس على
+   نفس الملفات، وده سبب مش نسيان.
+
+### يا) مطلوب من المالك
+
+- **`AddSubscription`**: (1) تتحوَّل على `Modal size="xl"` في نص وشريط فلوس، ولا (2) تفضل شاشة ملء
+  الشاشة وتتحوَّل على primitive تاني (sheet/panel معلن)، ولا (3) تتسجَّل استثناءً دائمًا في الخطة؟
+- **رقائق الأيام/الدفع**: أرفع `min-h` بتاعها لـ48 على اللمس الخشن (تعديل سطر في ملفين)؟
+- **تصحيح تعليق `Modal.tsx`** (§د) معمول في نفس الدفعة — لو عايزه في commit لوحده قول.
+
