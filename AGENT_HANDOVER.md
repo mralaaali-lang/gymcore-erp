@@ -159,11 +159,22 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
   `platformGyms.createGym` (الملف عليه diff لسه uncommitted من جلسة موازية).
   **الفجوة المتبقية:** `onboarding.ts` بيزرع 4 عروض اشتراك ومعالج المنصة ما بقاش — يعني أي صالة
   اتعملت من المنصة لازم مديرها يعمل عروض بنفسه قبل أول `createMember(plan_id)` أو check-in يدوي.
-- **حذف صالة مستحيل بعد أول دخول لمديرها (عطل قائم، 2026-10-17):** `DELETE /platform/gyms/:id`
-  بيرجع **500** بقيد `activity_logs_staff_user_id_fkey`، و`activity_logs` append-only (triggers
-  بيرفع `TABLE_IS_IMMUTABLE`) فمفيش طريقة لمسح سجل المدير. نظّف صالات الاختبار بـsoft delete:
-  `UPDATE gyms SET deleted_at = NOW(), is_active = false` + `UPDATE staff_users SET is_active = false`
-  (`listGyms` بيفلتر على `deleted_at`)، والإصلاح الصح مطلوب في `platformGyms.deleteGym`.
+- **حذف صالة كان مستحيل بعد أول دخول لمديرها → اتصلح soft delete (2026-10-17):** `DELETE FROM gyms`
+  كان بيرجع **500** بقيد `activity_logs_staff_user_id_fkey`، و`activity_logs` append-only (triggers
+  بيرفع `TABLE_IS_IMMUTABLE`) فمفيش طريقة لمسح سجل المدير — القياس على الصف الحقيقي أكّد الـ23503.
+  `deleteGym` دلوقتي `UPDATE gyms SET deleted_at = CURRENT_TIMESTAMP, is_active = false` +
+  `UPDATE staff_users SET is_active = false` جوّا `BEGIN/COMMIT` **صريح** (`getAdminClient()`
+  بيفتح معاملة ضمنية، وأي فاشل يسيبها `25P02`)، والردّ محتفظ بنفس الشكل فما اتغيّرش `api.ts`.
+  **بقايا مُعلنة:** صالة الاختبار `4f4972e5…` فضلت مُأرشفة بسطور الـlogs بتاعتها — مسحها الجذري
+  مستحيل من غير كسر قاعدة التدقيق. الحذف الجذري الحقيقي (purge + نقل الـlogs لأرشيف) لسه بند.
+- **`:9000` مش الـdev server — دي صورة Docker:** :9000 بتخدم `dist` متبني **جوه الـimage**، فالإصلاحات
+  اللي على القرص ما بتظهرش هناك لحد ما تعمل `docker compose build frontend backend && up -d`
+  (الـdev server الحقيقي على :9100). مزلق التحقق من ده: `GET /auth/me 401` في الكونسول كان **عرضًا**
+  لطبيعي لجلسة منصة، مش العطل — العطل كان `/api/settings` اللي بيسأله الـbundle القديم.
+  **أي rebuild ياخد الـworking tree كله**، ف:9000 مش مرآة لـ`main`.
+- **بصمة التحقق لازم تتقاس على build سليم الأول:** البحث عن `enabled:"gym-admin"` طلع **0** في
+  القديم والجديد معًا لأن esbuild بيقلّل لـ`enabled:r==="gym-admin"`. اكتب البصمة من `dist` معروف
+  إنه صح، وإلا هتتّهم الكود وهو بريء.
 - **مسح بيانات الديمو من صالة موجودة:** `server/scripts/remove_demo_seed_data.sql` — للأمر نفسه
   transaction مفتوحة على `SELECT` تحقق و`COMMIT` معلّق (المالك يكتبها). الـdry-run اتعمل:
   `SELECT 15 / DELETE 52 / DELETE 15 / DELETE 15 / DELETE 6 / DELETE 4 / UPDATE 1` ثم تحقق
@@ -235,9 +246,10 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
 6. **Staging (Railway):** ✅ يعمل (2026-10-12 §21) — backend+frontend Online؛ الدومينات `frontend-production-abdd`/`backend-production-9b567`؛ **منذ §29: الرفع تلقائي — كل `git push origin main` يبني وينشر عبر GitHub App + Deployment Triggers (فرع main)**؛ إعدادات إلزامية: backend rootDirectory فارغ + dockerfilePath `/server/Dockerfile.prod`، frontend rootDirectory `.` (تفاصيل §29). `deploy.sh`/«ارفع» لم عادا لازمين إلا كطوارئ. **ديون دمج الصفحات: منتهية — اكتملت السلسلة بـ §27** (الفريق §22، المتجر §23، الديون/الإعلانات §26، backup/migration → تبويبات الإعدادات §27).
 6. **مؤجل بقرار:** ZATCA، استشارة قانونية، بوابات دفع حقيقية (نقدي/يدوي أولاً — راجع `PAYMENT_COLLECTION_STRATEGY.md`).
 7. **ديون تقنية:** `routeConfigs/` قديم، `UIContext` غير مُmount، `superAdminUtils.tr` مكرر، تحذير حجم chunks في البناء.
-   **من دفعة 2026-10-17 (الصالة الفاضية):** (أ) `platformGyms.deleteGym` بـ`DELETE FROM gyms`
-   بيرفض أي صالة سجل مديرها دخول (`activity_logs_staff_user_id_fkey` + `TABLE_IS_IMMUTABLE`) —
-   لازم يتحوّل soft delete أو يمسح الأبناء بالترتيب. (ب) توحيد حالة المصنع: `onboarding.ts`
+   **من دفعة 2026-10-17 (الصالة الفاضية):** (أ) ✅ اتصلح — `deleteGym` بقى soft delete + تعطيل
+   الحسابات، والمطلوب بعده لو المالك عايز حذفًا فعلي: **hard purge** ينقل `activity_logs` لجدول
+   أرشيف قبل الحذف (الجدول الحالي append-only فالقيد `activity_logs_staff_user_id_fkey` بيمنع أي
+   حذف جذري لأي صالة سجل مديرها دخول). (ب) توحيد حالة المصنع: `onboarding.ts`
    بيزرع `seedDefaultOffers` ومعالج المنصة لا، فاختار مسار واحد (إما البذرة الكتالوجية في
    الاتنين أو ولا واحد مع checklist يوضح إن العروض مطلوبة قبل أول عضوية).
 

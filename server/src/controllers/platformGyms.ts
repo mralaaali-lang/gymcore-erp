@@ -576,9 +576,16 @@ export const updateGymFull = async (req: Request, res: Response): Promise<void> 
 };
 
 // ====================================================================
-// Delete a gym (hard delete with cascade). Super-admin only.
-// All child data (members, staff, invoices, etc.) is removed via
-// ON DELETE CASCADE foreign keys. Requires a confirmation token in body.
+// Delete a gym — soft delete (archive). Super-admin only.
+// A hard `DELETE FROM gyms` cascades into staff_users, while `activity_logs`
+// keeps an immutable audit trail: its FK to staff_users is RESTRICT and the
+// append-only trigger raises TABLE_IS_IMMUTABLE, so any gym whose manager has
+// ever signed in could never be removed — pg error 23503 escaped as a bare
+// 500 "Internal server error". Archiving gives the console the same outcome
+// without breaking audit: `listGyms` already filters `deleted_at IS NULL`,
+// and deactivating the staff accounts blocks both `/auth/login` and `/auth/me`
+// (auth.ts rejects `!is_active`), so the tenant is unreachable immediately.
+// Requires the explicit "DELETE" confirmation string in the body.
 // ====================================================================
 export const deleteGym = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
@@ -592,18 +599,36 @@ export const deleteGym = async (req: Request, res: Response): Promise<void> => {
 
   const client = await getAdminClient();
   try {
-    const existing = await client.query('SELECT id, name FROM gyms WHERE id = $1', [id]);
-    if (existing.rows.length === 0) {
-      await client.query('ROLLBACK').catch(() => {});
+    await client.query('BEGIN');
+    const existing = await client.query('SELECT id, name, deleted_at FROM gyms WHERE id = $1', [id]);
+    // An archived gym is invisible to the console, so re-deleting it is a 404.
+    if (existing.rows.length === 0 || existing.rows[0].deleted_at) {
+      await client.query('ROLLBACK');
       res.status(404).json({ error: 'Gym not found.' });
       return;
     }
     const gymName = existing.rows[0].name;
 
-    await client.query('DELETE FROM gyms WHERE id = $1', [id]);
+    await client.query(
+      'UPDATE gyms SET deleted_at = CURRENT_TIMESTAMP, is_active = false WHERE id = $1',
+      [id],
+    );
+    const staffResult = await client.query(
+      'UPDATE staff_users SET is_active = false WHERE gym_id = $1 AND is_active = true',
+      [id],
+    );
     await client.query('COMMIT');
-    await logPlatformAudit({ action: 'DELETE', tableName: 'gyms', recordId: id, oldValues: existing.rows[0], req });
+    await logPlatformAudit({
+      action: 'DELETE',
+      tableName: 'gyms',
+      recordId: id,
+      oldValues: existing.rows[0],
+      newValues: { archived: true, staff_deactivated: staffResult.rowCount ?? 0 },
+      req,
+    });
 
+    // Shape kept identical to the old hard-delete reply so `deleteGym()` in
+    // src/services/api.ts and the TenantDirectory mutation need no change.
     res.json({ data: { id, name: gymName, deleted: true } });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});

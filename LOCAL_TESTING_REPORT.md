@@ -2831,3 +2831,71 @@ expense_cats 0 · offers 4 · sports 7 · counter_members 0`. الجلسة ات�
 التوحيد بند في المتبقي، وما اتعملش هنا لأن `onboarding.ts` و`platformGyms.ts` عليهم diff
 لسه uncommitted من الجلسة الموازية.
 
+### 4) «مش عارف أسجّل دخول سوبر ادمن» على :9000 = صورة Docker قديمة (2026-10-17)
+
+**العطل:** `http://localhost:9000/login` بيرمي في الكونسول
+`GET http://localhost:9000/auth/me 401` وما بيرجّعش على اللوحة.
+
+**التشخيص:** :9000 مش الـdev server (ده :9100) — دي حاوية nginx بتخدم `dist` متبني **جوه
+الـimage**. الـbundle اللي كان مخدوم `index-Icn7DFAw.js` وطابعه الزمني 2026-10-16 04:29،
+والإصلاح بتاع §1 (`Sidebar.tsx`) اتسجّل 2026-10-17 06:10 — يعني الفرع اللي بيسأل
+`/api/settings` لسه جوّا الصورة، وده بالظبط اللي بيجيب 401 → `clearTokens()` → رجوع قسري
+لـ`/login`. سطر `/auth/me 401` اللي شافه المالك **عرض** (طبيعي لجلسة منصة مفيهاش كوكي صالة)،
+مش العطل. مفيش مشكلة routing ولا مشكلة credentials على المحلي.
+
+**إعادة البناء (بموافقة المالك):** `docker compose build frontend backend` ثم `up -d`.
+
+**المتحقق بعد البناء:** الـbundle الجديد `index-w5Tk38tW.js` فيه **2** من بصمة
+`enabled:r==="gym-admin"` — نفس العدد في `dist` المحلي بعد `vite build` ✓ 5.95s. داخل
+backend container: `factory-fresh` = 1 و`deleted_at = CURRENT_TIMESTAMP` = 1 (فالكود المعالَج
+في §3 و§5 بقى مخدوم فعلاً). من بره الحاويات: `:9000 GET /` → **200**،
+`POST /platform/auth/login` بجسد فاضي → **400** (الوصول للسيرفر شغال)، `:4001/health` → **200**.
+
+**مزلق البصمة (اتسجّل):** أول مقياس بحث عن `enabled:"gym-admin"` وطلع **0** في القديم والجديد
+معًا، لأن esbuild بيقلّل التعبير لـ`enabled:r==="gym-admin"`. القاعدة: أي بصمة للتحقق لازم
+تتقارن أول ما بتتكتب بـbuild محلي معروف إنه سليم، وإلا البصمة نفسها هي الغلط مش الكود.
+
+**تحذير مهم:** أي rebuild للـstack ده ياخد الـworking tree كله — فالصورة اللي على :9000 دلوقتي
+فيها كود الجلسة الموازية اللي لسه ما اتودعش. دي طبيعة البناء من الشجرة، مش عطل، بس تعني إن
+:9000 مش مرآة لـ`main`.
+
+### 5) وظيفة «حذف النادي» بعد كتابة DELETE ما بتمسحش → soft delete (هذا الكوميت)
+
+**العطل:** المالك أبلغه مستقلًّا بعد §3: زرار الحذف بيرجع رسالة فشل من غير سبب مفهوم.
+
+**السبب الجذري (مُقاس على صفّ حقيقي):** صالة الاختبار `4f4972e5…` عليها سطر `activity_logs`
+واحد من دخول مديرها. `DELETE FROM gyms` يعمل cascade على `staff_users`، والقيد
+`activity_logs_staff_user_id_fkey` من نوع RESTRICT بيرفض:
+
+    23503 | update or delete on table "staff_users" violates foreign key constraint
+          "activity_logs_staff_user_id_fkey" on table "activity_logs"
+
+و`activity_logs` append-only (الـtrigger بيرفع `TABLE_IS_IMMUTABLE`) فمفيش مخرج بمسح السجل.
+كل صالة مديرها سجل دخول مرة واحدة على الأقل مستحيلة الحذف بالطريق القديم، والخطأ كان بيرشّح
+كـ500 عامّة من الـ`catch`.
+
+**الإصلاح (بالاعتماد: «soft delete + تعطيل الحسابات»):** `deleteGym` بقى
+`UPDATE gyms SET deleted_at = CURRENT_TIMESTAMP, is_active = false` ثم
+`UPDATE staff_users SET is_active = false WHERE gym_id = $1 AND is_active = true`، كله جوّا
+`BEGIN/COMMIT` صريح (لأن `getAdminClient()` بيفتح معاملة ضمنية، وأي فاشل كان بيسيبها abort).
+الـ404 بقى يشمل الصالة المُأرشفة، و`logPlatformAudit` يسجّل `archived:true` مع عدد الحسابات
+المعطَّلة. شكل الردّ ما اتغيّرش (`{ id, name, deleted: true }`) فما احتجتش تعديل في
+`src/services/api.ts` ولا في `TenantDirectory`.
+
+**النتيجة السلوكية:** الصالة تختفي من الكونسول (`listGyms` بيصفّي `deleted_at IS NULL`)،
+وتسجيل دخول مديرها يرتدّ 401 لأن `auth.ts:152` بيرفض `!is_active` — يعني المؤثّر للمستخدم
+مساوي للحذف، مع بقاء سجل التدقيق كامل.
+
+**المتحقق على القاعدة:** `BEFORE: audit_rows=1 · active_staff=1` · المحاولة القديمة **فشلت
+بـ23503** كما هو موثّق · الطريق الجديد **نجح** و`staff deactivated = 1` ·
+`AFTER: archived=true · is_active=false · active_staff=0` · الظهور في قائمة الكونسول = **0** ·
+أسطر التدقيق محفوظة = **2** · back `tsc --noEmit` = **0** ·
+`DELETE /platform/gyms/:id` من غير جلسة منصة → **401** (الحماية زي ما هي).
+
+**بقايا مُعلنة (ما تتحذفش):** صالة الاختبار `zz-fresh-mvbuhpxa` (`4f4972e5…`) فضلت في القاعدة
+مُأرشفة بسطور الـ2 `activity_logs` الخاصة بيها — وده نفس القيد اللي بنى الإصلاح فوقه، فمسحها
+الجذري مستحيل من غير كسر قاعدة التدقيق. حالتها النهائية مُقاسة: مرئية في العدّاد
+`gyms_archived = 1` و`gyms_visible_in_console = 12`. صالة «حامد جيم» (`b37861be…`) **ما اتلمسَتش**:
+`is_active = t` و`archived = f`.
+الحذف الجذري الحقيقي (purge مع نقل الـlogs لجدول أرشيف) بند في المتبقي، مش منفّذ.
+
