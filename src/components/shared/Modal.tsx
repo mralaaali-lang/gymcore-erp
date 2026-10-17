@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -48,17 +48,11 @@ const SIZES: Record<NonNullable<ModalProps['size']>, string> = {
  * dialog into the page behind it, Escape does nothing, the scrim is a click
  * target rather than a dismissal affordance, the background stays readable to a
  * screen reader, and the page keeps scrolling underneath. Radix supplies all of
- * that except one thing, measured in Chromium on 2026-10-17 (see
- * LOCAL_TESTING_REPORT §موجة 2): background isolation comes as
- * `aria-hidden="true"` on `#root` from `hideOthers`, NOT as `aria-modal` —
- * `@radix-ui/react-dialog@1.3.1` calls that its "better supported equivalent",
- * so do not grep for `aria-modal` when auditing a dialog. What Radix does NOT
- * do here is return focus to the opener: because `react-remove-scroll` moves
- * focus inside the dialog before `FocusScope` reads `document.activeElement`,
- * the element it stores to restore is the dialog's own field, and after unmount
- * `.focus()` on a detached node drops the caret to `<body>`. Verified with
- * trusted `Enter`/`Escape` on a real `DataTable` row. Fixing it means capturing
- * the opener in this component, which is an owner decision — 38 modals share it.
+ * it, with two measured caveats (Chromium, 2026-10-17 — LOCAL_TESTING_REPORT
+ * §موجة 2): background isolation arrives as `aria-hidden="true"` on `#root` from
+ * `hideOthers`, NOT as `aria-modal`, so do not grep for `aria-modal` when
+ * auditing a dialog; and Radix does not return focus to the opener on its own,
+ * which is what the capture/restore below is for.
  *
  * Shell rules this component enforces (see AGENT_HANDOVER §5 بند 1هـ):
  * - centred, never a side drawer;
@@ -77,6 +71,32 @@ export default function Modal({
   disableDismiss = false,
   className = '',
 }: ModalProps) {
+  /*
+   * Radix's own "return focus to what opened me" does not work for a dialog
+   * opened by state, which is every dialog in this app. Measured in Chromium on
+   * 2026-10-17 with trusted Enter/Escape on a real `DataTable` row: after the
+   * close, `document.activeElement` was `<body>` at every sample from 150ms to
+   * 900ms. The cause is a race inside the library — `react-remove-scroll` moves
+   * focus into the dialog from a layout effect, and `FocusScope` then reads
+   * `document.activeElement` as "the element to come back to", so it stores one
+   * of the dialog's own nodes; `.focus()` on a detached node is a silent no-op
+   * and the caret lands on the body. A keyboard user therefore restarts the Tab
+   * walk from the top of the document after every popup.
+   *
+   * The opener is captured here, during render, at the moment `open` flips to
+   * true: the portal has not mounted yet, so `document.activeElement` is still
+   * the button or row the user just activated. Restoring happens from
+   * `onCloseAutoFocus`, which is Radix's own unmount hook — `preventDefault()`
+   * opts out of the broken restore instead of racing it with a timer.
+   */
+  const openerRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(open);
+  if (open && !wasOpenRef.current) {
+    const active = document.activeElement;
+    openerRef.current = active instanceof HTMLElement ? active : null;
+  }
+  wasOpenRef.current = open;
+
   return (
     <Dialog
       open={open}
@@ -91,6 +111,14 @@ export default function Modal({
         // dist — `descriptionPresent ? concat(...) : ariaDescribedby`). An
         // `aria-describedby` pointing at an element that does not exist would
         // be worse than no description at all.
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          const opener = openerRef.current;
+          openerRef.current = null;
+          // A row removed by the mutation that just completed is no longer in
+          // the document; focusing it would repeat the body-drop this fixes.
+          if (opener && document.contains(opener)) opener.focus({ preventScroll: true });
+        }}
         className={cn(
           'gap-4 overflow-y-auto rounded-shell border border-hairline bg-card p-5 shadow-none md:p-6',
           SIZES[size],

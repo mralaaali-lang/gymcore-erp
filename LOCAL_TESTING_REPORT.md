@@ -3313,3 +3313,54 @@ Vite watcher بـ`EBUSY` على ملف كوكيز كروم)، وملف تعري�
 أصلًا)، ولو المالك عايز رجوعها بتضاف `[class*="focus:bg-"]` للتنحي بس ده يدي نفس الحق في
 `focus:bg-` الضعيف. وكمان ~1700 كلاس حرفي في الصفحات لسه بيطغى على التوكنات (موجة 5/11)،
 و`--ring` نفسه لسه 2.29 (قرار D-gate).
+
+### الإصلاح اللي طلع من الفشل: استرجاع الفوكس في `Modal` + قياس `/login` الحقيقية (2026-10-17)
+
+المالك وافق على إصلاح بند 7 فوق (استرجاع الفوكس) ورفض/أجّل لمس `gyms`. اللي اتعمل:
+
+**`src/components/shared/Modal.tsx`** — الفاتح بيُلتقط **وقت الـrender** أول ما `open` تطلع
+`true` (الـportal لسه ما اتركّبش، فـ`document.activeElement` لسه الزرار/الصف اللي المستخدم
+دوس عليه)، والرجوع بيتم من `onCloseAutoFocus` — ده هوك Radix نفسه للـunmount،
+`event.preventDefault()` بيُلغي محاولة Radix المكسورة بدل ما ينافسها بـtimer، ومعاه حارس
+`document.contains(opener)` لأن أي صف بتمسحه الـmutation اللي خلصت للتو = نفس الوقوع على
+`body`. مفيش prop جديد ومفيش تغيير في أي مستدعٍ.
+
+**المتحقق بعد الإصلاح (نفس مجرى الـCDP بـtrusted keys، StrictMode شغّال زي `main.tsx`):**
+
+- مسار الصف: Tab → `TR` (حلقة نحاسية) → `Enter` → المودال `inside: true` و`active =
+  harness-field` → `Escape` → **`document.activeElement === TR` = true** والحالة
+  `:focus-visible = true` و`outline solid 2px rgb(166,124,46)` بعد الرجوع.
+- مسار الزرار: نفس الدورة على `#harness-open` → **`isButton = true`**.
+- الحبس ما اتكسرش: 4 ضغطات Tab لفّت `harness-drop-first` → `إغلاق` → `harness-field` →
+  رجعت للأول، وكل وقفة `inside = true`.
+- حارس «الفاتح اتمسح»: الزرار جوه المودال بيحذف الصف الفاتح (محاكاة mutation) → `Escape` →
+  مفيش استثناء، `activeElement = BODY` بهدوء، والجدول فضل 1 صف، والتاب التالي رجع
+  `#harness-open` عادي ✓.
+
+**`/login` على خادم التطوير (`:9100`، كود المنتج الحقيقي بدون دخول):** أول مرة يتقاس فيها
+`no-focus-floor` على الشاشة نفسها مش على نسخة DOM —
+
+- الحقل (`email`) كلاسّه `… outline-none no-focus-floor` → `outline: none rgb(255,255,255)`
+  (مطفي)، والـwrapper أبوه هو اللي بيرسم: `borderColor rgb(6, 182, 212)` و
+  `boxShadow rgba(6,182,212,0.3) 0 0 0 1px` — مؤشر واحد لا اتنين، وده بالظبط شرط السياسة.
+- أول Tab من غير تركيز → `INPUT:email` و`:focus-visible = true`؛ والتاب التاني نقل الفوكس
+  لـ`INPUT:password` والـwrapper الأول رجّع حدوده لـ`rgba(181,233,242,0.137)` في نص
+  الانتقال (0.0404947px في الـshadow = الانتقال شغال، مش لحظي).
+- باقي الوقفات كلها ليها مؤشر: `A نسيت كلمة المرور؟` و`A مدرب أو متدرب؟` و`BUTTON English`
+  → `outline solid 2px rgb(166,124,46) offset 2px` (الأرضية)؛ و`BUTTON تسجيل الدخول`
+  → `outline solid 2px rgb(186,153,93) offset 1px` (لها ستايلها الخاص على خلفية الـauth
+  الداكنة — مقبول، فيه مؤشر)، وارتفاعه 48px ✓.
+- **مشكلة جديدة متسجلة (مفيش إصلاح):** `AdminLoginPage.tsx:454` — «تذكرني» =
+  `<input type="checkbox" className="hidden">` جوه `<label>`، يعني `display:none` →
+  **مش قابل للـTab خالص** والـtoggle بالماوس بس (WCAG 2.1.1). الحل النمطي: `sr-only` بدل
+  `hidden` على الـinput + المربع المرسم يفضل `aria-hidden`، وده بند لوحده مستني الدور.
+
+**قرار الـDB بعد موافقة المالك:** طلب «فعّل صالة المدير مؤقتًا» اتنفذش، والسبب مقاس:
+كل الصالات عدا `hamedgym` عليها `deleted_at` (soft delete) — حتى صالة المدير `NONOGYM /
+first-gym` حالتها `is_active = f, tenant_status = active, deleted = t`. يعني الوصول للمودالات
+الحقيقية محتاج **محو `deleted_at`** مش بس `is_active`، وده بيرجع tenant للمعيشة وبيقع في نص
+شغل الجلسة التانية (`subscriptionEnforcement` / `gymFactory` / سكربت تنضيف المستأجرين).
+**المسيبة على حالها:** `staff_users.manager@first-gym.com = is_active true` (معلَن، رجوعه سطر
+واحد في البند فوق)، و`gyms` ما اتلمستش. التحقق اللي كان مفروض يتعمل جوه التطبيق اتعمل على
+`/login` الحقيقية + مكوّنات المنتج الحقيقية في harness، والفرق المتبقي (skip link جنب
+الـSidebar) معلَن.
