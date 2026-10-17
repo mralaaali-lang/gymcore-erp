@@ -21,6 +21,7 @@ import {
 import { PAYMENT_METHODS } from './subscriptions/shared';
 import PageLoader from '../../components/shared/PageLoader';
 import Modal from '../../components/shared/Modal';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
 import { AddExpenseModal } from './ExpensesPage';
 
 // ====================================================================
@@ -363,37 +364,89 @@ function MonthLine({ icon, iconClass, label, value, valueClass, bold }: {
   );
 }
 
+// Amount colour per panel, from tokens rather than tailwind literals: the
+// cash-box ledger has to stay readable on the Court Green dark shell, where
+// `text-red-500` on `bg-card` measured under AA.
+const TONE_CLASS: Record<'emerald' | 'rose' | 'amber', string> = {
+  emerald: 'text-primary',
+  rose: 'text-destructive',
+  amber: 'text-brass',
+};
+
+// Which tone a movement type carries. One map for the day cards and the search
+// panel, so the two can never drift apart.
+const TYPE_TONE: Record<CashMovement['type'], 'emerald' | 'rose' | 'amber'> = {
+  payment: 'emerald',
+  expense: 'rose',
+  refund: 'amber',
+};
+
 function DayTable({ rows, currency, tone, emptyText, emptyIcon, emptyAction }: {
   rows: CashMovement[]; currency: string | null | undefined; tone: 'emerald' | 'rose' | 'amber';
   emptyText?: string; emptyIcon?: string; emptyAction?: React.ReactNode;
 }) {
-  const color = tone === 'emerald' ? 'text-emerald-600' : tone === 'rose' ? 'text-red-500' : 'text-orange-500';
-  if (rows.length === 0) {
-    return (
-      <div className="py-10 px-4 text-center">
-        <span className="material-symbols-outlined text-5xl text-gray-300">{emptyIcon ?? 'inbox'}</span>
-        <p className="text-sm text-gray-400 mt-2">{emptyText}</p>
-        {emptyAction}
-      </div>
-    );
-  }
+  const { language } = useApp();
+  const rtl = language === 'ar';
+
+  // Sorting happens here in the browser, and that is honest only because `rows`
+  // is the whole day for this direction — the panel is not paginated, so the
+  // ordered set on screen IS the ordered set the user asked about.
+  const columns: TableColumn<CashMovement>[] = [
+    {
+      id: 'created_at',
+      label: rtl ? 'الوقت' : 'Time',
+      width: '5.5rem',
+      sortable: true,
+      value: (r) => r.created_at,
+      cell: (r) => (
+        <span dir="ltr" className="text-xs tabular-nums">
+          {r.created_at ? formatTime(String(r.created_at)) : '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'description',
+      label: rtl ? 'البيان' : 'Description',
+      // The member rides under the description rather than as a fourth column:
+      // the print report and the old two-line list both read it as detail of
+      // the movement, not a separate field.
+      cell: (r) => (
+        <div className="min-w-0">
+          <span className="block">{r.description || '—'}</span>
+          {r.member_name && <span className="block text-xs text-ink-faint">{r.member_name}</span>}
+        </div>
+      ),
+    },
+    {
+      id: 'amount',
+      label: rtl ? 'المبلغ' : 'Amount',
+      numeric: true,
+      sortable: true,
+      sortDescFirst: true,
+      value: (r) => Number(r.amount),
+      cell: (r) => (
+        <span className={`font-bold tabular-nums whitespace-nowrap ${TONE_CLASS[tone]}`}>
+          {formatMoney(Number(r.amount), currency)}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <ul className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
-      {rows.map((r) => (
-        <li key={r.id} className="flex items-center gap-3 px-5 py-2.5">
-          <span className="text-xs text-gray-400 tabular-nums shrink-0" dir="ltr">
-            {r.created_at ? formatTime(String(r.created_at)) : '—'}
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="block text-sm text-gray-900 truncate">{r.description || '—'}</span>
-            {r.member_name && <span className="block text-xs text-gray-400 truncate">{r.member_name}</span>}
-          </span>
-          <span className={`text-sm font-bold tabular-nums whitespace-nowrap ${color}`}>
-            {formatMoney(Number(r.amount), currency)}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <DataTable
+      columns={columns}
+      data={rows}
+      bare
+      dense
+      maxHeight="max-h-80"
+      empty={
+        <div className="flex flex-col items-center gap-1 py-6">
+          <span className="material-symbols-outlined text-4xl text-ink-faint">{emptyIcon ?? 'inbox'}</span>
+          <p className="text-sm text-ink-faint">{emptyText}</p>
+          {emptyAction}
+        </div>
+      }
+    />
   );
 }
 
@@ -489,8 +542,50 @@ function SearchModal({ onClose, currency, rtl }: {
 
   const typeLabel = (t: string) =>
     t === 'payment' ? (rtl ? 'إيراد' : 'Income') : t === 'expense' ? (rtl ? 'مصروف' : 'Expense') : (rtl ? 'مرتجع' : 'Refund');
-  const typeClass = (t: string) =>
-    t === 'payment' ? 'text-emerald-600' : t === 'expense' ? 'text-red-500' : 'text-orange-500';
+  // Same token ladder the day tables use: the search panel and the day cards
+  // must never disagree about what an income looks like.
+  const typeClass = (t: string) => TONE_CLASS[TYPE_TONE[(t === 'payment' || t === 'expense' || t === 'refund') ? t : 'refund']];
+
+  const searchColumns: TableColumn<CashMovement>[] = [
+    {
+      id: 'created_at',
+      label: rtl ? 'التاريخ والوقت' : 'When',
+      width: '10rem',
+      sortable: true,
+      sortDescFirst: true,
+      value: (r) => r.created_at,
+      cell: (r) => (
+        <span dir="ltr" className="text-xs tabular-nums">
+          {r.created_at ? `${String(r.created_at).slice(0, 10)} · ${formatTime(String(r.created_at))}` : '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'description',
+      label: rtl ? 'البيان' : 'Description',
+      cell: (r) => (
+        <div className="min-w-0">
+          <span className="block">{r.description || '—'}</span>
+          <span className="block text-xs text-ink-faint">
+            {typeLabel(r.type)}{r.member_name ? ` · ${r.member_name}` : ''}
+          </span>
+        </div>
+      ),
+    },
+    {
+      id: 'amount',
+      label: rtl ? 'المبلغ' : 'Amount',
+      numeric: true,
+      sortable: true,
+      sortDescFirst: true,
+      value: (r) => Number(r.amount),
+      cell: (r) => (
+        <span className={`font-bold tabular-nums whitespace-nowrap ${typeClass(r.type)}`}>
+          {formatMoney(Number(r.amount), currency)}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <Modal
@@ -545,26 +640,14 @@ function SearchModal({ onClose, currency, rtl }: {
               <span className="rounded-full bg-orange-50 text-orange-500 px-3 py-1.5 tabular-nums">↩ {formatMoney(stats.refund_sum, currency)}</span>
             </div>
             {rows.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">{rtl ? 'لا نتائج مطابقة' : 'No matching results'}</p>
+              <p className="text-sm text-ink-faint text-center py-6">{rtl ? 'لا نتائج مطابقة' : 'No matching results'}</p>
             ) : (
-              <ul className="divide-y divide-gray-50 max-h-72 overflow-y-auto border border-gray-100 rounded-2xl">
-                {rows.map((r) => (
-                  <li key={r.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <span className="text-xs text-gray-400 tabular-nums shrink-0" dir="ltr">
-                      {r.created_at ? `${String(r.created_at).slice(0, 10)} · ${formatTime(String(r.created_at))}` : '—'}
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm text-gray-900 truncate">{r.description || '—'}</span>
-                      <span className="block text-xs text-gray-400 truncate">
-                        {typeLabel(r.type)}{r.member_name ? ` · ${r.member_name}` : ''}
-                      </span>
-                    </span>
-                    <span className={`text-sm font-bold tabular-nums whitespace-nowrap ${typeClass(r.type)}`}>
-                      {formatMoney(Number(r.amount), currency)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <DataTable
+                columns={searchColumns}
+                data={rows}
+                dense
+                maxHeight="max-h-72"
+              />
             )}
           </>
         )}
@@ -606,18 +689,18 @@ function ReportModal({ date, rows, currency, rtl, onClose }: {
 
   const Block = ({ title, xs, color }: { title: string; xs: CashMovement[]; color: string }) => (
     <div>
-      <p className="text-sm font-bold text-gray-900 mb-1.5">{title} ({xs.length})</p>
+      <p className="mb-1.5 text-sm font-bold text-foreground">{title} ({xs.length})</p>
       {xs.length === 0 ? (
-        <p className="text-xs text-gray-400">—</p>
+        <p className="text-xs text-ink-faint">—</p>
       ) : (
-        <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+        <ul className="max-h-40 space-y-1.5 overflow-y-auto">
           {xs.map((r) => (
-            <li key={r.id} className="flex items-center gap-2 text-sm rounded-xl bg-gray-50 px-3 py-2">
-              <span className="text-xs text-gray-400 tabular-nums shrink-0" dir="ltr">
+            <li key={r.id} className="flex items-center gap-2 rounded-shell bg-muted/60 px-3 py-2 text-sm">
+              <span className="shrink-0 text-xs tabular-nums text-ink-faint" dir="ltr">
                 {r.created_at ? formatTime(String(r.created_at)) : '—'}
               </span>
-              <span className="flex-1 min-w-0 truncate text-gray-800">{r.description || '—'}</span>
-              <span className={`font-bold tabular-nums whitespace-nowrap ${color}`}>{formatMoney(Number(r.amount), currency)}</span>
+              <span className="min-w-0 flex-1 truncate text-table-fg">{r.description || '—'}</span>
+              <span className={`whitespace-nowrap font-bold tabular-nums ${color}`}>{formatMoney(Number(r.amount), currency)}</span>
             </li>
           ))}
         </ul>
@@ -669,9 +752,9 @@ function ReportModal({ date, rows, currency, rtl, onClose }: {
             <p className="text-[11px] text-sky-600 tabular-nums">{rows.length} {rtl ? 'حركة' : 'moves'}</p>
           </div>
         </div>
-        <Block title={rtl ? 'إيرادات' : 'Income'} xs={pin} color="text-emerald-600" />
-        <Block title={rtl ? 'مصروفات' : 'Expenses'} xs={pout} color="text-red-500" />
-        <Block title={rtl ? 'مرتجعات' : 'Refunds'} xs={pref} color="text-orange-500" />
+        <Block title={rtl ? 'إيرادات' : 'Income'} xs={pin} color={TONE_CLASS.emerald} />
+        <Block title={rtl ? 'مصروفات' : 'Expenses'} xs={pout} color={TONE_CLASS.rose} />
+        <Block title={rtl ? 'مرتجعات' : 'Refunds'} xs={pref} color={TONE_CLASS.amber} />
       </div>
     </Modal>
   );

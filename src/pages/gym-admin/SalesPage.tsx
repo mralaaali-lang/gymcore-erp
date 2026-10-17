@@ -21,6 +21,7 @@ import PageLoader from '../../components/shared/PageLoader';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
 
 interface SaleRow {
   id: string; member_name?: string; staff_name?: string;
@@ -123,6 +124,47 @@ export default function SalesPage() {
   const monthlyExpenses = Number(summaryRes?.data?.monthly_expenses ?? 0);
   const products = productsRes?.data || [];
 
+  // No `sortable` on any column: /api/finance/sales takes page/limit only, so a
+  // header control here would re-order the twenty rows already loaded and pass
+  // them off as the whole ledger sorted. It stays a plain, token-coloured table
+  // until the endpoint gains an ORDER BY the client can ask for.
+  const saleColumns: TableColumn<SaleRow>[] = [
+    {
+      id: '__n',
+      label: rtl ? 'م' : '#',
+      width: '3.5rem',
+      numeric: true,
+      cell: (_s, i) => (page - 1) * 20 + i + 1,
+    },
+    {
+      id: 'member_name',
+      key: 'member_name',
+      label: rtl ? 'العضو' : 'Member',
+      cell: (s) => <span className="font-medium text-foreground">{s.member_name || '—'}</span>,
+    },
+    { id: 'staff_name', key: 'staff_name', label: rtl ? 'الموظف' : 'Staff' },
+    {
+      id: 'total_amount',
+      label: rtl ? 'الإجمالي' : 'Total',
+      numeric: true,
+      value: (s) => s.total_amount,
+      cell: (s) => <span className="font-bold text-primary">{money(s.total_amount)}</span>,
+    },
+    {
+      id: 'payment_method',
+      label: rtl ? 'الدفع' : 'Payment',
+      cell: (s) => {
+        const pm = paymentMethods.find((x) => x.value === s.payment_method);
+        return <StatusBadge status={pm ? (rtl ? pm.labelAr : pm.labelEn) : s.payment_method} variant="neutral" />;
+      },
+    },
+    {
+      id: 'created_at',
+      label: rtl ? 'التاريخ' : 'Date',
+      cell: (s) => <span dir="ltr" className="text-xs">{formatDate(s.created_at)}</span>,
+    },
+  ];
+
   const renderCreateSale = () => (
     <div className="max-w-2xl mx-auto">
       <Card className="space-y-4">
@@ -214,53 +256,28 @@ export default function SalesPage() {
         <p className="text-sm text-gray-500">{rtl ? 'إجمالي مبيعات الشهر' : 'Monthly Sales'}: <span className="font-bold text-emerald-600 text-lg">{money(monthlySalesSum)}</span>{monthlySalesCount > 0 && <span className="text-xs text-gray-400"> · {monthlySalesCount} {rtl ? 'فاتورة' : 'invoices'}</span>}</p>
       </div>
       {isLoading ? <PageLoader variant="skeleton" rows={5} /> : (
-        <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-right p-4 text-xs font-semibold text-gray-500">#</th>
-                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'العضو' : 'Member'}</th>
-                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الموظف' : 'Staff'}</th>
-                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الإجمالي' : 'Total'}</th>
-                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'الدفع' : 'Payment'}</th>
-                  <th className="text-right p-4 text-xs font-semibold text-gray-500">{rtl ? 'التاريخ' : 'Date'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sales.map((s: SaleRow, i: number) => (
-                  <tr key={s.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-                    <td className="p-4 text-gray-500">{(page - 1) * 20 + i + 1}</td>
-                    <td className="p-4 font-medium text-gray-900">{s.member_name || '-'}</td>
-                    <td className="p-4 text-gray-500">{s.staff_name || '-'}</td>
-                    <td className="p-4 font-bold text-emerald-600">{money(s.total_amount)}</td>
-                    <td className="p-4">
-                      <StatusBadge
-                        status={paymentMethods.find((pm) => pm.value === s.payment_method) ? (rtl ? paymentMethods.find((pm) => pm.value === s.payment_method)!.labelAr : paymentMethods.find((pm) => pm.value === s.payment_method)!.labelEn) : s.payment_method}
-                        variant="neutral"
-                      />
-                    </td>
-                    <td className="p-4 text-gray-500 text-xs" dir="ltr">{formatDate(s.created_at)}</td>
-                  </tr>
-                ))}
-                {sales.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-gray-500/50">{rtl ? 'لا توجد مبيعات' : 'No sales found'}</td></tr>}
-              </tbody>
-            </table>
-          </div>
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between p-4 border-t border-gray-100">
-              <span className="text-sm text-gray-500">{rtl ? `صفحة ${page} من ${totalPages}` : `Page ${page} of ${totalPages}`}</span>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
-                  {rtl ? 'السابق' : 'Previous'}
-                </Button>
-                <Button variant="outline" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>
-                  {rtl ? 'التالي' : 'Next'}
-                </Button>
+        <DataTable
+          columns={saleColumns}
+          data={sales}
+          empty={rtl ? 'لا توجد مبيعات' : 'No sales found'}
+          footer={
+            totalPages > 1 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-sm text-table-head">
+                  {rtl ? `صفحة ${page} من ${totalPages}` : `Page ${page} of ${totalPages}`}
+                </span>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
+                    {rtl ? 'السابق' : 'Previous'}
+                  </Button>
+                  <Button variant="outline" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>
+                    {rtl ? 'التالي' : 'Next'}
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-        </Card>
+            ) : undefined
+          }
+        />
       )}
     </>
   );
