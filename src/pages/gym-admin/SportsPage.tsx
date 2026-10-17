@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Pencil, FloppyDisk as Save, Trash as Trash2, X } from '@phosphor-icons/react';
+import { ArrowRight, Pencil, FloppyDisk as Save, Trash as Trash2 } from '@phosphor-icons/react';
+import Modal from '../../components/shared/Modal';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -313,34 +314,41 @@ export default function SportsPage() {
 
       {/* تأكيد الحذف */}
       {deleting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setDeleting(null)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">{rtl ? 'حذف الرياضة' : 'Delete sport'}</h2>
-              <button onClick={() => setDeleting(null)} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label={rtl ? 'إغلاق' : 'Close'}>
-                <X size={18} />
-              </button>
-            </div>
-            <p className="text-sm text-gray-700">{rtl ? `حذف «${deleting.name_ar}»؟` : `Delete “${deleting.name_ar}”?`}</p>
-            {(Number(deleting.plan_count ?? 0) > 0 || Number(deleting.active_sub_count ?? 0) > 0) && (
-              <p className="mt-2 text-sm font-semibold text-red-600">
-                {rtl ? `مستخدمة في ${fmtNum(Number(deleting.plan_count ?? 0))} باقة و${fmtNum(Number(deleting.active_sub_count ?? 0))} اشتراك — الحذف سيرفض. أوقفها بدل ذلك.` : 'In use — deletion will be refused. Pause instead.'}
-              </p>
-            )}
-            <div className="flex items-center gap-3 mt-5">
+        <Modal
+          open
+          onClose={() => setDeleting(null)}
+          size="md"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={remove.isPending}
+          title={rtl ? 'حذف الرياضة' : 'Delete sport'}
+          footer={
+            <>
               <button
-                onClick={() => remove.mutate(deleting)}
+                type="button"
+                onClick={() => setDeleting(null)}
                 disabled={remove.isPending}
-                className="flex-1 min-h-[44px] rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-50"
+                className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
               >
-                {rtl ? 'تأكيد الحذف' : 'Confirm delete'}
-              </button>
-              <button onClick={() => setDeleting(null)} className="min-h-[44px] px-6 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold">
                 {rtl ? 'إلغاء' : 'Cancel'}
               </button>
-            </div>
-          </div>
-        </div>
+              <button
+                type="button"
+                onClick={() => remove.mutate(deleting)}
+                disabled={remove.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition disabled:opacity-50"
+              >
+                {remove.isPending ? (rtl ? 'جارٍ الحذف…' : 'Deleting…') : (rtl ? 'تأكيد الحذف' : 'Confirm delete')}
+              </button>
+            </>
+          }
+        >
+          <p className="text-sm text-gray-700">{rtl ? `حذف «${deleting.name_ar}»؟` : `Delete “${deleting.name_ar}”?`}</p>
+          {(Number(deleting.plan_count ?? 0) > 0 || Number(deleting.active_sub_count ?? 0) > 0) && (
+            <p className="mt-2 text-sm font-semibold text-red-600">
+              {rtl ? `مستخدمة في ${fmtNum(Number(deleting.plan_count ?? 0))} باقة و${fmtNum(Number(deleting.active_sub_count ?? 0))} اشتراك — الحذف سيرفض. أوقفها بدل ذلك.` : 'In use — deletion will be refused. Pause instead.'}
+            </p>
+          )}
+        </Modal>
       )}
     </div>
   );

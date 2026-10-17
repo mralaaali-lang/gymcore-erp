@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Check, X, Barbell as Dumbbell, Ticket } from '@phosphor-icons/react';
+import Modal from '../../components/shared/Modal';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -227,39 +228,37 @@ export default function PrivateTrainingPage() {
 function PtReportModal({ rtl, onClose, money }: { rtl: boolean; onClose: () => void; money: (v: unknown) => string }) {
   const { data, isLoading } = useApiQuery(['pt-enrollments', 'report'], ptReport, { staleTime: 60_000 });
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-gray-900">{rtl ? 'تقارير البرايفت' : 'PT reports'}</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label={rtl ? 'إغلاق' : 'Close'}>
-            <X size={18} />
-          </button>
-        </div>
-        {isLoading ? (
-          <PageLoader variant="skeleton" rows={4} />
-        ) : (
-          <table className="w-full text-sm text-gray-900">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="text-start px-4 py-2.5 text-xs font-semibold text-gray-500">{rtl ? 'الشهر' : 'Month'}</th>
-                <th className="text-start px-4 py-2.5 text-xs font-semibold text-gray-500">{rtl ? 'تسجيلات' : 'Sales'}</th>
-                <th className="text-start px-4 py-2.5 text-xs font-semibold text-gray-500">{rtl ? 'محصّل' : 'In'}</th>
-                <th className="text-start px-4 py-2.5 text-xs font-semibold text-gray-500">{rtl ? 'مستحق' : 'Due'}</th>
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      dir={rtl ? 'rtl' : 'ltr'}
+      title={rtl ? 'تقارير البرايفت' : 'PT reports'}
+    >
+      {isLoading ? (
+        <PageLoader variant="skeleton" rows={4} />
+      ) : (
+        <table className="w-full text-sm text-gray-900">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="text-start px-4 py-2.5 text-xs font-semibold text-gray-500">{rtl ? 'الشهر' : 'Month'}</th>
+              <th className="text-start px-4 py-2.5 text-xs font-semibold text-gray-500">{rtl ? 'تسجيلات' : 'Sales'}</th>
+              <th className="text-start px-4 py-2.5 text-xs font-semibold text-gray-500">{rtl ? 'محصّل' : 'In'}</th>
+              <th className="text-start px-4 py-2.5 text-xs font-semibold text-gray-500">{rtl ? 'مستحق' : 'Due'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data?.data ?? []).map((r) => (
+              <tr key={r.month} className="border-t border-gray-100">
+                <td className="px-4 py-2.5 tabular-nums" dir="ltr">{r.month}</td>
+                <td className="px-4 py-2.5 tabular-nums">{fmtNum(r.enrollments)}</td>
+                <td className="px-4 py-2.5 tabular-nums text-emerald-600 font-semibold">{money(r.collected)}</td>
+                <td className="px-4 py-2.5 tabular-nums text-red-600 font-semibold">{money(r.outstanding)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {(data?.data ?? []).map((r) => (
-                <tr key={r.month} className="border-t border-gray-100">
-                  <td className="px-4 py-2.5 tabular-nums" dir="ltr">{r.month}</td>
-                  <td className="px-4 py-2.5 tabular-nums">{fmtNum(r.enrollments)}</td>
-                  <td className="px-4 py-2.5 tabular-nums text-emerald-600 font-semibold">{money(r.collected)}</td>
-                  <td className="px-4 py-2.5 tabular-nums text-red-600 font-semibold">{money(r.outstanding)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Modal>
   );
 }

@@ -10,6 +10,7 @@ import { fmtNum } from '../../utils/date';
 import { listCoachesSummary, createStaff, updateStaff, type CoachSummary } from '../../services/api';
 import { DashboardPage, StatCard, Panel, EmptyState } from '../../components/dashboard';
 import PageLoader from '../../components/shared/PageLoader';
+import Modal from '../../components/shared/Modal';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { sportName, useSportsCatalog } from './subscriptions/shared';
 
@@ -291,54 +292,66 @@ export default function TrainersPage() {
 
       {/* إضافة مدرب — الدور ثابت coach والعمولة من أول يوم */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-gray-900">{rtl ? 'إضافة مدرب' : 'Add coach'}</h2>
-              <button onClick={() => setShowForm(false)} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label={rtl ? 'إغلاق' : 'Close'}>
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'الاسم' : 'Name'} *</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'البريد' : 'Email'} *</label>
-                <input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'كلمة المرور' : 'Password'} *</label>
-                <input type="password" dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'الهاتف' : 'Phone'}</label>
-                <input dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'الراتب' : 'Salary'}</label>
-                  <input type="number" min={0} value={salary} onChange={(e) => setSalary(e.target.value)} className={inputCls} />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'العمولة %' : 'Commission %'}</label>
-                  <input type="number" min={0} max={100} step={0.5} value={commission} onChange={(e) => setCommission(e.target.value)} placeholder="0" className={inputCls} />
-                </div>
-              </div>
-              <p className="text-xs text-gray-400">
-                {rtl ? 'نوع التعاقد يُشتق تلقائيًا: راتب>0 وعمولة>0 = مختلط — راتب 0 وعمولة 0 = بدون تعاقد.' : 'Contract type derives automatically from salary/commission.'}
-              </p>
+        <Modal
+          open
+          onClose={() => setShowForm(false)}
+          size="md"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={create.isPending}
+          title={rtl ? 'إضافة مدرب' : 'Add coach'}
+          footer={
+            <>
               <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                disabled={create.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+              >
+                {rtl ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="button"
                 onClick={() => create.mutate()}
                 disabled={!formValid || create.isPending}
-                className="w-full min-h-[48px] rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold disabled:opacity-50"
+                className="min-h-[48px] px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition disabled:opacity-50"
               >
-                {create.isPending ? '…' : (rtl ? 'إضافة المدرب' : 'Add coach')}
+                {create.isPending ? (rtl ? 'جارٍ الإضافة…' : 'Adding…') : (rtl ? 'إضافة المدرب' : 'Add coach')}
               </button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'الاسم' : 'Name'} *</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
             </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'البريد' : 'Email'} *</label>
+              <input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'كلمة المرور' : 'Password'} *</label>
+              <input type="password" dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'الهاتف' : 'Phone'}</label>
+              <input dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'الراتب' : 'Salary'}</label>
+                <input type="number" min={0} value={salary} onChange={(e) => setSalary(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'العمولة %' : 'Commission %'}</label>
+                <input type="number" min={0} max={100} step={0.5} value={commission} onChange={(e) => setCommission(e.target.value)} placeholder="0" className={inputCls} />
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">
+              {rtl ? 'نوع التعاقد يُشتق تلقائيًا: راتب>0 وعمولة>0 = مختلط — راتب 0 وعمولة 0 = بدون تعاقد.' : 'Contract type derives automatically from salary/commission.'}
+            </p>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
