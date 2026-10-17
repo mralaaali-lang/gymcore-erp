@@ -11,7 +11,7 @@ import {
   type PlatformGym, type PlatformContract,
 } from '../../services/api';
 import {
-  Plus, X, DotsThreeVertical, Users, ArrowSquareOut,
+  Plus, DotsThreeVertical, Users, ArrowSquareOut,
   Prohibit, CheckCircle, SignIn, ClipboardText, Pencil, Trash,
   WarningCircle, ArrowsClockwise, SquaresFour, List as ListIcon,
   MagnifyingGlass, Warning, FileText,
@@ -22,6 +22,7 @@ import { tr, formatDate, planLabel, daysRemaining } from './superAdminUtils';
 import { fmtMoney } from './contracts/contractsUtils';
 import ContractDetailModal from './contracts/ContractDetailModal';
 import ContractFormModal from './contracts/ContractFormModal';
+import Modal from '../../components/shared/Modal';
 
 type StatusFilter = 'all' | 'active' | 'suspended' | 'trial' | 'expired';
 type SortKey = 'name' | 'created_at' | 'members' | 'renewal_date';
@@ -72,19 +73,8 @@ export default function TenantDirectory() {
   // إجراء الصف (مودال وسطي)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!openDropdownId) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpenDropdownId(null);
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [openDropdownId]);
+  // موجة 3 / دفعة 5: قفل السكرول ومعالِج Escape اليدوي اتحذفوا — `shared/Modal`
+  // بيجيبهم مع Radix، ومعاهم حبس الفوكس وعزلة الخلفية واسترجاع الفاتح.
 
   const params = {
     search: debouncedSearch.trim() || undefined,
@@ -482,49 +472,43 @@ export default function TenantDirectory() {
         </div>
       </div>
 
-      {/* Centered row actions dialog shared visually with Platform Admins. */}
+      {/* موجة 3 / دفعة 5: نفس max-w-md (= size="md") ونفس الصفوف السبعة بنفس
+          الـhandlers. سطر العقد نزل أول عنصر في المتّن لأن `description` بتاعة
+          القشرة بتترجّع لـ`<p>` واحد، وتداخل `<p>` جوه `<p>` HTML غير صالح. */}
       {actionGym && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[3px]"
-          onClick={() => setOpenDropdownId(null)}
+        <Modal
+          open
+          onClose={() => setOpenDropdownId(null)}
+          size="md"
+          dir={isRtl ? 'rtl' : 'ltr'}
+          title={(
+            <span className="flex items-center gap-2">
+              <SquaresFour size={20} className="text-primary" />
+              {T('Gym actions', 'إجراءات الصالة')}
+            </span>
+          )}
+          description={(
+            <>
+              {actionGym.name} · <span dir="ltr">{actionGym.subdomain}.gymcore.app</span>
+            </>
+          )}
+          footer={(
+            <button
+              type="button"
+              onClick={() => setOpenDropdownId(null)}
+              className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+            >
+              {T('Cancel', 'إلغاء')}
+            </button>
+          )}
         >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="tenant-actions-title"
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-white/60 bg-white shadow-2xl shadow-slate-950/20 ring-1 ring-black/5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between border-b border-slate-100 bg-gradient-to-br from-gray-50 via-white to-gray-100 p-5 sm:p-6">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <SquaresFour size={22} />
-                </div>
-                <div className="min-w-0">
-                  <h2 id="tenant-actions-title" className="text-lg font-bold text-gray-900">
-                    {T('Gym actions', 'إجراءات الصالة')}
-                  </h2>
-                  <p className="mt-1 truncate text-sm text-[#64748b]">{actionGym.name}</p>
-                  <p className="mt-0.5 text-xs text-slate-400" dir="ltr">{actionGym.subdomain}.gymcore.app</p>
-                  {actionGym.contract_id && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      {actionGym.plan_name || planLabel(actionGym.plan_tier, isRtl)} · {fmtMoney(actionGym.contract_price, actionGym.contract_currency)}
-                      {actionGym.contract_renewal_date ? ` · ${T('renewal', 'تجديد')} ${formatDate(actionGym.contract_renewal_date)}` : ''}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label={T('Close', 'إغلاق')}
-                onClick={() => setOpenDropdownId(null)}
-                className="rounded-xl p-2 text-slate-500 transition hover:bg-white hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-2 p-4 sm:p-5">
+          <div className="space-y-2">
+            {actionGym.contract_id && (
+              <p className="text-xs text-gray-500">
+                {actionGym.plan_name || planLabel(actionGym.plan_tier, isRtl)} · {fmtMoney(actionGym.contract_price, actionGym.contract_currency)}
+                {actionGym.contract_renewal_date ? ` · ${T('renewal', 'تجديد')} ${formatDate(actionGym.contract_renewal_date)}` : ''}
+              </p>
+            )}
               <button
                 type="button"
                 onClick={() => {
@@ -622,19 +606,8 @@ export default function TenantDirectory() {
                   <span className="mt-0.5 block text-xs text-red-700/75">{T('Permanently remove this gym', 'حذف هذه الصالة نهائيًا')}</span>
                 </span>
               </button>
-            </div>
-
-            <div className="border-t border-slate-100 px-4 py-3 text-end sm:px-5">
-              <button
-                type="button"
-                onClick={() => setOpenDropdownId(null)}
-                className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                {T('Cancel', 'إلغاء')}
-              </button>
-            </div>
-          </section>
-        </div>
+          </div>
+        </Modal>
       )}
 
       {/* §40 — تفاصيل العقد من نفس الشاشة */}
@@ -661,35 +634,56 @@ export default function TenantDirectory() {
         />
       )}
 
-      {/* === Delete Confirmation Modal === */}
+      {/* موجة 3 / دفعة 5: تأكيد الحذف — نفس max-w-md (= size="md") ونفس حارس
+          «اكتب DELETE» ونفس الـmutation. الـ`z-[70]` القديم كان تركة: الصف اللي
+          بيفتح اللوحة دي بيقفل لوحة الإجراءات (`setOpenDropdownId(null)`) في نفس
+          اللحظة، فمفيش تكديس نوافذ أصلًا وz-50 بتاعة القشرة كافية. */}
       {deleteModalGym && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={() => { setDeleteModalGym(null); setDeleteConfirmText(''); }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-4">
-              <WarningCircle size={22} className="text-red-600" />
-              <h2 className="text-lg font-bold text-gray-900">{T('Delete Gym', 'حذف النادي')}</h2>
-            </div>
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-              <p className="text-sm text-red-800 font-medium mb-1">{T(`Are you sure you want to delete "${deleteModalGym.name}"?`, `هل أنت متأكد من حذف نادي "${deleteModalGym.name}"؟`)}</p>
-              <p className="text-xs text-red-600">{T('All data will be permanently deleted.', 'سيتم حذف جميع البيانات بشكل نهائي.')}</p>
-            </div>
-            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{T('Type "DELETE" to confirm:', 'اكتب "DELETE" للتأكيد:')}</label>
-            <input type="text" value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder="DELETE" className="w-full px-3 py-2 border border-gray-100 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-400 font-mono" dir="ltr" autoFocus />
-            <div className="flex gap-3 mt-5">
-              <button type="button" disabled={deleteMutation.isPending || deleteConfirmText !== 'DELETE'}
+        <Modal
+          open
+          onClose={() => { setDeleteModalGym(null); setDeleteConfirmText(''); }}
+          size="md"
+          dir={isRtl ? 'rtl' : 'ltr'}
+          disableDismiss={deleteMutation.isPending}
+          title={(
+            <span className="flex items-center gap-2">
+              <WarningCircle size={20} className="text-red-600" />
+              {T('Delete Gym', 'حذف النادي')}
+            </span>
+          )}
+          footer={(
+            <>
+              <button
+                type="button"
+                onClick={() => { setDeleteModalGym(null); setDeleteConfirmText(''); }}
+                className="px-5 py-3 border border-gray-100 rounded-xl text-gray-500 font-medium hover:bg-gray-50 transition-colors"
+              >
+                {T('Cancel', 'إلغاء')}
+              </button>
+              <button
+                type="button"
+                disabled={deleteMutation.isPending || deleteConfirmText !== 'DELETE'}
                 onClick={() => deleteMutation.mutate(deleteModalGym.id)}
-                className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
                 {deleteMutation.isPending && <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />}
                 {T('Delete Permanently', 'حذف نهائي')}
               </button>
-              <button type="button" onClick={() => { setDeleteModalGym(null); setDeleteConfirmText(''); }}
-                className="px-5 py-3 border border-gray-100 rounded-xl text-gray-500 font-medium hover:bg-gray-50 transition-colors">
-                {T('Cancel', 'إلغاء')}
-              </button>
+            </>
+          )}
+        >
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <p className="text-sm text-red-800 font-medium mb-1">{T(`Are you sure you want to delete "${deleteModalGym.name}"?`, `هل أنت متأكد من حذف نادي "${deleteModalGym.name}"؟`)}</p>
+              <p className="text-xs text-red-600">{T('All data will be permanently deleted.', 'سيتم حذف جميع البيانات بشكل نهائي.')}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-500 mb-1.5">{T('Type "DELETE" to confirm:', 'اكتب "DELETE" للتأكيد:')}</label>
+              <input type="text" value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE" className="w-full px-3 py-2 border border-gray-100 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-400 font-mono" dir="ltr" autoFocus />
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

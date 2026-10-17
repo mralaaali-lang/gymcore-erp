@@ -4192,3 +4192,162 @@ JavaScript بيفسّر `` $` `` داخل نص الاستبدال معناه «�
 القاعدة اللي طلعت (بتنزلت كبنود (7) في `FRONTEND_MASTER_PLAN.md` §4): **ممنوع `String.replace` بنص
 استبدال فيه `$`؛ استخدم `split(from).join(to)` أو أداة التحرير الحرفية**، وأي تعديل وثائقي يتقاس بـ`wc -l`
 + عدّاد عناوين قبل ما يُحسب خلص.
+---
+
+## §54 — موجة 3 / دفعة 5: `PlatformAdmins` + `PlatformMarketing` + `TenantDirectory` على `shared/Modal` (2026-10-17 — جلسة A+C)
+
+**الطلب:** أمر المالك الثابت «كمل» على `FRONTEND_MASTER_PLAN.md` موجة 3، بدفعات 3–5 ملفات.
+الدفعة دي = آخر ثلاث ملفات حيّة في `super-admin` (المؤشر قبلها **23 ملفًا / 30 موضعًا** من §53).
+
+### ١) إيه اتحوّل بالضبط (٥ لوحات في ٣ ملفات)
+
+| الملف | اللوحة | الحجم | كان | بقى |
+|---|---|---|---|---|
+| `src/pages/super-admin/PlatformAdmins.tsx` | إنشاء/تعديل مشرف | `size="lg"` | `div.fixed inset-0` + scrim + قفل سكرول يدوي + `Escape` handler | `Modal` + `dir` + `disableDismiss={createMutation.isPending \|\| updateMutation.isPending}` |
+| `src/pages/super-admin/PlatformAdmins.tsx` | إجراءات صف | `size="md"` | نفس الكتلة اليدوية | `Modal` |
+| `src/pages/super-admin/PlatformMarketing.tsx` | لوحة حملة جديدة/تعديل | `size="md"` | نفس الكتلة اليدوية | `Modal` + `footer` بزر `type="submit" form="platform-campaign-form"` |
+| `src/pages/super-admin/TenantDirectory.tsx` | إجراءات صف الصالة | `size="md"` | نفس الكتلة اليدوية | `Modal` |
+| `src/pages/super-admin/TenantDirectory.tsx` | تأكيد الحذف | `size="sm"` | نفس الكتلة اليدوية | `Modal` |
+
+اتحذف من الملفات: effect قفل السكرول، معالِج `keydown/Escape`، طبقة الـscrim اليدوية، واستيراد `X`
+و`useEffect` اللي بقوا بلا استعمال. مفيش أي mock ومفيش أي بيانات ثابتة — نفس مسارات التطبيق
+الحقيقية (`createPlatformAdmin` · `POST /platform/marketing/campaigns` · …) بلا أي تعديل.
+
+### ٢) المنهجية: ليه الـharness المؤقّت (`scratch/w3e`) ضروري، وإزاي اتحوّل لـ«صفر كتابة»
+
+الدخول المحلي مقفول (`403 GYM_SUSPENDED`/`401`) لأن كل الصالات `deleted_at` ما عدا `hamedgym`
+(ذاكرة المشروع)، فملفات `super-admin` متوصلش من الراوتر الحقيقي. البديل: **نفس الصفحات الحقيقية**
+تحت providers الحقيقية (`MemoryRouter > ThemeProvider > QueryClientProvider(retry:false) > AppProvider > ToastProvider`)
+عبر نقطة دخول مؤقتة — **مش مكوّنات مستنسخة**.
+
+أربع حقائق اتقاست وغيّرت الخطة:
+
+1. **`server/.env` فيه `CORS_ORIGIN=http://localhost:9000`** والمقروب عليه `http://127.0.0.1:9100`
+   ⇒ الـPOST بيموت عند الـpreflight، و`Fetch.requestPaused` **ما بيشوفوش أبدًا** (كروم بيردّ على
+   `OPTIONS` جوّه الشبكة: `status 204 type Preflight`، وبعدين الطلب نفسه ما بيخرجش). الحل: إعادة
+   كتابة داخل الـharness للـURL المطلق ⇒ نفس المسار على `127.0.0.1:9100/api/v1/…` بيخدعه الـproxy
+   بتاع `vite.config.ts`.
+2. **`src/services/api.ts:170/187/228`** تحوّل أي `401` إلى `window.location.href = '/login'` —
+   وأول ما الـharness بقى same-origin، الـ401 الحقيقي رماني على `/login` وحطّم الصفحة المقروسة
+   (الـDOM بقى 17,235 حرف و`document.title` = «جيم كور - GymCore ERP»). ⇒ أي probe يشغّل طلبات
+   حقيقية لازم يمنع الوصول للـ401 أصلًا.
+3. **الحارس `installBackendGuard`:** `Fetch.enable({ patterns:[{ urlPattern:'*api/v1*' }] })` +
+   الطلبات الكتابية المطابقة تُحبس، وكل الباقي `Fetch.failRequest('ConnectionRefused')`.
+   فشل النقل ده **بلا `error.response`** فـ`isError`/`onError` بيتنفّذوا في نفس الفرع الحقيقي
+   و**بلا redirect**. النتيجة: `forwarded = 0` — صفر بايت خرجت من المتصفح، و`disableDismiss`
+   اتقاس من جوّة نافذة pending حقيقية مش متخيّلة.
+4. **`Fetch.enable({urlPattern:'*'})` قبل الـnavigation يعلّق `Page.navigate`** (بيحبس طلب المستند
+   نفسه، 15s timeout) — النمض لازم يبقى `*api/v1*` بس.
+
+مزاليق تانية اتصحّحت في نفس الطلقة: `getComputedStyle` على عقدة اتفصلت بيرجع نص فاضي (لازم
+تُنسخ قيم الـtoken قبل `probe.remove()`)؛ و`window.scrollTo` مسموح على صندوق `overflow:hidden`
+فمش دليل قفل — القفل الحقيقي اتقاس بـ`mouseWheel` موثوق؛ و`querySelector('[role=dialog]')` بيرجع
+عقدة الـexit animation، فكل قراء بتستخدم `[...].filter(data-state==='open').pop()` (درس §49 تاني مرة)؛
+ومقروب `'[role="tab"]'` بيرجع null لأن `UnifiedTabs` ما بيطلّعش أدوار (تحت §٧).
+
+التنظيف: `rm -rf scratch/w3e` و`git ls-files scratch` = **0**؛ كروم اتقفل بـ`Browser.close` عبر
+CDP مش `taskkill /IM chrome.exe` (الحادثة القديمة)، وبروفيله `cdp-m3b5-profile` اتمسح.
+
+### ٣) PlatformMarketing — اللوحة الـ`md` (probe 1: **44/44 pass**، Chromium 155 headless، إدخال موثوق)
+
+- العرض **448px** (`max-w-md`) والتمركز `centreDelta [0,0]`.
+- تكافؤ التوكنات مقابل `probe` بنفس classes: `radius 10px = 10px` · `border 1px rgb(239, 233, 221) = rgb(239,233,221)` (`--hairline`) · `bg rgb(255, 253, 249)` (`--card`) · `shadow` = ظلال صفرية الثلاث = **`shadow-none`** (العمق من الحرف بس).
+- عزلة الخلفية `#root aria-hidden="true"` (مش `aria-modal`)، و`aria-labelledby` موجود،
+  و`aria-describedby` **مغيب** مقصود (مفيش `description`) — عقد `Modal`.
+- فتح بـ**Enter موثوق**، Escape بيقفل والفوكس بيرجع لـ«حملة جديدة»، والـscrim بيقفل في وضع الخمول،
+  وحبس Tab **15/15** جوّه اللوحة، وقفل السكرول الموثوق: `{y:0, de:0, b:0, bodyOverflow:"hidden"}`.
+- **التحقق المزدوج حيّ:** إرسال والحقول فاضية ⇒ `submits: []` و`invalids: ["text","text"]`
+  و`validity:false` واللوحة فضلت مفتوحة (الـnative لسه شغال لأن الزرار برّه الـ`form` لكن مربوط بـ`form="…"`).
+- `POST http://127.0.0.1:9100/api/v1/platform/marketing/campaigns` اتحبس بـ
+  `{"name":"probe-عاجل-verify-only","type":"email"}` ⇒ أثناء التعليق `{disabled:true, spinner:true, open:1}`
+  و**Escape/scrim/X كلها مرفوضة**؛ بعد التحرير `onError` الحقيقي «فشل إنشاء الحملة» واللوحة فضلت مفتوحة.
+- مصفوفة `dir` أربع حالات: ar+`<html dir=rtl>` → `rtl`؛ ar+`<html dir=ltr>` مفروض → اللوحة **لسه `rtl`**؛
+  en → `ltr` و**448px** و`[0,0]`.
+- الفضلات بعد القفل: `{dialogs:0, fixedOverlays:0, bodyOverflow:"visible"}` · صفر أخطاء console ·
+  صفر طلبات متقدمة للشبكة · صفر `window.confirm`.
+
+### ٤) PlatformAdmins — اللوحة الـ`lg` (probe 2: **41/41 pass**، viewport صريح 1280×900)
+
+- **512×598px** (`max-w-lg`) و`centreDelta [0,0]` ونفس رباعي التوكنات المقاس في §٣ حرفيًا،
+  و`dir=rtl`/`css=rtl`/`html=rtl`، و`#root aria-hidden="true"`.
+- زرار الحفظ في الـfooter مربوط بـ`form="platform-admin-form"`: `{x:598, y:699, type:"submit", disabled:false, inView:true}`.
+- **ثلاث طبقات تحقق متتالية على نفس اللوحة:**
+  - فاضي ⇒ `{submits:0, validity:false, open:1, activeInDialog:true}` (الفوكس ما خرجش).
+  - اسم + بريد بس ⇒ لسه `validity:false` (الباسورد مطلوب في وضع الإنشاء) ⇒ صفر إرسال.
+  - `abcdefgh` ⇒ **`validity:true`** (شرط `minLength=8` محقّق أصيلًا في المتصفح) بس `held:0` و`submits:1` والسطر
+    اللي طلع هو قاعدة التطبيق مش المتصفح: «استخدم 8 أحرف على الأقل، مع حرف كبير وصغير ورقم.»
+    (`PlatformAdmins.tsx:184-188`).
+- `POST /platform/admins` اتحبس؛ مفاتيح الـpayload: `email · phone_number · password · full_name · role_type`
+  (قيمة الباسورد سنخة مقصودة للبرهنة ومطبوعاش هنا ولا في أي سجل). أثناء التعليق:
+  `{disabled:true, spinner:true, open:1}` و**Escape مرفوض** و**scrim مرفوض** و**X مرفوض**
+  (موقع الـX في الـRTL على الشمال: `x=414, y=181` — `inset-inline-end:1rem`).
+- بعد التحرير: `{disabled:false, open:1, kept:true, inlineErr:"فشل إضافة المشرف"}` — الغلط بيطلع
+  **جوّه اللوحة** عبر `setModalError` (`:106-109` + `:549-551`) مش toast، وده صح التصميم: المحاولات
+  الفاشلة ما بتضيعش المدخلات.
+- فضلات دورة القفل: `{dialogs:0, open:0, fixedOverlays:0, bodyOverflow:"visible", ariaHidden:null}` ·
+  حبس Tab **12/12** · الفوكس رجع لـ«إضافة مشرف».
+- `TenantDirectory` بتركّب من غير أي effect يدوي: `{dialogs:0, bodyOverflow:"visible", scrollLock:false}`
+  وطلعت نسخته الحقيقية من فرع الخطأ «تعذر تحميل الصالات».
+
+### ٥) §34و عند 390 / `(pointer: coarse)`
+
+`matchMedia('(max-width: 768px)') = true` و`pointer: coarse = true` عند 390×844 ×2. اللوحة الـ`lg`
+واللوحة الـ`md` **اتفتحتوا بـEnter موثوق**، وكلتاهما **358px** جوّه `innerW 390`، و
+`docScrollWidth = 390 = base` (اللوحة ما زادتش overflow أفقي ولا بكسل واحد)، و**9/9 عناصر تحكّم ≥ 48px**
+في كل واحدة (`under48: 0`, `worst: []`). زرار X بتاع القشرة **[26, 48]** — عرض أقل من 44 (بوابة مالك، تحت).
+
+**ملاحظة صدق عن حجم النافذة:** `clearDeviceMetricsOverride` رجّع `innerWidth = 764` — يعني نافذة
+كروم الرأسless نفسها أقل من 768. فالطلقة الأولى (probe 1) اتقاست كلها على 764، و`md:p-6` (≥768)
+ما اتطبّقش ⇒ الحشو المقاس **20px** (`p-5`) مش 24px. الطلقة التانية عدّلت ده بـoverride صريح 1280×900.
+
+### ٦) صفر كتابة — متحقق من ضفتين
+
+- **المتصفح:** الحارس عدّ `forwarded = 0` (كل الطلبات اتحبست أو فشلَت عند النقل)، وصفر ردود 401.
+- **القاعدة** (قراءة فقط، `residue.mjs` اتمسح مع الـharness، ومفيش أي طباعة لاتصال):
+  `marketing_campaigns probe rows: []` · `platform_admins probe rows: []` ·
+  `totals {"campaigns":"0","platform_admins":"1"}` — نفس الأرقام في ثلاث قراءات متتابعة قبل/بعد
+  الطلقتين، يعني حتى الصف الموجود قبل الشغل ده ما اتلمسش.
+
+### ٧) فجوات ومعلَنات (مقرّة وما اتصلحش — خارج نطاق الدفعة)
+
+1. **لوحة «إجراءات الصف» في `PlatformAdmins` واللوحتين في `TenantDirectory` ما فتحتش حيًّا:**
+   قائمة المشرفين فاضية تحت `401` فـ`actionAdmin` مستحيل يتعمل، و`TenantDirectory` بيرجع فرع
+   `isLoading`/`isError` قبل الجدول. ثلاثتها بنفس القشرة ونفس توكنات `md`/`sm` المقاسة في §٣ و§٤ —
+   **مورَّث من مقاس، مش مقاس على الشاشة دي**. اللي يلغي الفجوة دي: جلسة صالة حيّة (بوابة مالك).
+2. **`UnifiedTabs.tsx:101-124` بلا أدوار:** الأزرار عادية من غير `role="tab"`/`aria-selected`،
+   فمقروب `[role="tab"]` بيرجع null وقارئ الشاشة ما بيقولش «التبويب النشط». (الفقرة دي سبّبت أول
+   فشل للـprobe، مش عيب في المتحوَّل.)
+3. **`ToastContext.tsx:65` بلا `role="status"`/`aria-live`:** مقاس `{role:null, live:null}` —
+   «فشل إنشاء الحملة» بيظهر بصريًا بس، ومستخدم قارئ شاشة ما بيسمعش نتيجة الإرسال. (نقل toast لـsonner
+   محجوز لجلسة تانية — مهمة #3.)
+4. **زر «إلغاء» في الـfooter بيتجاوز `disableDismiss`:** مقاس — أثناء تعليق طلب حقيقي،
+   `Escape/scrim/X` مرفوضين، لكن الضغط على «إلغاء» قفل اللوحة (`open after Cancel = 0`).
+   السبب إن `disableDismiss` بيحرس `onOpenChange` بس (`Modal.tsx:142-144`)، أما الـfooter فبينادي
+   `closeModal()` مباشرة. **سلوك قشرة مورَّث من كل الدفعات السابقة (§49/§51/§52/§53)** ومش مُدخل
+   في الدفعة دي؛ الإصلاح قرار ملكية على `shared/Modal` (بوابة مالك).
+5. **`window.confirm()` لسه موجود:** `PlatformAdmins.tsx:238-246` (حذف مشرف) و`confirm(...)` في
+   حذف الحملة بـ`PlatformMarketing.tsx` — حوار متصفح أصلي، خارج الهوية، وغير مترجم.
+   `N34` أكّد صفر `confirm` اتطلقت **في المسارات المقاسة بس** (الحذف محتاج صفوف حيّة).
+6. **موخيبايت في `PlatformMarketing.tsx`:** تعليق سطر 190، وشرطات `'—'` بتطلع `'â€—'` في جدول
+   الإحالات (نص ظاهر للمستخدم). مش شغل صدفة، فمعلَن ومستني قرار.
+7. **بوابات قشرة مفتوحة من قبل:** عرض X = 26px و`aria-label="إغلاق"` عربي حرفي في
+   `shadcn/dialog.tsx:66-67` (بيبان عربي في واجهة إنجليزي)، والحقول بلا `htmlFor` (اسم متاح ناقص).
+
+### ٨) أرقام البوابات بعد الدفعة
+
+- `npx tsc --noEmit` = **0 أخطاء** · `npm run build` = ✓ **6.29s**، `index-Dzfkz14Y.js` = **902.58 kB** (908,941 بايت؛ §53 كان 908,937 — **+4 بايت** وhash غيّّر لأنه تغيير كود حقيقي).
+- مؤشر الموجة بـglob الخطة نفسه: `src/pages` **20 ملفًا / 25 موضعًا** (كان 23/30) و`src/**` **25 / 31** (كان 28/36).
+- `super-admin` بقى فيه **ملف واحد بس**: `AddGymModal.tsx:1` — وهو على قائمة الكود الميت (موجة 1)
+  ومقول «ما يتلمسش»، فلو اتساب برّا: **صدفات `super-admin` الحيّة = صفر** والمتبقي الحقيقي كله
+  `gym-admin` **19 ملفًا / 24 موضعًا**.
+- غير المدفوع `origin/main..HEAD` = **18** قبل commit الدفعة (17 بعد §53 + 1 توثيق) ⇒ **19** بعدها،
+  والمحسوب على ref محلّي مش مجلوب (`git fetch` أمر مالك). **D7 مستني أمرك. D8 (`:9000`) ما اتلمسش.**
+
+### ٩) مستني المالك (نفس البوابات، بلا تنفيذ unilateral)
+
+قرار `AddGymModal` (يتمسح في موجة 1 ولا يتحوّل) · أمر الدفعة الجاية من `gym-admin` (19/24) ·
+`D9 AddSubscription` · رفع رقائق الأيام لـ48px · عرض X واسمه المتاح في `shadcn/dialog.tsx` ·
+دفعة `htmlFor`/`id` · D1/D2 خرائط الألوان · D6 الملفات الميتة · إصلاح الـموخيبايت ·
+استعادة صالة حيّة للتحقق داخل التطبيق + `manager@first-gym.com` `is_active=false` ·
+reflow الجداول على 390 كبند في موجة 4 · **`push` (D7) وإعادة بناء `:9000` (D8)** — ولا واحدة اتعملت في الجلسة دي.
+

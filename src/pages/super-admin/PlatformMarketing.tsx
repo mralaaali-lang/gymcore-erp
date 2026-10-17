@@ -11,13 +11,14 @@ import {
 } from '../../services/api';
 import type { MarketingCampaign, EmailTemplate, ReferralData, LoyaltySummary } from '../../services/api';
 import {
-  MegaphoneSimple, Users, Star, Plus, X, FloppyDisk, Trash,
+  MegaphoneSimple, Users, Star, Plus, FloppyDisk, Trash,
   Envelope, CheckCircle, Clock,
 } from '@phosphor-icons/react';
 import PageLoader from '../../components/shared/PageLoader';
 import PageHeader from '../../components/shared/PageHeader';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import MarketingReportsTab from './marketing/MarketingReportsTab';
+import Modal from '../../components/shared/Modal';
 
 type MarketingTab = 'dashboard' | 'campaigns' | 'referrals' | 'loyalty' | 'reports';
 
@@ -371,18 +372,46 @@ export default function PlatformMarketing() {
       {/* â–¼ Reports */}
       {activeTab === 'reports' && <MarketingReportsTab />}
 
-      {/* â”€â”€ Campaign Create Modal â”€â”€ */}
+      {/* موجة 3 / دفعة 5: استمارة الحملة — نفس max-w-md (= size="md") ونفس الحقول
+          ونفس الـmutation، بس الطبقة الثابتة والـscrim وزرار X بقوا شغل القشرة
+          (ومعاها Escape وحبس الفوكس وعزلة الخلفية). زرار الإنشاء في الفوتر
+          بـ`form="platform-campaign-form"` عشان `required` الأصلي يفضل شغال. */}
       {showCampaignModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowCampaignModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <MegaphoneSimple size={20} className="text-primary" />
-                <h2 className="text-lg font-bold text-gray-900">{isRtl ? 'حملة جديدة' : 'New Campaign'}</h2>
-              </div>
-              <button onClick={() => setShowCampaignModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <form onSubmit={(e) => { e.preventDefault(); createCampaignMutation.mutate({
+        <Modal
+          open
+          onClose={() => setShowCampaignModal(false)}
+          size="md"
+          dir={isRtl ? 'rtl' : 'ltr'}
+          disableDismiss={createCampaignMutation.isPending}
+          title={(
+            <span className="flex items-center gap-2">
+              <MegaphoneSimple size={20} className="text-primary" />
+              {isRtl ? 'حملة جديدة' : 'New Campaign'}
+            </span>
+          )}
+          footer={(
+            <>
+              <button
+                type="button"
+                onClick={() => setShowCampaignModal(false)}
+                className="px-5 py-3 border border-gray-100 rounded-xl text-gray-500 font-medium hover:bg-gray-50 transition-colors"
+              >
+                {isRtl ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="submit"
+                form="platform-campaign-form"
+                disabled={createCampaignMutation.isPending}
+                className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-petrol-light transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {createCampaignMutation.isPending && (<span className="material-symbols-outlined animate-spin text-base">progress_activity</span>)}
+                <FloppyDisk size={16} />
+                {isRtl ? 'إنشاء الحملة' : 'Create'}
+              </button>
+            </>
+          )}
+        >
+            <form id="platform-campaign-form" onSubmit={(e) => { e.preventDefault(); createCampaignMutation.mutate({
               name: campForm.name,
               name_ar: campForm.name_ar || undefined,
               type: campForm.type,
@@ -430,21 +459,8 @@ export default function PlatformMarketing() {
                     className="w-full px-3 py-2 border border-gray-100 rounded-lg" />
                 </div>
               </div>
-              <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={createCampaignMutation.isPending}
-                  className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-petrol-light transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
-                  {createCampaignMutation.isPending && (<span className="material-symbols-outlined animate-spin text-base">progress_activity</span>)}
-                  <FloppyDisk size={16} />
-                  {isRtl ? 'إنشاء الحملة' : 'Create'}
-                </button>
-                <button type="button" onClick={() => setShowCampaignModal(false)}
-                  className="px-5 py-3 border border-gray-100 rounded-xl text-gray-500 font-medium hover:bg-gray-50 transition-colors">
-                  {isRtl ? 'إلغاء' : 'Cancel'}
-                </button>
-              </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

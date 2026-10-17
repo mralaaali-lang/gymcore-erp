@@ -196,6 +196,26 @@ grep -rl "fixed inset-0" src/pages | wc -l ; grep -ro "fixed inset-0" src/pages 
 محتاجين نفس الجلسة؛ فالمتبقي من الموجة دي **مقاس** بعد دفعة 4: `src/pages` **23 / 30** — `gym-admin`
 **19/24** و`super-admin` **4/6** (`AddGymModal` · `PlatformAdmins` · `PlatformMarketing` ·
 `TenantDirectory`)، و**`BillingEngine` مش فيهم** (مقاس: مستخدِم `shared/Modal` من قبل الموجة، 0 مواضع).
+
+**الحالة بعد دفعة 5 (3 ملفات / ٥ لوحات، §54):** `super-admin/PlatformAdmins` → `Modal size="lg"` (إنشاء/تعديل)
++ `size="md"` (إجراءات صف) · `PlatformMarketing` → `size="md"` · `TenantDirectory` → `size="md"` (إجراءات)
++ `size="sm"` (تأكيد حذف). القياس الحيّ (`scratch/w3e`، اتمسح و`git ls-files scratch` = 0) على
+Chromium 155 headless بإدخال موثوق: **44/44** و**41/41** — الـ`md` **448px** والـ`lg` **512×598px**
+بـ`centreDelta [0,0]` وتوكنات مطابقة للقط في الاتنين، و`aria-hidden` على `#root`، وحبس Tab
+**15/15** و**12/12**، والفوكس راجع للفاتح في الحالتين، و`disableDismiss` متقاس من جوّة **POST حقيقي
+محبوس** (`/platform/marketing/campaigns` و`/platform/admins`) — escape/scrim/X مرفوضة والزرار
+`disabled` + spinner، واللوحة فضلت مفتوحة بعد فشل `onError` الحقيقي. §34و على 390 coarse:
+**9/9 عناصر ≥ 48px** في اللوحتين والـ`docScrollWidth` فضلت **390 = base** (المودال ما زادش overflow).
+**صفر كتابة بضفتين:** `forwarded=0` + عدّ الصفوف `marketing_campaigns=[]` و`platform_admins=[]`
+وtotals `{"campaigns":"0","platform_admins":"1"}` في ثلاث قراءات.
+المؤشر بعد الدفعة: `src/pages` **20 ملفًا / 25 موضعًا** (`src/**` **25/31**) — و`super-admin` بقى
+فيه `AddGymModal` (1) فقط، وهو على قائمة الكود الميت (موجة 1 / `D6`) ومقول «ما يتلمسش»،
+ف**صدفات `super-admin` الحيّة = صفر** والمتبقي الحقيقي كله `gym-admin` **19 ملفًا / 24 موضعًا**
+(+ `AddSubscription` المستنية قرار `D9`).
+**فجوات مقرّة في الدفعة:** لوحتا `TenantDirectory` ولوحة إجراءات `PlatformAdmins` ما فتحتش حيًّا
+(القائمة فاضية تحت `401`/`isError`) — هندسة `md`/`sm` مورّثة من المقاس؛ و**زر «إلغاء» بيتجاوز
+`disableDismiss`** (مقاس: الطلب معلّق والـCancel بيقفل اللوحة رغم إن Escape/scrim/X مرفوضين) —
+سلوك قشرة مورَّث من §49/§51/§52/§53 وإصلاحه قرار ملكية على `shared/Modal` (بوابة مالك).
 المتبقي بيستنى بوابة المالك «رجّع tenant حيّة». وبوابتان جديدتان
 اتفتحتا من القياس: **عرض زرار X بتاع القشرة 26px** (`shadcn/dialog.tsx:66` — ملف واحد = كل المودالات)
 و**6/11 حقل بلا اسم متاح** في استمارات العقد (نمط `LABEL_CLASS` من غير `htmlFor` في المنتج كله).

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { formatDate } from '../../utils/date';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
@@ -13,7 +13,6 @@ import {
   type PlatformAdminRole,
 } from '../../services/api';
 import {
-  X,
   Shield,
   ShieldCheck,
   ShieldChevron as ShieldHalf,
@@ -32,6 +31,7 @@ import PageLoader from '../../components/shared/PageLoader';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
+import Modal from '../../components/shared/Modal';
 
 const roleLabels: Record<string, Record<string, string>> = {
   super_admin: { ar: 'مشرف عام', en: 'Super Admin' },
@@ -81,21 +81,8 @@ export default function PlatformAdmins() {
   const [formRole, setFormRole] = useState<PlatformAdminRole>('support_admin');
   const [modalError, setModalError] = useState<string | null>(null);
 
-  // Keep the centered actions dialog modal and keyboard accessible.
-  useEffect(() => {
-    if (!openDropdownId) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpenDropdownId(null);
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [openDropdownId]);
+  // موجة 3 / دفعة 5: قفل السكرول ومعالِج Escape اليدوي اتحذفوا — `shared/Modal`
+  // (Radix) بييجوا معاه، ومعاه كمان حبس الفوكس وعزلة الخلفية واسترجاع الفاتح.
 
   const { data, isLoading, isError } = useApiQuery(['platform', 'admins'], listPlatformAdmins, { staleTime: 30_000 });
   const admins = data?.data ?? [];
@@ -341,42 +328,33 @@ export default function PlatformAdmins() {
         </div>
       </Card>
 
-      {/* Centered actions dialog, detached from the table so it cannot be clipped. */}
+      {/* موجة 3 / دفعة 5: نفس max-w-md (= size="md") ونفس الصفوف الثلاثة، بس الطبقة
+          الثابتة والـscrim وزرار X وEscape وقفل السكرول بقوا شغل القشرة. الهيدر
+          المتدرج والمربع الملون مش جزء من عقد `Modal` — الأيقونة فضلت في العنوان. */}
       {actionAdmin && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[3px]"
-          onClick={() => setOpenDropdownId(null)}
+        <Modal
+          open
+          onClose={() => setOpenDropdownId(null)}
+          size="md"
+          dir={isRtl ? 'rtl' : 'ltr'}
+          title={(
+            <span className="flex items-center gap-2">
+              <ShieldCheck size={20} className="text-primary" />
+              {isRtl ? 'إجراءات المشرف' : 'Admin actions'}
+            </span>
+          )}
+          description={actionAdmin.full_name}
+          footer={(
+            <button
+              type="button"
+              onClick={() => setOpenDropdownId(null)}
+              className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+            >
+              {isRtl ? 'إلغاء' : 'Cancel'}
+            </button>
+          )}
         >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="platform-admin-actions-title"
-            className="w-full max-w-md overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl shadow-slate-950/20 ring-1 ring-black/5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between border-b border-slate-100 bg-gradient-to-br from-gray-50 via-white to-gray-100 p-5 sm:p-6">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <ShieldCheck size={22} />
-                </div>
-                <div>
-                  <h2 id="platform-admin-actions-title" className="text-lg font-bold text-gray-900">
-                    {isRtl ? 'إجراءات المشرف' : 'Admin actions'}
-                  </h2>
-                  <p className="mt-1 text-sm text-[#64748b]">{actionAdmin.full_name}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label={isRtl ? 'إغلاق' : 'Close'}
-                onClick={() => setOpenDropdownId(null)}
-                className="rounded-xl p-2 text-slate-500 transition hover:bg-white hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-2 p-4 sm:p-5">
+          <div className="space-y-2">
               <button
                 type="button"
                 onClick={() => openEditModal(actionAdmin)}
@@ -426,41 +404,53 @@ export default function PlatformAdmins() {
                   <span className="mt-0.5 block text-xs text-red-700/75">{isRtl ? 'تعطيل الحساب مع الاحتفاظ بسجلاته' : 'Deactivate the account and keep its history'}</span>
                 </span>
               </button>
-            </div>
+          </div>
+        </Modal>
+      )}
 
-            <div className="border-t border-slate-100 px-4 py-3 text-end sm:px-5">
+      {/* موجة 3 / دفعة 5: استمارة الإضافة/التعديل — نفس max-w-lg (= size="lg") ونفس
+          الحقول ونفس handleSubmit من غير أي تعديل على منطق كلمة المرور. القفل
+          الممتدّ على الاتنين، وزرار الحفظ بقى في الفوتر بـ`form="platform-admin-form"`
+          عشان تحقق المتصفح الأصلي (required / minLength 8) يفضل شغال وهو برا الـ<form>. */}
+      {modalMode && (
+        <Modal
+          open
+          onClose={closeModal}
+          size="lg"
+          dir={isRtl ? 'rtl' : 'ltr'}
+          disableDismiss={createMutation.isPending || updateMutation.isPending}
+          title={(
+            <span className="flex items-center gap-2">
+              <ShieldCheck size={20} className="text-primary" />
+              {modalMode === 'create'
+                ? (isRtl ? 'إضافة مشرف جديد' : 'New Platform Admin')
+                : (isRtl ? 'تعديل بيانات المشرف' : 'Edit Platform Admin')}
+            </span>
+          )}
+          footer={(
+            <>
               <button
                 type="button"
-                onClick={() => setOpenDropdownId(null)}
-                className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                onClick={closeModal}
+                className="px-5 py-3 border border-gray-100 rounded-xl text-gray-500 font-medium hover:bg-gray-50 transition-colors"
               >
                 {isRtl ? 'إلغاء' : 'Cancel'}
               </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {/* Create / Edit Modal */}
-      {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeModal}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={20} className="text-primary" />
-                <h2 className="text-lg font-bold text-gray-900">
-                  {modalMode === 'create'
-                    ? (isRtl ? 'إضافة مشرف جديد' : 'New Platform Admin')
-                    : (isRtl ? 'تعديل بيانات المشرف' : 'Edit Platform Admin')
-                  }
-                </h2>
-              </div>
-              <button onClick={closeModal} className="p-1.5 hover:bg-gray-100 rounded-lg">
-                <X size={18} />
+              <button
+                type="submit"
+                form="platform-admin-form"
+                disabled={createMutation.isPending || updateMutation.isPending}
+                className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-petrol-light transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {(createMutation.isPending || updateMutation.isPending) && <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>}
+                {modalMode === 'create'
+                  ? (isRtl ? 'إضافة المشرف' : 'Create Admin')
+                  : (isRtl ? 'حفظ التغييرات' : 'Save Changes')}
               </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
+            </>
+          )}
+        >
+            <form id="platform-admin-form" onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-500 mb-1.5">
                   {isRtl ? 'الاسم الكامل' : 'Full Name'} <span className="text-red-500">*</span>
@@ -559,30 +549,8 @@ export default function PlatformAdmins() {
               {modalError && (
                 <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{modalError}</p>
               )}
-
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                  className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-petrol-light transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  {(createMutation.isPending || updateMutation.isPending) && <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>}
-                  {modalMode === 'create'
-                    ? (isRtl ? 'إضافة المشرف' : 'Create Admin')
-                    : (isRtl ? 'حفظ التغييرات' : 'Save Changes')
-                  }
-                </button>
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-5 py-3 border border-gray-100 rounded-xl text-gray-500 font-medium hover:bg-gray-50 transition-colors"
-                >
-                  {isRtl ? 'إلغاء' : 'Cancel'}
-                </button>
-              </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
