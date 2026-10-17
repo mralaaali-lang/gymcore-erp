@@ -2740,7 +2740,7 @@ value, cell, sortable, sortDescFirst, numeric, align, width }`، والـ`{key,l
 
 ---
 
-## إصلاحان في جلسة السوبر ادمن (2026-10-17)
+## إصلاحات جلسة السوبر ادمن (2026-10-17)
 
 ### 1) دخول السوبر ادمن بيرمي بره المنصة (`4e3b691`)
 
@@ -2785,4 +2785,49 @@ value, cell, sortable, sortDescFirst, numeric, align, width }`، والـ`{key,l
 **مزلق جديد اتسجل:** المتصفح بيعمل **autofill** على نموذج الصالة الجديدة — حطّ بريدًا شخصيًا
 محفوظًا في خانة بريد المدير وكلمة سر محفظتك في خانة كلمة السر. تجربة الواجهة الحيّة لازم
 تتوقف عند ظهور ده، والتحقق يتحوّل لـAPI ببيانات اختبار صريحة (`probe-ui@example.com`).
+
+### 3) الصالة الجديدة كانت تفتح ببيانات ديمو (هذا الكوميت)
+
+**العطل:** بعد إضافة صالة من معالج المنصة وتسجيل الدخول كمديرها، اللوحة عرضت 15 عضوًا
+واشتركات نشطة وحضور — بيانات ما دخلهاش حد، ورسَمها `seedNewGym` نفسه.
+
+**السبب:** `server/src/seed/seedNewGym.ts` كان مسار إنتاج بيت تصرّف كده لكل صالة جديدة:
+15 عضو ملفّق (أسماء سعودية النمط، تليفونات `+9665…`، صور من `ui-avatars.com`) + اشتراك
+`active` لكل عضو + حضور عشوائي على 7 أيام + 6 منتجات (باركود `200000`–`200005`) + 4 تصنيفات
+مصروفات، وبعدين `UPDATE gym_usage_counters SET current_members_count = 15`. ده بيانات تجريبية
+في طريق إنتاجي — ممنوع في المشروع (قاعدة صفر mock).
+
+**الإصلاح:** `seedNewGym` بقى logging بس: «New gym created factory-fresh (no demo data seeded)».
+الدوال التشغيلية `seedDefaultSports` و`seedDefaultOffers` ضلت مُصدَّرة لأن `gymReset` ومسار
+`onboarding` بيستخدموها، و`import { getAdminClient }` اتشال (ما فيش مستخدم ليه — `noUnusedLocals`
+كان بيرفض). نداء `seedNewGym` في `platformGyms.createGym` سيبته كـseam لأن الملف ده عليه diff
+لسه uncommitted من جلسة موازية.
+
+**المتحقق (تدفق حيّ كامل):** back `tsc --noEmit` = 0 · دخول المنصة **200** ·
+`POST /platform/gyms` → **201** (صالة اختبار `4f4972e5-ccd6-46fb-980e-8b35c387e9ab`،
+subdomain `zz-fresh-mvbuhpxa`) · `/auth/login` لمدير الصالة **200** · بعدها بصلاحيات الصالة:
+`/api/members` → **0**، `/api/membership-offers` → **0**، `/api/products` → **0**،
+`/api/attendance/today` → **0**. الصالة الجديدة بتفتح فاضية تمامًا.
+
+**عطل قديم طلع في أثناء تنظيف صالة الاختبار:** `DELETE /platform/gyms/:id` رجّع **500** بقيد
+`activity_logs_staff_user_id_fkey` — و`activity_logs` جدول append-only (triggers بيرفع
+`TABLE_IS_IMMUTABLE`) فمفيش طريقة لمسح سجل المدير. معناها أي صالة المدير بتاعها سجل دخول مرة
+**ما بتتحذفش** من الطريق ده؛ صالة الاختبار سيبتها soft-delete (`deleted_at = NOW()` +
+`is_active = false` + تعطيل المدير) وهي مش بتظهر في القوائم ولا في العدادات.
+
+**أمر المسح الجاهز لـ«حامد جيم»:** `server/scripts/remove_demo_seed_data.sql` (مشغّل من طرف
+المالك، مقصود — البيانات دي ملكه). اشتغّل dry-run كامل: `SELECT 15` → `DELETE 52` (حضور) →
+`DELETE 15` (اشتراكات) → `DELETE 15` (أعضاء) → `DELETE 6` (منتجات) → `DELETE 4` (تصنيفات) →
+`UPDATE 1` (العدّاد)، وسطر التحقق طلع `members 0 · subs 0 · attendance 0 · products 0 ·
+expense_cats 0 · offers 4 · sports 7 · counter_members 0`. الجلسة اتقفلت من غير `COMMIT`
+فالـtransaction عملت abort، وقياس تاني بعد كده أكّد إن الأصل لسه موجود: **15 / 52 / 15** (ما
+اتغيّرش حاجة).
+الكتالوج الحقيقي (4 عروض + 7 رياضات) متروك في السكربت كخيار افتراضي لأن من غيره
+`createMember(plan_id)` والـcheck-in اليدوي ما يمشيوش، وفيه بلوك اختياري معلّق (مش شغّال) لو
+عايز الصالة تبقى فاضية على طول.
+
+**فجوة مقصودة ومسجّلة:** مسار الـonboarding الذاتي بيزرع 4 عروض، ومعالج المنصة ما بقاش
+يزرع — يعني صالة اتعملت من المنصة لازم المدير يخلق عروض اشتراك بنفسه قبل أول عضوية.
+التوحيد بند في المتبقي، وما اتعملش هنا لأن `onboarding.ts` و`platformGyms.ts` عليهم diff
+لسه uncommitted من الجلسة الموازية.
 

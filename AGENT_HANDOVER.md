@@ -148,6 +148,27 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
   على النموذج ده لازم تتوقف عند ظهوره، والتحقق يتحوّل لـAPI ببيانات اختبار صريحة ثم
   `DELETE /platform/gyms/:id` (مطلوب `{"confirmation":"DELETE"}` + `X-CSRF-Token`) فما تسيبش
   صالة زائدة في الـDB المشترك.
+- **البذرة التجريبية في مسار الإنتاج (اتشالت 2026-10-17):** `server/src/seed/seedNewGym.ts` كان
+  بيحشي كل صالة جديدة بـ15 عضو ملفق (صور `ui-avatars.com`، تليفونات `+9665…`) + اشتراك `active`
+  لكل واحد + حضور 7 أيام + 6 منتجات (باركود `200000`–`200005`) + 4 تصنيفات مصروفات، وبيرفع
+  `gym_usage_counters.current_members_count` لـ15. دلوقتي الدالة logging بس والصالة بتفتح فاضية
+  (المقاييس في `LOCAL_TESTING_REPORT.md` → «إصلاحات جلسة السوبر ادمن»، البند 3).
+  **ما ترجعش تبذر بيانات وهمية في أي مسار إنتاجي** — قاعدة صفر mock؛ ولو اللوحة الفاضية باينَة
+  ناقصة فالحل checklist حقيقي، مش بيانات مزروعة. `seedDefaultSports`/`seedDefaultOffers` لسه
+  مُصدَّرة لأن `gymReset` و`onboarding` بيستخدموهم، ونداء `seedNewGym` سيبته seam في
+  `platformGyms.createGym` (الملف عليه diff لسه uncommitted من جلسة موازية).
+  **الفجوة المتبقية:** `onboarding.ts` بيزرع 4 عروض اشتراك ومعالج المنصة ما بقاش — يعني أي صالة
+  اتعملت من المنصة لازم مديرها يعمل عروض بنفسه قبل أول `createMember(plan_id)` أو check-in يدوي.
+- **حذف صالة مستحيل بعد أول دخول لمديرها (عطل قائم، 2026-10-17):** `DELETE /platform/gyms/:id`
+  بيرجع **500** بقيد `activity_logs_staff_user_id_fkey`، و`activity_logs` append-only (triggers
+  بيرفع `TABLE_IS_IMMUTABLE`) فمفيش طريقة لمسح سجل المدير. نظّف صالات الاختبار بـsoft delete:
+  `UPDATE gyms SET deleted_at = NOW(), is_active = false` + `UPDATE staff_users SET is_active = false`
+  (`listGyms` بيفلتر على `deleted_at`)، والإصلاح الصح مطلوب في `platformGyms.deleteGym`.
+- **مسح بيانات الديمو من صالة موجودة:** `server/scripts/remove_demo_seed_data.sql` — للأمر نفسه
+  transaction مفتوحة على `SELECT` تحقق و`COMMIT` معلّق (المالك يكتبها). الـdry-run اتعمل:
+  `SELECT 15 / DELETE 52 / DELETE 15 / DELETE 15 / DELETE 6 / DELETE 4 / UPDATE 1` ثم تحقق
+  `members 0 · subs 0 · attendance 0 · offers 4 · sports 7 · counter 0`، والـabort سيّب الأصل
+  كما هو (قُيِّت تاني: 15 / 52 / 15).
 - **Railway staging (2026-10-12):** النشر بـ `railway up` من الجذر (سياق build = repo root).
   بروكسي Railway يوصل للـ replica على **منفذ 8080** إن لم يُضبط Application Port — nginx يlisten على 80+8080 معاً. بعد كل redeploy للـ backend **أعد نشر الـ frontend** (nginx يظلّم DNS لـ `backend.railway.internal` عند الإقلاع وإلا يجمّد البروكسي) — مع الرفع التلقائي (§29) كل push يبني الخدمةين معاً فتنتهي هذه المشكلة جانبياً؛ تبقى عند إعادة نشر backend وحده يدوياً. `railway service restart` يتعطّل أحياناً — `railway up -d` أضمن.
 
@@ -169,7 +190,12 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
 6. **Staging (Railway):** ✅ يعمل (2026-10-12 §21) — backend+frontend Online؛ الدومينات `frontend-production-abdd`/`backend-production-9b567`؛ **منذ §29: الرفع تلقائي — كل `git push origin main` يبني وينشر عبر GitHub App + Deployment Triggers (فرع main)**؛ إعدادات إلزامية: backend rootDirectory فارغ + dockerfilePath `/server/Dockerfile.prod`، frontend rootDirectory `.` (تفاصيل §29). `deploy.sh`/«ارفع» لم عادا لازمين إلا كطوارئ. **ديون دمج الصفحات: منتهية — اكتملت السلسلة بـ §27** (الفريق §22، المتجر §23، الديون/الإعلانات §26، backup/migration → تبويبات الإعدادات §27).
 6. **مؤجل بقرار:** ZATCA، استشارة قانونية، بوابات دفع حقيقية (نقدي/يدوي أولاً — راجع `PAYMENT_COLLECTION_STRATEGY.md`).
 7. **ديون تقنية:** `routeConfigs/` قديم، `UIContext` غير مُmount، `superAdminUtils.tr` مكرر، تحذير حجم chunks في البناء.
+   **من دفعة 2026-10-17 (الصالة الفاضية):** (أ) `platformGyms.deleteGym` بـ`DELETE FROM gyms`
+   بيرفض أي صالة سجل مديرها دخول (`activity_logs_staff_user_id_fkey` + `TABLE_IS_IMMUTABLE`) —
+   لازم يتحوّل soft delete أو يمسح الأبناء بالترتيب. (ب) توحيد حالة المصنع: `onboarding.ts`
+   بيزرع `seedDefaultOffers` ومعالج المنصة لا، فاختار مسار واحد (إما البذرة الكتالوجية في
+   الاتنين أو ولا واحد مع checklist يوضح إن العروض مطلوبة قبل أول عضوية).
 
 ## 8) الملفات المرجعية
 
-`LOCAL_TESTING_REPORT.md` (سجل حي شامل) • `DOCKER_GUIDE.md` (Docker) • `PROJECT_ANALYSIS_DOCUMENTATION.md` (جرد النظام) • `ACTION_PLAN_PRODUCTION_READY.md` (الخطة) • `PAYMENT_COLLECTION_STRATEGY.md` (التحصيل) • `server/scripts/reset-local.ps1` (التصفير).
+`LOCAL_TESTING_REPORT.md` (سجل حي شامل) • `DOCKER_GUIDE.md` (Docker) • `PROJECT_ANALYSIS_DOCUMENTATION.md` (جرد النظام) • `ACTION_PLAN_PRODUCTION_READY.md` (الخطة) • `PAYMENT_COLLECTION_STRATEGY.md` (التحصيل) • `server/scripts/reset-local.ps1` (التصفير) • `server/scripts/remove_demo_seed_data.sql` (مسح بيانات الديمو المزروعة في صالة موجودة).

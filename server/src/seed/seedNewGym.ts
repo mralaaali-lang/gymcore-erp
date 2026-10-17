@@ -1,6 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { PoolClient } from 'pg';
-import { getAdminClient } from '../config/database';
 import logger from '../config/logger';
 
 const OFFER_TEMPLATES = [
@@ -36,8 +35,9 @@ export async function seedDefaultSports(client: PoolClient, gymId: string): Prom
  * Seeds the standard membership-offer catalog for a gym. This is operating
  * catalog data (NOT demo junk): without it createMember(plan_id) can never
  * succeed and members can never hold a subscription — which blocks manual
- * check-in entirely ("no active subscription found"). Shared by the
- * platform add-gym seed and the self-service onboarding wizard.
+ * check-in entirely ("no active subscription found"). Callers today: the
+ * self-service onboarding wizard and `gymReset`. The platform "add gym"
+ * wizard no longer calls it — see `seedNewGym` below.
  * Returns the created offer ids so callers can reference them.
  */
 export async function seedDefaultOffers(client: PoolClient, gymId: string): Promise<string[]> {
@@ -54,121 +54,31 @@ export async function seedDefaultOffers(client: PoolClient, gymId: string): Prom
   return offerIds;
 }
 
-const FIRST_NAMES_MALE = [
-  'أحمد', 'محمد', 'علي', 'خالد', 'عمر', 'عبدالله', 'فيصل', 'سعد', 'نواف', 'ماجد',
-  'ياسر', 'هاني', 'تركي', 'بدر', 'سلطان', 'فهد', 'نايف', 'مشعل', 'عبدالرحمن', 'طلال',
-];
-
-const LAST_NAMES = [
-  'الزهراني', 'القحطاني', 'العتيبي', 'الدوسري', 'الغامدي',
-  'الشهراني', 'المطيري', 'الحربي', 'العنزي', 'الجهني',
-];
-
-const SEED_MEMBERS_COUNT = 15;
-
-const PRODUCT_NAMES = ['ماء (500ml)', 'ماء (1.5L)', 'بروتين بار', 'مشروب طاقة', 'منشفة', 'شيكر'];
-const EXPENSE_CATS = ['كهرباء', 'مياه', 'إيجار', 'صيانة'];
-
 /**
- * Seeds minimal demo data into a newly-created gym so the owner
- * sees a non-empty dashboard immediately.
+ * Factory state for a gym created from the platform "add gym" wizard.
  *
- * This runs OUTSIDE the main gym-creation transaction (fire-and-forget),
- * so a seed failure never blocks the gym from being created.
+ * It is intentionally **empty**: a new tenant must open with zero members,
+ * zero subscriptions, zero attendance, zero products and zero expense
+ * categories. The previous version of this function injected 15 fabricated
+ * members (Saudi-style names, `+966…` phones, `ui-avatars.com` photos) with
+ * `active` subscriptions and 7 days of check-ins, plus 6 products and 4
+ * expense categories, and then bumped `gym_usage_counters.current_members_count`
+ * to 15 — so a real gym's first dashboard showed data nobody entered.
+ * That is demo data in a production path and is not coming back.
+ *
+ * The call site in `platformGyms.createGym` is kept as the seam (that file is
+ * owned by another session's uncommitted diff); removing it entirely is the
+ * follow-up when that file is free.
+ *
+ * The catalog helpers above (`seedDefaultSports`, `seedDefaultOffers`) stay
+ * exported and are used by `gymReset` and the self-service `onboarding`
+ * controller. Note the divergence that remains after this change: the
+ * self-service onboarding path seeds the 4 default offers, this path does
+ * not — so a gym created from the platform wizard must create its own offers
+ * before `createMember(plan_id)` / manual check-in can succeed.
  */
 export async function seedNewGym(gymId: string, gymName: string): Promise<void> {
-  const client = await getAdminClient();
-  try {
-    await client.query('BEGIN');
-
-    // --- Sports catalog (plans require a sport — no uncategorized seeds) ---
-    await seedDefaultSports(client, gymId);
-
-    // --- Membership Offers ---
-    const offerIds = await seedDefaultOffers(client, gymId);
-
-    // --- Members with subscriptions + attendance ---
-    for (let m = 0; m < SEED_MEMBERS_COUNT; m++) {
-      const memberId = uuidv4();
-      const firstName = FIRST_NAMES_MALE[m % FIRST_NAMES_MALE.length];
-      const lastName = LAST_NAMES[m % LAST_NAMES.length];
-      const fullName = `${firstName} ${lastName}`;
-      const phone = `+9665${String(10000000 + Math.floor(Math.random() * 89999999)).padStart(8, '0')}`;
-
-      await client.query(
-        `INSERT INTO members (id, gym_id, full_name, phone_number, photo_url, is_blacklisted)
-         VALUES ($1, $2, $3, $4, $5, false)`,
-        [
-          memberId, gymId, fullName, phone,
-          `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=random`,
-        ],
-      );
-
-      const offerIndex = m % offerIds.length;
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - Math.floor(Math.random() * OFFER_TEMPLATES[offerIndex].duration_days));
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + OFFER_TEMPLATES[offerIndex].duration_days);
-
-      await client.query(
-        `INSERT INTO member_subscriptions (id, gym_id, member_id, offer_id, price_paid, start_date, end_date, status, is_frozen)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', false)`,
-        [
-          uuidv4(), gymId, memberId, offerIds[offerIndex],
-          OFFER_TEMPLATES[offerIndex].price,
-          startDate.toISOString().split('T')[0],
-          endDate.toISOString().split('T')[0],
-        ],
-      );
-
-      // Seed some attendance logs for the last 7 days
-      for (let d = 0; d < 7; d++) {
-        if (Math.random() > 0.5) {
-          const day = new Date();
-          day.setDate(day.getDate() - d);
-          day.setHours(6 + Math.floor(Math.random() * 14), Math.floor(Math.random() * 60), 0, 0);
-          await client.query(
-            `INSERT INTO attendance_logs (id, gym_id, member_id, check_in_time, entry_method)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [uuidv4(), gymId, memberId, day.toISOString(), Math.random() > 0.3 ? 'qr_code' : 'manual_phone'],
-          );
-        }
-      }
-    }
-
-    // --- Products ---
-    for (let p = 0; p < PRODUCT_NAMES.length; p++) {
-      await client.query(
-        `INSERT INTO products (id, gym_id, name, barcode, stock_quantity, purchase_price, selling_price)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [uuidv4(), gymId, PRODUCT_NAMES[p], String(200000 + p), 10 + Math.floor(Math.random() * 50), 5 + Math.random() * 15, 10 + Math.random() * 30],
-      );
-    }
-
-    // --- Expense Categories ---
-    for (const cat of EXPENSE_CATS) {
-      await client.query(
-        `INSERT INTO expense_categories (id, gym_id, name) VALUES ($1, $2, $3)`,
-        [uuidv4(), gymId, cat],
-      );
-    }
-
-    // --- Update usage counters ---
-    await client.query(
-      `UPDATE gym_usage_counters
-       SET current_members_count = $1, current_staff_count = 1, updated_at = CURRENT_TIMESTAMP
-       WHERE gym_id = $2`,
-      [SEED_MEMBERS_COUNT, gymId],
-    );
-
-    await client.query('COMMIT');
-    logger.info(`Auto-seed complete for gym "${gymName}" (${gymId}): ${SEED_MEMBERS_COUNT} members, ${PRODUCT_NAMES.length} products`);
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    // Log but do NOT throw — this is a fire-and-forget background job
-    logger.error('seedNewGym failed', { gymId, gymName, error: (error as Error).message });
-  } finally {
-    client.release();
-  }
+  logger.info('New gym created factory-fresh (no demo data seeded)', { gymId, gymName });
 }
+
 
