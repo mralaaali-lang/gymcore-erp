@@ -340,7 +340,7 @@ export default function DebtsPage() {
                           <button
                             onClick={() => sendReminder(r)}
                             title={rtl ? 'تذكير واتساب' : 'WhatsApp reminder'}
-                            aria-label={rtl ? 'WhatsApp reminder' : 'WhatsApp reminder'}
+                            aria-label={rtl ? 'تذكير واتساب' : 'WhatsApp reminder'}
                             className="w-11 min-h-[44px] inline-flex items-center justify-center rounded-xl bg-green-500 hover:bg-green-600 text-white shadow-sm transition"
                           >
                             <MessageSquare size={17} />
