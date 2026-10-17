@@ -13,6 +13,7 @@ import {
   type ProductData,
 } from '../../../services/api';
 import PageLoader from '../../../components/shared/PageLoader';
+import Modal from '../../../components/shared/Modal';
 import Card from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import StatusBadge from '../../../components/ui/StatusBadge';
@@ -49,7 +50,7 @@ const statusVariant = (status: string): 'success' | 'warning' | 'error' | 'neutr
   status === 'completed' ? 'success' : status === 'pending' ? 'warning' : status === 'cancelled' ? 'error' : 'neutral';
 
 const inputClass =
-  'w-full px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400';
+  'w-full px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-ring focus:border-emerald-500 placeholder:text-gray-400';
 
 export default function PurchasesPanel() {
   const { language, gymProfile } = useApp();
@@ -214,21 +215,33 @@ export default function PurchasesPanel() {
         </Card>
       )}
 
+      {/* موجة 3 / دفعة 3: الصدفة اليدوية (طبقة + scrim + حواف + زرار X) بقت shared/Modal
+          بنفس العرض max-w-2xl (= size="xl") ونفس المنطق؛ القفل محبوس طالٍ الحفظ جارٍ. */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowModal(false)}>
-          <div
-            className="bg-white rounded-3xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 mx-4 border border-gray-100"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-gray-900">
-                {rtl ? 'مشتريات جديدة' : 'New Purchase'}
-              </h2>
-              <button onClick={() => setShowModal(false)} className="w-9 h-9 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
-                <span className="material-symbols-outlined">close</span>
-              </button>
+        <Modal
+          open
+          onClose={() => setShowModal(false)}
+          size="xl"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={createMutation.isPending}
+          title={rtl ? 'مشتريات جديدة' : 'New Purchase'}
+          footer={
+            <div className="flex w-full gap-3">
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={handleSubmit}
+                disabled={createMutation.isPending}
+              >
+                {createMutation.isPending && <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>}
+                {rtl ? 'حفظ المشتريات' : 'Save Purchase'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowModal(false)}>
+                {rtl ? 'إلغاء' : 'Cancel'}
+              </Button>
             </div>
-
+          }
+        >
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -281,7 +294,7 @@ export default function PurchasesPanel() {
                         min="1"
                         value={item.quantity}
                         onChange={(e) => updateItem(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-full px-2 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 text-center focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-2 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 text-center focus:ring-2 focus:ring-ring"
                       />
                     </div>
                     <div className="w-20">
@@ -291,7 +304,7 @@ export default function PurchasesPanel() {
                         step="0.01"
                         value={item.unit_price}
                         onChange={(e) => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)}
-                        className="w-full px-2 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 text-center focus:ring-2 focus:ring-emerald-500"
+                        className="w-full px-2 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 text-center focus:ring-2 focus:ring-ring"
                       />
                     </div>
                     <div className="w-20 text-left text-sm font-medium text-gray-900 py-2">
@@ -343,26 +356,7 @@ export default function PurchasesPanel() {
                 />
               </div>
             </div>
-
-            <div className="flex gap-3 mt-6">
-              <Button
-                variant="primary"
-                fullWidth
-                onClick={handleSubmit}
-                disabled={createMutation.isPending}
-              >
-                {createMutation.isPending && <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>}
-                {rtl ? 'حفظ المشتريات' : 'Save Purchase'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowModal(false)}
-              >
-                {rtl ? 'إلغاء' : 'Cancel'}
-              </Button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

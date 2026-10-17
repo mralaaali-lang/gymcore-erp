@@ -3674,7 +3674,9 @@ probes #3/#4/#6/#7 بعد التصحيح؛ أرقام #1 و#2 متلوّيه و�
 (`ImportMembersModal` · `subscriptions/AddSubscription` · `subscriptions/EditSubscription` ·
 `team/StaffDirectory`) ولا أوقف/أعدّل النهج في ضوء اللي طلع من الدفعة الأولى.
 **`git push` ما عملتش** (D7 = **11** عملة غير مدفوعة) و`:9000` ما اتبناطش (D8)، والنشر قرار
-منفصل.---
+منفصل.
+
+---
 
 ## §51 — موجة 3 / دفعة 2: `ImportMembersModal` + `subscriptions/EditSubscription` + `team/StaffDirectory` على `shared/Modal`، و`AddSubscription` مُرجَّع للمالك (2026-10-17 — جلسة A+C)
 
@@ -3755,7 +3757,7 @@ docker exec gymcore-db psql -U gymcore -d gymcore -t -A -F'|' -c "SELECT s.id, s
 | `ImportMembersModal` | 5 | 1 | `input[type=file]` بس `className="hidden"` (h=0) — مش هدف لمس؛ الأزرار الظاهرة كلها ≥48 |
 | `EditSubscription` | 15 | **7** | الـ7 checkboxes أيام الحضور **13px**، والـ`label` اللي حوّلها **40px** = هدف اللمس الحقيقي، أقل من الحد بـ8px. الـ`selects` والـbuttons كلها **48px** ✓ |
 
-(كمان 3 `label` نصّية بتاعة العناوين عندها 20px — دي مش أهداف لمس ومحسوبешا في الرقم فوق.)
+(كمان 3 `label` نصّية بتاعة العناوين عندها 20px — دي مش أهداف لمس وما اتحسبتش في الرقم فوق.)
 **ماصلحناش** — قرار مالك (§ي).
 
 ### و) `disableDismiss` على الملف المتحوَّل نفسه (بمشد الطلب، بلا أي تلفيق)
@@ -3826,3 +3828,178 @@ cd /d/_proj/gymcore-erp && npx tsc --noEmit ; npm run build 2>&1 | grep -E "buil
 - **رقائق الأيام/الدفع**: أرفع `min-h` بتاعها لـ48 على اللمس الخشن (تعديل سطر في ملفين)؟
 - **تصحيح تعليق `Modal.tsx`** (§د) معمول في نفس الدفعة — لو عايزه في commit لوحده قول.
 
+## §52 — موجة 3 / دفعة 3: `store/PurchasesPanel` + `store/SuppliersPanel` على `shared/Modal` (2026-10-17 — جلسة A+C)
+
+### أ) لوحتين اتحوّلوا — والمنطق زي ما هو
+
+| الملف | الصدفة القديمة | الجديدة | `fixed inset-0` بعد التحويل |
+|---|---|---|---|
+| `src/pages/gym-admin/store/PurchasesPanel.tsx` | div يدوي `max-w-2xl` + scrim يدوي + زرار X يدوي | `Modal size="xl"` + footer فيه (حفظ المشتريات/إلغاء) + `disableDismiss={createMutation.isPending}` | **0** |
+| `src/pages/gym-admin/store/SuppliersPanel.tsx` | div يدوي `max-w-lg` + scrim يدوي + زرار X يدوي | `Modal size="lg"` + footer فيه (إضافة/إلغاء) + `disableDismiss={createMutation.isPending}` | **0** |
+
+السلوك ما اتغيّرش: نفس `createPurchase` / `createSupplier`، نفس `invalidateQueries(['purchases' | 'products-all' | 'products' | 'suppliers' | 'suppliers-all'])`،
+نفس حرس التحقق (`validItems.length === 0` و`!name.trim()`). اللي اتغيّر صدفة صرفة +
+`focus:ring-emerald-500` → `focus:ring-ring` (3 مواضع في المشتريات، موضع في الموردين).
+`focus:border-emerald-500` سايبة على قصدها لموجة 5 (الألوان الحرفية المتبقية)، و**ولا `mock` اتحطّ**.
+
+### ب) الـharness الحيّ (مؤقّت، اتحذف)
+
+الدخول الحيّ مقفول (الأندية `deleted_at` → `403`)، فالقياس على **المكوّنين الحقيقيين** تحت
+`MemoryRouter > QueryClientProvider > AppProvider > ToastProvider` في `scratch/w3c/index.html` +
+`main.tsx`، والفتح من زراراري الصفحة نفسهما («إضافة مشتريات» / «إضافة مورد») — مش من زرار صُنع للقياس.
+الدرس بتاع §51 اتطبّق من أول مرة: `main.tsx` بيستورد `src/styles/index.css` و`src/i18n` (بدون دول
+القياس بيطلع لوحة 1248px و`centreDelta [0,-120]`). بعد القياس: `rm -rf scratch/w3c` و`git ls-files scratch` = **0**.
+مفيش حاجة اتكتبت في القاعدة: الطلب الوحيد اللي خرج هو `POST …/api/finance/suppliers` بلا توكن.
+
+### ج) تكافؤ العقد — مقاس (1280×900، Chromium 155، pointer ناعم)
+
+| اللوحة | `size` | عرض مقاس | `centreDelta` | radius مقابل `rounded-shell` | border مقابل `--hairline` | bg مقابل `bg-card` | shadow | padding | تركيز أول ثانية |
+|---|---|---|---|---|---|---|---|---|---|
+| مشتريات | `xl` | **672px** (= 42rem) | **[0, 0]** | 10px = 10px ✓ | `1px rgb(239,233,221)` = نفس الـprobe ✓ | `rgb(255,253,249)` = نفس الـprobe ✓ | صفر مطلق (`shadow-none`) ✓ | 24px (`md:p-6`) ✓ | `SELECT` داخل الـdialog |
+| موردين | `lg` | **512px** (= 32rem) | **[0, 0]** | 10px = 10px ✓ | مطابق ✓ | مطابق ✓ | صفر ✓ | 24px ✓ | `INPUT` داخل الـdialog |
+
+المقارنة اتعملت بـ**probe**: عنصر `div` بيتعمل لحظيًا بنفس class (`bg-card` / `border-hairline` /
+`rounded-shell`) وبيتقارن الـcomputed value باللوحة — مش بالعين. و`aria-labelledby` موجود،
+`aria-describedby` **مغيب** (اللوحتين ملهوماش `description` — ده العقد المتعمَّد في `Modal.tsx`)،
+والعزل وصل كـ`aria-hidden="true"` على `#root` مش `aria-modal` (تاني؛ ما يتبحثش عن `aria-modal`)،
+وقفل الصفحة جاي من `body.style.pointerEvents = 'none'` تبع `react-remove-scroll`.
+
+**محسوب ومعلن:** القشرة نفسها بتدي **طبقتين** `fixed inset-0` على `<body>`
+(`fixed inset-0 z-50 bg-black/50` + `fixed inset-0 z-50`) — فمقياس الموجة لازم يفضل grep على
+ملفات `src/pages`/`src`، مش عدّ عقد في الـDOM. زرار X جاي من القشرة والـ`aria-label` بتاعه
+**«إغلاق» بالعربي حتى في اللوحة الإنجليزية** — قرار المالك سايب (§ل).
+
+### د) `dir` — مقياس تاني على لوحتين × لغتين
+
+| الحالة | `<html dir>` | `dir` على اللوحة | `direction` | `centreDelta` |
+|---|---|---|---|---|
+| مشتريات/عربي | `rtl` | `rtl` | `rtl` | [0, 0] |
+| مشتريات/إنجليزي (بعد مفتاح اللغة) | `ltr` | `ltr` | `ltr` | [0, 0] |
+| موردين/عربي | `rtl` | `rtl` | `rtl` | [0, 0] |
+| موردين/إنجليزي | `ltr` | `ltr` | `ltr` | [0, 0] |
+| **اختبار عدم التطابق**: موردين + التطبيق عربي + `<html dir="ltr">` متغرِّب يدويًا | `ltr` (forced) | **`rtl`** | **`rtl`** | [0, 0] |
+
+أي الـprop بيثبّت اتجاه اللوحة مستقل عن حالة `<html>`، ومطابقة النص والاتجاه فضلَت في كل الحالات.
+
+### هـ) مسارات القفل الأربعة × اللوحتين = **8/8** (فتح بـEnter موثوق، قفل بالمسار نفسه)
+
+| المسار | مشتريات | موردين | بعد القفل |
+|---|---|---|---|
+| Escape موثوق | ✓ | ✓ | `open=0`, `nodes=0`, **`activeIsOpener=true`** |
+| ضغطة على الـscrim في (10, h/2) | ✓ | ✓ | نفسه |
+| زرار X (`aria-label="إغلاق"`) | ✓ | ✓ | نفسه |
+| زرار «إلغاء» في الـfooter | ✓ | ✓ | نفسه |
+
+**سنخة في عدّادي اتقالت قبل أي استنتاج:** أول طلق (probe 3c) كان بيقول «Escape مقفّل» — السبب إن
+جدول `PATHS` كان بيسند `ENTER()` بدل `ESC()` في حالة الـescape. اتعملت آلة تشخيص (probe 3e) بيثبت
+إن Escape الموثوق **بيوصل**: `win-capture → doc-capture` و`defaultPrevented=true` واللوحة اقفلت
+ورجعت الفوكس للفاتح. يعني العيب كان في السكربت، مش في `Modal` ولا في Radix — والقفل الحقيقي للوحة
+المشتريات والموردين مقياس تاني في الجدول ده (8/8).
+
+### و) §34و على 390 coarse pointer (`Emulation` + `pointer: coarse = true`)
+
+| اللوحة | عرض اللوحة | x | `fits` | footer | أهداف لمسية | `< 48px` | min / max |
+|---|---|---|---|---|---|---|---|
+| مشتريات | 358px | 16 | ✓ | مكدّس (`column-reverse`) | 10 | **0** | 48 / 62 |
+| موردين | 358px | 16 | ✓ | مكدّس | 8 | **0** | 48 / 62 |
+
+**بس في حاجة طلعت برّة اللوحة:** `document.documentElement.scrollWidth = 532 > 390` — والعناصر
+اللي زيادة عن العرض **كلها برّة الـdialog** (`offenders in dialog = 0`)، وهي صفحة اللوحتين نفسها:
+`div.space-y-4` و`div.bg-white.rounded-3xl.border` بعرض **516px** و`div.overflow-x-auto > table.w-full.text-sm`
+بعرض **474px** (الاتجاه rtl فالزيادة بتطلع على الشمال). يعني كسر الـreflow ده **ملف الجول/الترتيب
+بتاع اللوحة** مش صدفة المودال، وده يوجّه موجة 4 (`DataTable`) و5 (الألوان الحرفية:
+`bg-white`/`rounded-3xl`) — مش حاجة تتنسب للموجة دي ولا تتصلّح فيها سرًا.
+
+### ز) `disableDismiss` على mutation حقيقية — بشدّ التوقيت، مش بتزوير الرد
+
+الطلب هو طلب التطبيق نفسه (`POST http://localhost:4000/api/v1/api/finance/suppliers`)، اتوقف في
+النار بشبكة CDP `Fetch.enable({patterns:[{urlPattern:'*4000*',requestStage:'Request'}]})` واتحرَّر
+بعد 1.8 ثانية بـ`Fetch.continueRequest` — مفيش أي رد مختلَق ولا بيانات ثابتة.
+
+| القياس | النتيجة |
+|---|---|
+| نافذة الـpending | **113 عيّنة كل 16ms من t=16ms لـt=1808ms**، وكلها واللوحة مفتوحة |
+| `POST` | `start=3 → end=1820ms` (من غير الشدّ كان بيموت في 22ms) |
+| وقت 712ms (جوه النافذة) | `data-state="open"`، زرار الحفظ `disabled=true` ونصّه `«progress_activity إضافة»` |
+| **Escape موثوق وقت 729ms** (جوه النافذة) | اللوحة **فضلت مفتوحة** (`open=1`, `state=open`) → القفل شغال |
+| بعد التحرير | الزرار رجع `disabled=false`، `onError` الحقيقي طلع «فشل إضافة المورد»، واللوحة ما اقفلتش نفسها |
+| «إلغاء» بعد الفشل | اقفلت (`open=0`) والفوكس رجع للفاتح (`isOpener=true`) |
+
+الـcontrol اللي يحوّل السطر ده من «استنتاج» لـ«دليل»: نفس Escape على نفس اللوحة وهي **مش** قيد
+الحفظ اقفلها (سطر §هـ). السلوك المعلن من دفعة 2 يفضل زي ما هو: وقت ما زرار مركّز بيتعمله
+`disabled`، الفوكس يقع على `BODY` (`activeTag: BODY` في القياس) — ده مش ريجریشن من الدفعة دي.
+
+### ح) صفر كتابة — متحقق منه في القاعدة
+
+قبل وبعد كل الطلقات: `suppliers = 0`، `purchases = 0`، `purchase_items = 0`، `products = 80` (بلا
+تغيّر)، و`SELECT count(*) FROM suppliers WHERE name = '__probe_only_row'` = **0**. أي قراءة اتعملت
+بـ`psql` على `gymcore-db` read-only؛ ما اتلمسش ولا عمود حسّاس (`password_hash`/`pin_hash`/`phone_encrypted`).
+
+### ط) سنخَات منهجية اتصحّحت في نفس الجلسة (تتعدّ قبل أي دفعة جايّة)
+
+1. **`send()` لازمّه سقف زمن:** الطلق 3c تعلّق 13 دقيقة على أمر `Emulation` ما ردّش. بعد ما كل أمر
+   بقى بـtimeout 20 ثانية، الفشل بقى صريح بدل التعليق.
+2. **مؤشرات الماوس ما تخدمش تحت `pointer: coarse`:** في الطلق 3f الفتح بـ`Input.dispatchMouseEvent`
+   تحت `setTouchEmulationEnabled` ما اشتغلش (`waitFor timeout: dialog node`)؛ الطلق 3g فتح
+   بـ**Enter موثوق على الزرار المركَّز** وطلّع القياس. أي قياس لمس يفتح بالكيبورد.
+3. **ما تربطش الـregex بتاع زرار الحفظ بـ`^…$`:** أول ما الـmutation تطلع، الـspinner بيدخل جوه
+   الزرار و`innerText` بقى `«progress_activity إضافة»` → النسخة المثبّتة بل `^إضافة$` أبلغت
+   «نافذة pending فاضية» وهي كدابة. الطلق 3h أعاد القياس بمطابقة غير مثبّتة وطلع الرقم الحقيقي في §ز.
+4. **`Fetch` مش بيشدّ نفسه:** لازم الراية تتشغّل **قبل** الضغط (`stallOn = true`) — الطلق 3f نسيها
+   فطلع `end=22ms` واتفسّر غلط.
+
+### ي) الفجوات المعلنة (ما اتقاستش)
+
+1. **نافذة الـpending بتاعة المشتريات** ما اتقاستش حيًّا: `createPurchase` محتاج صف منتج من
+   `['products-all']`، والجول بيرجّع `401` من غير توكن فتحرس `validItems.length === 0` يمنع الطلب
+   أصلًا. سطر القفل في الملفين حرفيًا واحد (`disableDismiss={createMutation.isPending}`) ومتقاس على
+   الموردين — والقول ده **مستنتج من كود + قياس على أختها**، مش قياس على اللوحة نفسها.
+2. مفيش قياس جوه التطبيق الحقيقي (الدخول مقفول) ولا في الوضع الداكن ولا على قارئ شاشة (NVDA).
+3. `:9000` (Docker) لسه بيخدم حزمة بايّتة (D8) — مفيش إعادة بناء اتعملت.
+4. الـreflow المكسور على 390 في §و ماصلّحتوش: ملف الجداول نفسه، برّة نطاق الموجة.
+5. مفيش `push` ولا deploy؛ HEAD المحلي لسه هو المرجع.
+6. **حادثة كتابة متزامنة في الملف نفسه — وأنا اللي عملتها:** commit دفعة 2 (`9a02245`) اتعمل وهو شايل
+   نسخة كاملة من `LOCAL_TESTING_REPORT.md` من شجرة العمل، وفي تلك اللحظة كانت جلسة C كتبت §50
+   **جزئيًا**، فاللي دخل الـcommit سطر مقطوع (`منفصل.` ملزوق فيه `---`) ومضمون §50 كله ضاع من
+   `HEAD` (مقياس: `git show HEAD:LOCAL_TESTING_REPORT.md | grep -c '^## §50'` = **0** وهو لسه كده
+   بعد دفعة 3). الشجرة فيها §50 كاملة (107 سطر) + «### ٨)» تتمتها، والدفعة دي **ما عملتش commit
+   لهم** — سيّبتهم لجلسة C توثّقهم باسمها، واللي عملته هنا بس: فك الملزوقة (`منفصل.` /
+   فاصل / `---`) والتوضيح ده. **القاعدة اللي طلعت:** أي ملف مشترك يتstage
+   من `git show HEAD:<file>` + بلوك الجلسة نفسه عبر `hash-object`/`update-index`، مش `git add` للملف
+   كله، ويتقارن `grep -c` على عناوين جلسات تانية قبل الدفع.
+
+### يا) البوابات — مقاسة بعد التحويل
+
+| البوابة | النتيجة |
+|---|---|
+| `npx tsc --noEmit` | **0 خطأ** |
+| `npx vite build` | `✓ built in 5.50s` · `dist/assets/index-*.js` = **902.59 kB** (+0.01 kB عن دفعة 2) |
+| `grep -c 'fixed inset-0'` في الملفين | **0 / 0** |
+| مؤشر الموجة `git grep` | `src/pages` = **25 ملفًا / 32 موضعًا** (كان 27/34) · `src/**` = **30 / 38** (كان 32/40) |
+| فتح/إغلاق حقيقي بالمتصفح | ✓ 8/8 (§هـ) بـ`setTimeout` مش rAF |
+| `role=dialog` مقروب | ✓ (المقروب بيتاخده من `[...querySelectorAll('[role="dialog"]')].pop()`) |
+| إعادة قياس المؤشر | `git grep -c 'fixed inset-0' -- src/pages \| wc -l` و`git grep -o 'fixed inset-0' -- src/pages \| wc -l` |
+
+الأمر ده بيتعاد قبل كل دفعة (الرقم في النص مش في اللقطات القديمة):
+
+```bash
+git grep -c 'fixed inset-0' -- 'src/pages' | wc -l && git grep -o 'fixed inset-0' -- 'src/pages' | wc -l
+git grep -c 'fixed inset-0' -- 'src' | wc -l && git grep -o 'fixed inset-0' -- 'src' | wc -l
+```
+
+### ك) بقايا `%TEMP%` (معلنة، متحذفتش لأن برّة المستودع)
+
+`cdp-w3c.mjs` · `cdp-w3c-e.mjs` · `cdp-w3c-f.mjs` · `cdp-w3c-g.mjs` · `cdp-w3c-h.mjs` ·
+`kill-w3c-chrome.ps1` · `w3c-run.log` · `w3c-f.log` · `w3c-g.log` · `cdp-w3c-chrome.log` ·
+`gymcore-a11y/w3c-f.json` `w3c-g.json` `w3c-h.json` · ومخلّفات دفعات قبلها (`cdp-w3*.mjs`،
+`cdp-w3b-profile/`، `w3h-*.png`). كروميا القياس (headless 155) اتقفل بالـPID المرتبط ببروفايل
+`cdp-w3c-profile` وبس (43828/43400/25504) — نوافذ المالك ما اتلمستش.
+
+### ل) أبواب المالك اللي الدفعة دي فتحتها (ما عملتش واحدة منها لوحدي)
+
+- **D7** `push`: غير مدفوع. **D8** إعادة بناء `:9000`: مش متنفَّذ.
+- **`aria-label="إغلاق"` المحشور عربيًا** في `src/components/shadcn/dialog.tsx:67` — بيظهر كده في
+  كل لوحة إنجليزية (مقياس §ج). يتصلّح بـprop أو بـ`useApp()`؟
+- **reflow 390** بتاع جدولي المشتريات/الموردين: يتحطّ بند صريح في موجة 4 ولا يستاهل بوابة لوحده؟
+- **`AddSubscription`** (D9) و**رقائق الأيام/الدفع** و**خريطة الألوان** (D1/D2) و**الملفات الميتة**
+  (D6): لسه مستنية ردّك من §51.

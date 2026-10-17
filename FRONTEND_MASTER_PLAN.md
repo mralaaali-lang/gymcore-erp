@@ -157,7 +157,34 @@ grep -rl "fixed inset-0" src/pages | wc -l ; grep -ro "fixed inset-0" src/pages 
 `subscriptions/AddSubscription` **اتسحبت من الدفعة بقرار معروض على المالك**: مش منبثقة متوسّطة،
 دي شاشة ملء الشاشة (`fixed inset-0 bg-gray-100` + هيدر sticky + عمود `max-w-2xl` + ~15 تحكم + مسار
 فلس «حفظ وطباعة الفاتورة»)، وتحويلها على `size="xl"` (42rem) هيفضّل قرار مالك مش إعادة تنسيق صامتة
-(§51 ز/يا). فالدُفعات الجايّة تبدأ من `store/PurchasesPanel` · `store/SuppliersPanel`.
+(§51 ز/يا). فالمتبقي من الترتيب ده بقى `super-admin/contracts/ContractDetailModal` و`ContractFormModal`
+و`BillingEngine` و`TenantDirectory` و`PlatformAdmins` و`PlatformMarketing`.
+
+**الحالة بعد دفعة 3 (2/ اتنين، §52):** `store/PurchasesPanel` → `Modal size="xl"` و`store/SuppliersPanel`
+→ `Modal size="lg"`، والقياس الحيّ على `scratch/w3c` (اتمسح) طلع تكافؤ عقد كامل (672px و512px،
+`centreDelta [0,0]`، radius/border/bg = probes التوكنات، `shadow-none`، footer row→row-reverse مكدّس
+على اللمس) و**مسارات قفل 8/8** مع `activeIsOpener=true` و§34و نظيف (0 هدف تحت 48px على 390 coarse)
+و`disableDismiss` متقاس على `POST …/finance/suppliers` حقيقي بشدّه 1.8s — **بلا أي كتابة في القاعدة**
+(عدّ متساوي قبل/بعد). المؤشر بعد الدفعة: `src/pages` **25 ملفًا / 32 موضعًا** (`src/**` **30/38**).
+**معلَن للمتابعة:** نافذة الـpending بتاعة المشتريات ما اتقاستش حيًّا — `['products-all']` بيرجع
+`401` من غير توكن فتحقّق الصفحة نفسه يمنع الطلب؛ سطر القفل متقاس على أختها ومستنتج هنا.
+والـreflow المكسور على 390 (`documentElement.scrollWidth = 532`) **مش من المودال**: عناصره كلها
+برّة الـdialog وهي جداول اللوحتين نفسها (`div.bg-white.rounded-3xl.border` = 516px، `table` = 474px)
+→ ده بند **موجة 4** (الجداول على `DataTable`) و**موجة 5** (الألوان الحرفية)، ما يتحسبش على الموجة دي.
+
+**منهجية من دفعة 3 بتسري على كل قياس جاي (§52 ط):** (1) أي أمر CDP لازم يخلص بـtimeout — أمر
+`Emulation` اللي ما بيردّش علّق الطلق 13 دقيقة؛ (2) تحت `pointer: coarse` مؤشرات
+`Input.dispatchMouseEvent` ما بفتحتش المودال — الفتح بـ**Enter موثوق** على الزرار المركَّز؛
+(3) ما تربطش regex زرار الحفظ بـ`^…$` لأن الـspinner بيدخل جوه أول ما الـmutation تطلع
+(`«progress_activity إضافة»`) فالمطابقة المثبّتة بتبلّغ «نافذة pending فاضية» وهي كدابة؛
+(4) شدّ `Fetch` ما يشتغلش إلا لو الراية اتشغّلت **قبل** الضغط؛ (5) أي «فشل وصول» في عدّادي
+يتشخّص بطلقة مخصصة قبل ما يننسَب للتطبيق (في §52 كان سببه `ENTER()` بدل `ESC()` في جدول المسارات).
+(6) **ستاجنج الملفات المشتركة:** `git add` لملف مشترك كامل بياخد معاه شغل الجلسات التانية
+اللي لسه ما اتعملهوش commit — وده **صار فعلًا**: `9a02245` بلع نسخة نصّية من §50 فمضمونها ضاع من
+`HEAD` (`git show HEAD:LOCAL_TESTING_REPORT.md | grep -c '^## §50'` = **0**) وساب ملزوقة `منفصل.---`.
+البروتوكول من هنا: بلوك الجلسة + `git show HEAD:<file>` → `git hash-object -w --stdin` →
+`git update-index --cacheinfo`، و`grep -c '^## §'` + `git diff --cached | grep` على علامات الجلسات
+التانية قبل كل commit، والتحقق إن الشجرة لسه فيها شغل الغيرين (`MM` في `git status`).
 
 الهدف: تصفير `fixed inset-0` اليدوي في `src/pages` على `shared/Modal`.
 الترتيب (بدايةً من اللي هتنزلها موجة 4 و5 نفس الجلسة): `EditMemberModal` · `ImportMembersModal` · `subscriptions/AddSubscription` · `subscriptions/EditSubscription` · `team/StaffDirectory` · `store/PurchasesPanel` · `store/SuppliersPanel` — بعدين `super-admin/contracts/ContractDetailModal` و`ContractFormModal` و`BillingEngine` و`TenantDirectory` و`PlatformAdmins` و`PlatformMarketing`.

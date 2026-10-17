@@ -5,6 +5,7 @@ import { useApiQuery } from '../../../hooks/useApiQuery';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { listSuppliers, createSupplier } from '../../../services/api';
 import PageLoader from '../../../components/shared/PageLoader';
+import Modal from '../../../components/shared/Modal';
 import Card from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import StatusBadge from '../../../components/ui/StatusBadge';
@@ -32,7 +33,7 @@ const statusVariant = (status: string): 'success' | 'warning' | 'error' | 'neutr
   status === 'active' ? 'success' : 'neutral';
 
 const inputClass =
-  'w-full px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400';
+  'w-full px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-ring focus:border-emerald-500 placeholder:text-gray-400';
 
 export default function SuppliersPanel() {
   const { language } = useApp();
@@ -147,21 +148,33 @@ export default function SuppliersPanel() {
         </Card>
       )}
 
+      {/* موجة 3 / دفعة 3: نفس عرض اللوحة (max-w-lg = size="lg") على shared/Modal —
+          زرار X اليدوي والـscrim اليدوي بقوا شغل القشرة، والقفل محبوس وقت الحفظ. */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowModal(false)}>
-          <div
-            className="bg-white rounded-3xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 mx-4 border border-gray-100"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-gray-900">
-                {rtl ? 'إضافة مورد جديد' : 'New Supplier'}
-              </h2>
-              <button onClick={() => setShowModal(false)} className="w-9 h-9 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
-                <span className="material-symbols-outlined">close</span>
-              </button>
+        <Modal
+          open
+          onClose={() => setShowModal(false)}
+          size="lg"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={createMutation.isPending}
+          title={rtl ? 'إضافة مورد جديد' : 'New Supplier'}
+          footer={
+            <div className="flex w-full gap-3">
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={handleSubmit}
+                disabled={createMutation.isPending}
+              >
+                {createMutation.isPending && <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>}
+                {rtl ? 'إضافة' : 'Add'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowModal(false)}>
+                {rtl ? 'إلغاء' : 'Cancel'}
+              </Button>
             </div>
-
+          }
+        >
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -216,26 +229,7 @@ export default function SuppliersPanel() {
                 />
               </div>
             </div>
-
-            <div className="flex gap-3 mt-6">
-              <Button
-                variant="primary"
-                fullWidth
-                onClick={handleSubmit}
-                disabled={createMutation.isPending}
-              >
-                {createMutation.isPending && <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>}
-                {rtl ? 'إضافة' : 'Add'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowModal(false)}
-              >
-                {rtl ? 'إلغاء' : 'Cancel'}
-              </Button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
