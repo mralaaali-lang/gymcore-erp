@@ -246,13 +246,39 @@ export const createSale = async (req: Request, res: Response) => {
     const order = await client.query(`INSERT INTO pos_orders (gym_id, staff_user_id, member_id, payment_method, total_amount) VALUES ($1,$2,$3,$4,0) RETURNING *`, [gym_id, staff_user_id, member_id || null, payment_method || 'cash']);
     const orderId = order.rows[0].id;
     let total = 0;
-    for (const item of items || []) {
-      const prod = await client.query(`SELECT selling_price FROM products WHERE id=$1 AND gym_id=$2`, [item.product_id, gym_id]);
-      if (prod.rows.length === 0) { await client.query('ROLLBACK'); res.status(400).json({ error: `Product ${item.product_id} not found` }); return; }
-      const price = prod.rows[0].selling_price;
-      await client.query(`INSERT INTO pos_order_items (order_id, product_id, quantity, unit_price) VALUES ($1,$2,$3,$4)`, [orderId, item.product_id, item.quantity, price]);
-      await client.query(`UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id=$2 AND gym_id=$3`, [item.quantity, item.product_id, gym_id]);
-      total += price * item.quantity;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ error: 'يجب اختيار منتج واحد على الأقل' });
+      return;
+    }
+    for (const item of items) {
+      const qty = Number(item.quantity);
+      if (!qty || qty <= 0 || !Number.isInteger(qty)) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `كمية غير صالحة للمنتج ${item.product_id}` });
+        return;
+      }
+      const prod = await client.query(
+        `SELECT name, selling_price, stock_quantity FROM products WHERE id=$1 AND gym_id=$2 FOR UPDATE`,
+        [item.product_id, gym_id]
+      );
+      if (prod.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `المنتج غير موجود: ${item.product_id}` });
+        return;
+      }
+      const availableStock = Number(prod.rows[0].stock_quantity ?? 0);
+      if (availableStock < qty) {
+        await client.query('ROLLBACK');
+        res.status(400).json({
+          error: `مخزون غير كافٍ للمنتج "${prod.rows[0].name}" (المتاح: ${availableStock}، المطلوب: ${qty})`
+        });
+        return;
+      }
+      const price = Number(prod.rows[0].selling_price);
+      await client.query(`INSERT INTO pos_order_items (order_id, product_id, quantity, unit_price) VALUES ($1,$2,$3,$4)`, [orderId, item.product_id, qty, price]);
+      await client.query(`UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id=$2 AND gym_id=$3`, [qty, item.product_id, gym_id]);
+      total += price * qty;
     }
     await client.query(`UPDATE pos_orders SET total_amount=$1 WHERE id=$2`, [total, orderId]);
     // §34ث: POS revenue must reach the finance ledger in the SAME transaction —
@@ -418,7 +444,7 @@ export const createDebt = async (req: Request, res: Response) => {
 // outcome — the screen derives the «سداد جزئي» status from paid>0 & remaining>0.
 export const payDebt = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { amount, note } = req.body;
+  const { amount, note, payment_method } = req.body;
   const gym_id = req.staff?.gym_id;
   const staff_user_id = req.staff?.staff_user_id;
   const client = await getClient();
@@ -447,12 +473,13 @@ export const payDebt = async (req: Request, res: Response) => {
     await client.query(`UPDATE member_debts SET remaining_amount=$1, status=$2, updated_at=NOW() WHERE id=$3`,
       [newRemaining, newStatus, id]);
     const desc = `سداد دين — ${row.member_name}${note ? ` — ${String(note).slice(0, 200)}` : ''}`.slice(0, 500);
+    const method = String(payment_method || 'cash').trim().toLowerCase();
     // OPEN_SESSION expands a $1-shaped subquery and here $1 is gym_id — the same
     // cash-session attribution createPayment uses (§34ث).
     await client.query(
       `INSERT INTO financial_transactions (gym_id, type, amount, description, staff_user_id, member_id, payment_method, cash_session_id)
-       VALUES ($1,'payment',$2,$3,$4,$5,'cash',${OPEN_SESSION}) RETURNING id`,
-      [gym_id, paid, desc, staff_user_id, row.member_id]);
+       VALUES ($1,'payment',$2,$3,$4,$5,$6,${OPEN_SESSION}) RETURNING id`,
+      [gym_id, paid, desc, staff_user_id, row.member_id, method]);
     await client.query('COMMIT');
     res.json({ success: true, paid, remaining: newRemaining, status: newStatus });
   } catch (e: any) {

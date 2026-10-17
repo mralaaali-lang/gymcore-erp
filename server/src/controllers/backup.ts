@@ -15,11 +15,37 @@ if (!fs.existsSync(BACKUPS_DATA_DIR)) {
 // النواة القابلة لإعادة الاستخدام: نسخة صالة برقمها — تُستدعى من الـendpoint
 // ومن cron النسخ التلقائي اليومي (backup_auto_daily) بنفس المنطق.
 export async function runTenantBackup(gymId: string, actor: string | null): Promise<{ folder: string; records: number; summary: Record<string, number> }> {
+  // منع التكرار: نسخة مكتملة لنفس الصالة خلال آخر 3 دقائق تُرفض
+  // (ضغطة مزدوجة / cron مكرر) — بدل مجلدات متطابقة الشكل
+  try {
+    if (fs.existsSync(BACKUPS_DATA_DIR)) {
+      const now = Date.now();
+      for (const f of fs.readdirSync(BACKUPS_DATA_DIR)) {
+        const metaPath = path.join(BACKUPS_DATA_DIR, f, '_meta.json');
+        if (!fs.existsSync(metaPath)) continue;
+        try {
+          const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+          if (meta.gym_id === gymId && now - new Date(meta.created_at).getTime() < 3 * 60_000) {
+            throw Object.assign(new Error('A backup was just created moments ago — please wait before creating another.'), { code: 'DUPLICATE_BACKUP' });
+          }
+        } catch (e: any) {
+          if (e?.code === 'DUPLICATE_BACKUP') throw e;
+        }
+      }
+    }
+  } catch (e: any) {
+    if (e?.code === 'DUPLICATE_BACKUP') throw e;
+    logger.error('Backup duplicate check failed', { error: e.message });
+  }
   const gymResult = await query(`SELECT id, name FROM gyms WHERE id = $1`, [gymId]);
   if (gymResult.rows.length === 0) throw new Error('Gym not found.');
   const gymName = gymResult.rows[0].name;
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
-  const folderName = `${gymName.replace(/\s+/g, '_')}_${ts}`;
+  // SECURITY: gym name is user-controlled — strip everything outside safe
+  // folder chars so the backup dir can never escape BACKUPS_DATA_DIR and
+  // can never inject shell metacharacters into the zip step.
+  const safeGym = String(gymName).replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 60) || 'gym';
+  const folderName = `${safeGym}_${ts}`;
   const dumpDir = path.join(BACKUPS_DATA_DIR, folderName);
   fs.mkdirSync(dumpDir, { recursive: true });
 
@@ -106,6 +132,11 @@ export const createTenantBackup = async (req: Request, res: Response): Promise<v
       message: `Backup created (${folder}, ${records} records).`,
     });
   } catch (error) {
+    const err = error as { code?: string; message: string };
+    if (err?.code === 'DUPLICATE_BACKUP') {
+      res.status(429).json({ error: err.message });
+      return;
+    }
     logger.error('Failed to create tenant backup', { error: (error as Error).message });
     res.status(500).json({ error: 'Failed to create tenant backup.' });
   }
@@ -142,7 +173,12 @@ export const listTenantBackups = async (req: Request, res: Response): Promise<vo
     }
     const sizeBytes = getFolderSize(path.join(BACKUPS_DATA_DIR, folder));
     const backupGymId = (meta as any).gym_id;
-    return { folder, timestamp: stat.birthtime.toISOString(), sizeBytes, summary, totalRecords, gym_id: backupGymId };
+    // birthtime غير موثوق على ext4/overlayfs (يعود epoch للكل) — التاريخ
+    // الحقيقي من _meta.json الذي نكتبه لحظة الإنشاء
+    const createdAt = typeof (meta as any).created_at === 'string' && (meta as any).created_at
+      ? String((meta as any).created_at)
+      : stat.birthtime.toISOString();
+    return { folder, timestamp: createdAt, sizeBytes, summary, totalRecords, gym_id: backupGymId };
   })
     .filter((b) => b.gym_id === gym_id)
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
@@ -154,8 +190,26 @@ export const downloadBackup = async (req: Request, res: Response): Promise<void>
   const { folder } = req.params;
   const gym_id = req.staff?.gym_id;
 
-  const folderPath = path.join(BACKUPS_DATA_DIR, folder);
-  if (!folder || !fs.existsSync(folderPath)) {
+  // SECURITY (RCE fix): folder comes from the URL — reject anything outside
+  // the safe charset BEFORE touching the FS or shell, then resolve and
+  // verify containment (same guard as restoreTenantBackup).
+  if (!folder || !SAFE_FOLDER_RE.test(folder)) {
+    res.status(400).json({ error: 'A valid backup folder name is required.' });
+    return;
+  }
+  const folderPath = path.resolve(BACKUPS_DATA_DIR, folder);
+  if (!folderPath.startsWith(path.resolve(BACKUPS_DATA_DIR) + path.sep)) {
+    res.status(403).json({ error: 'Access denied.' });
+    return;
+  }
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(folderPath);
+  } catch {
+    res.status(404).json({ error: 'Backup folder not found.' });
+    return;
+  }
+  if (!stat.isDirectory()) {
     res.status(404).json({ error: 'Backup folder not found.' });
     return;
   }
