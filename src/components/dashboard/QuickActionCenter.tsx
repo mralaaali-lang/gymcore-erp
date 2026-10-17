@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import jsQR from 'jsqr';
 import { formatTime } from '../../utils/date';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -11,7 +11,8 @@ import {
   listOffers, listExpenseCategories, searchMembers, getTodayAttendance,
 } from '../../services/api';
 import Spinner from '../../components/ui/Spinner';
-import { UserPlus, UserGear as UserCog, QrCode, Bank as Banknote, Receipt, X } from '@phosphor-icons/react';
+import Modal from '../shared/Modal';
+import { UserPlus, UserGear as UserCog, QrCode, Bank as Banknote, Receipt } from '@phosphor-icons/react';
 
 // ====================================================================
 // §33 دفعة 1 — Quick Action Center for the manager dashboard.
@@ -63,30 +64,24 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
-/** Centered modal dialog (user feedback 2026-10-13: popups in the middle of the screen). */
-function Modal({
-  open, onClose, title, children,
-}: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
-  const { language } = useApp();
-  const rtl = language === 'ar';
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
-      <div
-        dir={rtl ? 'rtl' : 'ltr'}
-        className="relative w-full max-w-md max-h-[88vh] overflow-y-auto bg-white rounded-3xl shadow-2xl"
-      >
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-3xl">
-          <h3 className="font-bold text-gray-900">{title}</h3>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-gray-500" aria-label="close">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
-  );
+/** Centered modal dialog (user feedback 2026-10-13: popups in the middle of the screen).
+ * الصدفة نفسها بقى مسؤولة عنها `shared/Modal` (موجة 3 / دفعة 12) — القفل والفوكس والعزل
+ * والتوكنات كلها من القشرة، والحشو ده بيفضل جوّه اللوحة لأنه `type="submit"` داخل `<form>`. */
+
+/**
+ * موجة 3 / دفعة 12 — كل لوحات موجة 3 بتقفل التفريغ أثناء الكتابة الجارية
+ * (`disableDismiss={mut.isPending}`)، لكن هنا الفيو في مستويين: `QuickActionModals`
+ * بيركب القشرة والفورمات بتلف الـ mutation جوه. الكونتكست ده هو القنطرة، من غير
+ * ما كل فورم ياخد prop زيادة ومن غير ما الحالة تتنقل لفوق للداشبورد.
+ */
+const PendingContext = createContext<(v: boolean) => void>(() => {});
+
+function useReportPending(pending: boolean) {
+  const set = useContext(PendingContext);
+  useEffect(() => {
+    set(pending);
+    return () => set(false);
+  }, [pending, set]);
 }
 
 function SubmitButton({ pending, disabled, label }: { pending: boolean; disabled: boolean; label: string }) {
@@ -142,6 +137,7 @@ function AddMemberForm({ onDone, defaultPlanNote }: { onDone: () => void; defaul
     },
     onError: (e) => showToast(apiError(e, rtl ? 'فشل إضافة العضو' : 'Failed to add member'), 'error'),
   });
+  useReportPending(mut.isPending); // موجة 3 / دفعة 12 — تقفل التفريغ أثناء الكتابة
 
   if (created) {
     return (
@@ -234,6 +230,7 @@ function AddStaffForm({ defaultRole, onDone }: { defaultRole: 'coach' | 'recepti
     },
     onError: (e) => showToast(apiError(e, rtl ? 'فشل إضافة الموظف' : 'Failed to add staff'), 'error'),
   });
+  useReportPending(mut.isPending); // موجة 3 / دفعة 12 — تقفل التفريغ أثناء الكتابة
 
   return (
     <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); mut.mutate(); }}>
@@ -390,6 +387,7 @@ function CheckInForm() {
     },
     onError: (e) => setLast({ ok: false, text: apiError(e, rtl ? 'فشل تسجيل الحضور' : 'Check-in failed') }),
   });
+  useReportPending(phoneMut.isPending); // موجة 3 / دفعة 12 — تقفل التفريغ أثناء الكتابة
 
   return (
     <div className="space-y-4">
@@ -623,6 +621,7 @@ function PaymentForm({ onDone, presetMember }: { onDone: () => void; presetMembe
     },
     onError: (e) => showToast(apiError(e, rtl ? 'فشل تسجيل الدفعة' : 'Failed to record payment'), 'error'),
   });
+  useReportPending(mut.isPending); // موجة 3 / دفعة 12 — تقفل التفريغ أثناء الكتابة
 
   return (
     <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); mut.mutate(); }}>
@@ -674,6 +673,7 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
     },
     onError: (e) => showToast(apiError(e, rtl ? 'فشل تسجيل المصروف' : 'Failed to record expense'), 'error'),
   });
+  useReportPending(mut.isPending); // موجة 3 / دفعة 12 — تقفل التفريغ أثناء الكتابة
 
   return (
     <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); mut.mutate(); }}>
@@ -747,16 +747,26 @@ const TITLES: Record<ActionKey, [string, string]> = {
 export function QuickActionModals({ action, onClose }: { action: ActionKey | null; onClose: () => void }) {
   const { language } = useApp();
   const rtl = language === 'ar';
+  const [pending, setPending] = useState(false);
   return (
-    <Modal open={action !== null} onClose={onClose} title={action ? (rtl ? TITLES[action][0] : TITLES[action][1]) : ''}>
-      {action === 'member' && <AddMemberForm key="m" onDone={onClose} />}
-      {(action === 'coach' || action === 'reception') && (
-        <AddStaffForm key={`s-${action}`} defaultRole={action === 'coach' ? 'coach' : 'receptionist'} onDone={onClose} />
-      )}
-      {action === 'checkin' && <CheckInForm key="ci" />}
-      {action === 'today' && <TodayAttendance key="td" />}
-      {action === 'payment' && <PaymentForm onDone={onClose} />}
-      {action === 'expense' && <ExpenseForm onDone={onClose} />}
+    <Modal
+      open={action !== null}
+      onClose={onClose}
+      size="md"
+      dir={rtl ? 'rtl' : 'ltr'}
+      disableDismiss={pending}
+      title={action ? (rtl ? TITLES[action][0] : TITLES[action][1]) : ''}
+    >
+      <PendingContext.Provider value={setPending}>
+        {action === 'member' && <AddMemberForm key="m" onDone={onClose} />}
+        {(action === 'coach' || action === 'reception') && (
+          <AddStaffForm key={`s-${action}`} defaultRole={action === 'coach' ? 'coach' : 'receptionist'} onDone={onClose} />
+        )}
+        {action === 'checkin' && <CheckInForm key="ci" />}
+        {action === 'today' && <TodayAttendance key="td" />}
+        {action === 'payment' && <PaymentForm onDone={onClose} />}
+        {action === 'expense' && <ExpenseForm onDone={onClose} />}
+      </PendingContext.Provider>
     </Modal>
   );
 }
