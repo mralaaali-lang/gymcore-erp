@@ -129,7 +129,7 @@ export default function WebsiteGenerator() {
               type="text"
               value={form.subdomain}
               onChange={(e) => setForm((prev) => ({ ...prev, subdomain: e.target.value }))}
-              className="flex-1 px-4 py-2.5 bg-transparent text-gray-900 focus:outline-none text-sm"
+              className="flex-1 px-4 py-2.5 bg-transparent text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brass text-sm"
             />
             <span className="px-3 text-sm text-gray-500 bg-gray-100 py-2.5">.gymcore.app</span>
           </div>

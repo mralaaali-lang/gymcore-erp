@@ -119,7 +119,7 @@ export default function SystemMonitor() {
             <select
               value={refreshInterval}
               onChange={(e) => setRefreshInterval(Number(e.target.value))}
-              className="px-2 py-1 text-xs border border-gray-100 rounded-xl bg-white focus:outline-none"
+              className="px-2 py-1 text-xs border border-gray-100 rounded-xl bg-white"
             >
               <option value={15}>15s</option>
               <option value={30}>30s</option>

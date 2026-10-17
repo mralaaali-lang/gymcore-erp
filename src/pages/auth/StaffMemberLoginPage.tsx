@@ -341,7 +341,7 @@ export default function StaffMemberLoginPage() {
                       onBlur={() => { setFocusedField(null); setTouched((s) => ({ ...s, phone: true })); }}
                       aria-invalid={phoneBad || undefined}
                       aria-describedby="member-phone-hint"
-                      className="flex-1 min-w-0 bg-transparent text-white text-base outline-none placeholder-white/25"
+                      className="flex-1 min-w-0 bg-transparent text-white text-base outline-none no-focus-floor placeholder-white/25"
                       placeholder="05xxxxxxxx"
                       dir="ltr"
                       required
@@ -379,7 +379,7 @@ export default function StaffMemberLoginPage() {
                       onBlur={() => { setFocusedField(null); setTouched((s) => ({ ...s, code: true })); }}
                       aria-invalid={pinBad || undefined}
                       aria-describedby="member-pin-hint"
-                      className="flex-1 min-w-0 bg-transparent text-white text-base tracking-[0.3em] outline-none placeholder-white/25"
+                      className="flex-1 min-w-0 bg-transparent text-white text-base tracking-[0.3em] outline-none no-focus-floor placeholder-white/25"
                       placeholder="••••"
                       dir="ltr"
                       required
@@ -424,7 +424,7 @@ export default function StaffMemberLoginPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       onFocus={() => setFocusedField('email')}
                       onBlur={() => setFocusedField(null)}
-                      className="flex-1 min-w-0 bg-transparent text-white text-base outline-none placeholder-white/25"
+                      className="flex-1 min-w-0 bg-transparent text-white text-base outline-none no-focus-floor placeholder-white/25"
                       placeholder="coach@gymcore.app"
                       dir="ltr"
                       required
@@ -452,7 +452,7 @@ export default function StaffMemberLoginPage() {
                       onChange={(e) => setPassword(e.target.value)}
                       onFocus={() => setFocusedField('password')}
                       onBlur={() => setFocusedField(null)}
-                      className="flex-1 min-w-0 bg-transparent text-white text-base outline-none placeholder-white/25"
+                      className="flex-1 min-w-0 bg-transparent text-white text-base outline-none no-focus-floor placeholder-white/25"
                       placeholder="••••••••"
                       dir="ltr"
                       required

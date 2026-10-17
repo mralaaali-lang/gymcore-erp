@@ -367,7 +367,7 @@ export default function AdminLoginPage() {
                     onChange={(e) => handleEmailChange(e.target.value)}
                     onFocus={() => setFocusedField('email')}
                     onBlur={() => setFocusedField(null)}
-                    className="flex-1 bg-transparent text-white text-sm outline-none placeholder-white/25"
+                    className="flex-1 bg-transparent text-white text-sm outline-none no-focus-floor placeholder-white/25"
                     placeholder="manager@yourgym.com"
                     dir="ltr"
                     required={loginMethod === 'email'}
@@ -394,7 +394,7 @@ export default function AdminLoginPage() {
                     onChange={(e) => handlePhoneChange(e.target.value)}
                     onFocus={() => setFocusedField('phone')}
                     onBlur={() => setFocusedField(null)}
-                    className="flex-1 bg-transparent text-white text-sm outline-none placeholder-white/25"
+                    className="flex-1 bg-transparent text-white text-sm outline-none no-focus-floor placeholder-white/25"
                     placeholder="05xxxxxxxx"
                     dir="ltr"
                     required={loginMethod === 'phone'}
@@ -420,7 +420,7 @@ export default function AdminLoginPage() {
                   onChange={(e) => handlePasswordChange(e.target.value)}
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
-                  className="flex-1 bg-transparent text-white text-sm outline-none placeholder-white/25"
+                  className="flex-1 bg-transparent text-white text-sm outline-none no-focus-floor placeholder-white/25"
                   placeholder="········"
                   dir="ltr"
                   required

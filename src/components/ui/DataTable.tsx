@@ -88,6 +88,14 @@ export interface DataTableProps<T> {
    * source order would decide which radius wins (AGENT_HANDOVER §6).
    */
   bare?: boolean;
+  /**
+   * Screen-reader name for the whole grid. Without one, a table announces
+   * itself as "table" and the page's heading has to be found by ear — pass a
+   * short label ("أعضاء ببقيّة أقل من 7 أيام") on the screens where several
+   * tables share a view. Renders a `<caption>` kept in the sr-only flow, so it
+   * never changes the visual layout or the 45px row rhythm.
+   */
+  caption?: ReactNode;
   className?: string;
 }
 
@@ -150,6 +158,7 @@ export default function DataTable<T>({
   minWidth,
   dense = false,
   bare = false,
+  caption,
   className = '',
 }: DataTableProps<T>) {
   const { language } = useApp();
@@ -220,6 +229,7 @@ export default function DataTable<T>({
       )}
     >
       <table className="w-full border-collapse text-sm" style={minWidth ? { minWidth } : undefined}>
+        {caption ? <caption className="sr-only">{caption}</caption> : null}
         <thead>
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id} className="bg-muted">
@@ -281,9 +291,29 @@ export default function DataTable<T>({
               key={row.id}
               onClick={onRowClick ? () => onRowClick(row.original) : undefined}
               title={onRowClick ? rowTitle?.(row.original) : undefined}
+              // A clickable row is otherwise mouse-only, which is a WCAG 2.1.1
+              // failure: the edit dialog cannot be opened from the keyboard at
+              // all. `tabIndex={0}` plus Enter/Space makes the row a real
+              // affordance; the floor in `styles/index.css` draws its focus
+              // ring because the selector covers `[tabindex]`.
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (event) => {
+                      // Only the row itself: a button or field inside a cell
+                      // bubbles its own Enter/Space up here, and firing the row
+                      // for it would open the dialog on top of the inner action.
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        onRowClick(row.original);
+                      }
+                    }
+                  : undefined
+              }
               className={cn(
                 'border-b border-hairline transition-colors duration-150 last:border-b-0 hover:bg-muted/50',
-                onRowClick && 'cursor-pointer',
+                onRowClick && 'cursor-pointer focus-visible:bg-muted/50',
               )}
             >
               {row.getVisibleCells().map((cell) => {

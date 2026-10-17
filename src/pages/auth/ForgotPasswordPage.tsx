@@ -98,7 +98,7 @@ export default function ForgotPasswordPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="username email"
                   enterKeyHint="send"
-                  className="flex-1 min-w-0 bg-transparent text-white text-base outline-none placeholder-white/25"
+                  className="flex-1 min-w-0 bg-transparent text-white text-base outline-none no-focus-floor placeholder-white/25"
                   placeholder={isRtl ? 'بريدك الإلكتروني' : 'Your email'}
                   dir="ltr"
                   required

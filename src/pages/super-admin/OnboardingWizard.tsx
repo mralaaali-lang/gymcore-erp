@@ -458,7 +458,7 @@ export default function OnboardingWizard() {
                       setGymForm((prev) => ({ ...prev, subdomain: clean }));
                     }}
                     placeholder="champions"
-                    className="flex-1 px-3 py-2.5 text-sm focus:outline-none bg-transparent"
+                    className="flex-1 px-3 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brass bg-transparent"
                   />
                   <span className="px-3 py-2.5 text-xs text-gray-500/60 bg-gray-50 border-s border-gray-100">.gymcore.app</span>
                 </div>

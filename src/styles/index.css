@@ -241,6 +241,88 @@ html {
   text-size-adjust: 100%;
 }
 
+/*
+ * Focus floor (موجة 2 — FRONTEND_MASTER_PLAN §4). 75 files write `outline-none`
+ * and only 69 pair it with a `focus:ring`; the rest render a control that can be
+ * reached by Tab and never SEEN by Tab, which is a WCAG 2.4.7 failure rather
+ * than a taste problem. This block makes the keyboard cursor visible everywhere
+ * without touching those files one by one.
+ *
+ * `:where()` keeps the selector at specificity 0, so the 69 controls that
+ * already own a treatment — the auth fields (wrapper keyline via `focusedField`)
+ * and every `focus:ring-*` utility — win without growing a double indicator.
+ * `:focus-visible` (not `:focus`) keeps the ring off mouse clicks, which is what
+ * the outlines were originally killed for.
+ *
+ * Why brass and not `--ring`: `--ring` is emerald #10b981, which measures 2.29
+ * against the bone page and 2.50 against the card — below the 3:1 WCAG 1.4.11
+ * floor for a non-text indicator, so light mode would ship a keyboard cursor
+ * nobody can see. `--brass` is 3.43 on bone (3.73 on card) and 8.09 against
+ * Court Green in dark, it is already mode-aware, and the shell reserves brass
+ * for exactly this kind of meta mark — never for an action. Re-pointing `--ring`
+ * itself is not in this wave: it feeds `ring-ring` at 69 call sites plus every
+ * shadcn control, so it is an owner decision with numbers before and after.
+ */
+:where(a, button, [role="button"], input, select, textarea, summary,
+       [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid hsl(var(--brass));
+  outline-offset: 2px;
+}
+
+/*
+ * The stand-down (same wave, measured): 51 class strings carry a plain
+ * `outline-none` *plus* their own `focus:` / `focus-visible:` ring or border —
+ * the emerald/brass field treatments across the gym-admin screens and every
+ * shadcn control. Against the floor above they would show two concentric
+ * indicators for one state, so a control that already names a focus treatment
+ * keeps its own. Substring attribute matching is what makes this one rule
+ * instead of 51 edits.
+ *
+ * Specificity is (0,2,0) — strictly above the floor's (0,1,0) — so the result
+ * does not depend on source order. `outline-none` is deliberately NOT in the
+ * list: it removes an indicator without putting one back, which is the exact
+ * bug the floor exists to cover.
+ */
+[class*="focus:ring"]:focus,
+[class*="focus-visible:ring"]:focus,
+[class*="focus:border"]:focus,
+[class*="focus:outline-"]:focus,
+[class*="focus-visible:outline-"]:focus {
+  outline-color: transparent;
+}
+
+/*
+ * `no-focus-floor` — the documented opt-out, used by the pre-login screens.
+ * Every auth field lives in a wrapper that paints its OWN keyboard cursor
+ * (`focus-within:border-auth-accent` + `ring-1 ring-auth-accent/30`, or the
+ * `focusedField` ternary), so a brass ring around the inner <input> as well is
+ * two indicators for one state. Same specificity as the floor and later in this
+ * file, so it wins without `!important`. Anything that opts out here must name
+ * the replacement indicator — an opt-out with nothing behind it is the original
+ * bug.
+ */
+:where(.no-focus-floor):focus-visible {
+  outline: none;
+}
+
+/*
+ * prefers-reduced-motion: CountUp, the slide-up drawer and every Radix
+ * transition animate by default. Vestibular safety (WCAG 2.3.3) asks for an
+ * alternative to that motion; collapsing durations is the standards way to give
+ * it without deleting the state change the animation was carrying.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @media (max-width: 768px) {
   /* Any tappable form control is at least 16px — below that mobile
      browsers auto-zoom the viewport when the field is focused. */

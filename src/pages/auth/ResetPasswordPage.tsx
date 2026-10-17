@@ -124,7 +124,7 @@ export default function ResetPasswordPage() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="flex-1 min-w-0 bg-transparent text-white text-base outline-none placeholder-white/25"
+                    className="flex-1 min-w-0 bg-transparent text-white text-base outline-none no-focus-floor placeholder-white/25"
                     placeholder="********"
                     dir="ltr"
                     minLength={8}
@@ -144,7 +144,7 @@ export default function ResetPasswordPage() {
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="flex-1 min-w-0 bg-transparent text-white text-base outline-none placeholder-white/25"
+                    className="flex-1 min-w-0 bg-transparent text-white text-base outline-none no-focus-floor placeholder-white/25"
                     placeholder="********"
                     dir="ltr"
                     minLength={8}

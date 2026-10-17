@@ -3058,3 +3058,103 @@ Pro/Enterprise) وعقودها القديمة تفضل بأسعارها المو
 لسه على اللوحة القديمة (60 نتيجة في الـaudit على الملفين) — اتلمسوا في منطق السعر بس. كمان
 `aiAnalytics.service.ts` و`geminiAdapter.ts` بيقترحوا أسماء باقات قديمة (Starter/Professional/
 Enterprise) في نص الـprompt — خارج نطاق الطلب، محتاج قرار قبل التعديل.
+
+---
+
+## موجة 2 (FRONTEND_MASTER_PLAN §4) — أرضية الفوكس واللمس: الوصول من غير ما نتتظر 150 ملف (2026-10-17)
+
+**المطلوب من الخطة:** حلقة فوكس عامة بدل تعديل 15 ملف سطر‑سطر، + `prefers-reduced-motion`، +
+الصف القابل للـEnter في `DataTable`، + skip link في الصدفة. اللي اتعلمل فعليًا أربعة ملفات
+صدفة + 7 ملفات صفحات، والباى غطّاه الـCSS من غير لمس.
+
+**الجرد قبل التنفيذ (بـgrep على `src/**/*.tsx`، مش تقدير):**
+
+| المجموعة | العدد | التصرف |
+|---|---|---|
+| `outline-none` مفردة من غير أي `focus:*` | **26 موضعًا في 10 ملفات** | اتغطّت بأرضية الفوكس — ما اتلمستش |
+| `outline-none` + ring/border خاصين | **52 موضعًا** | قاعدة «تنحّي» منعت الفوكس المزدوج |
+| `focus:outline-none` (specificity أعلى من الأرضية) | **91 موضعًا**، منها **3** من غير استبدال | 2 اتصلحوا + 1 `tabindex={-1}` (مرفوض الوصول أصلًا) |
+| حقول الـauth اللي ليها `focus-within` مرسوم | **10 حقول في 4 ملفات** | `no-focus-floor` صريح |
+
+**أرضية الفوكس (`src/styles/index.css`):** `:where(a, button, [role=button], input, select,
+textarea, summary, [tabindex]:not([tabindex=-1])):focus-visible { outline: 2px solid
+hsl(var(--brass)); outline-offset: 2px }`. اختيار `:where()` مقصود: specificity بتاعته (0,1,0)
+بس — يعادل `.outline-none` بكلاس واحد ويفوز بترتيب المصدر (اتأكدت من ده في الحزمة المبنية:
+`.outline-none` عند بايت 77906 والأرضية عند 92337)، فبيطبّع من فوق الكلاسات القديمة بلا
+`!important` وبلا ما يلغى أي `focus:ring` مكتوب بـ`focus:` (specificity 0,2,0) — دول ليهم
+قاعدة التنحي.
+
+**ليه نحاس مش `--ring`:** `--ring` = emerald `#10b981` وقياسه **2.29** على ورق العظم `#f5f3ee`
+و**2.50** على الكارت — تحت حد 3:1 بتاع WCAG 1.4.11 للمؤشرات غير النصية. `--brass` = **3.42**
+على العظم (جدول `--series-1` في `tokens.css` بيقول 3.73 على الكارت) و**8.09** على Court Green
+في الداكن، وmode-aware بالاسم زي باقي التوكنات. تغيير `--ring` نفسه **مش في النطاق**: وراؤه
+`ring-ring` في 69 موضعًا وكل مكوّنات shadcn — قرار المالك برقمين قبل وبعد.
+
+**قاعدة التنحي (مكتشف بالقياس، مش من الخطة):** من غيرها كانت 52 حقلًا هتطلع حلقتين (ring
+نصفي + outline نحاسي) في نفس الوقت. القاعدة `[class*="focus:ring"]:focus, … { outline-color:
+transparent }` بتغطي الخمس صيغ (`focus:ring`، `focus-visible:ring`، `focus:border`،
+`focus:outline-`، `focus-visible:outline-`) في سطر واحد بدل 52 تعديل، وspecificity (0,2,0)
+فكسبها مش معلّق على الترتيب. `outline-none` **مش** في القائمة — دي الحالة اللي الأرضية موجودة
+عشانها.
+
+**`prefers-reduced-motion`:** بلوك `*`/`::before`/`::after` بمدد 0.01ms و`scroll-behavior: auto`
+(أول حد يقرأ المشروع: `CountUp` والـslide-up والـRadix transitions كلها بتتحرّك
+بافتراض إن مفيش بديل).
+
+**`DataTable`:** `caption?: ReactNode` بيتصل في `<caption className="sr-only">` — مفيش
+`aria-label` على `<table>` لأن اسم جدول فيه رؤوس `scope=col` بيتعلا على المحتوى عند قارئ
+الشاشة؛ و`<tr>` بقى `tabIndex={0}` + Enter/Space لما `onRowClick` موجود، مع حراس
+`event.target !== event.currentTarget` لأن زرار حذف جوه الخلية بيرفع Enter بنفسه وكان هيفتح
+المودال فوق أكشنه. الحارس بيشغل بس لما الجدول قابل للضغط — الجدول العادي ما بقاش focus stop.
+
+**`AppLayout`:** skip link أول tab stop قبل الـSidebar، `sr-only` لحد ما يتلمس، وبعدين
+`focus:fixed focus:top-3 focus:start-3 focus:z-50` على صدفة الكارت (`bg-card` + `border-hairline`
++ `rounded-shell`)، و`<main id="main-content" tabIndex={-1}>`. `start-3` منطقي فبيربط يمين في
+العربي وشمال في الإنجليزي بلا قاعدة تانية.
+
+**المتحقق (قياس حيّ في Chromium على `dist/a11y-harness.html` — نسخة DOM من الكلاسّات نفسها،
+ملف في `dist/` المتجاهَل من Git واتمسح بعد القياس):**
+
+- أول Tab → `document.activeElement = probe-skip` و`position: fixed` و`top: 12px` و
+  `inset-inline-start: 12px` و`z-index: 50` و`bg rgb(255,253,249)` و`border 1px rgb(239,233,221)`
+  و`radius 10px` و`outline solid 2px rgb(166,124,46)`.
+- Enter → الرابط الجديد `#main-content` و`activeElement = main-content` (لو `<main>` بلا
+  `tabIndex={-1}` كانFocus فضل على الرابط).
+- حقل `outline-none` مفرد → `outline solid 2px rgb(166,124,46)` + `offset 2px` ✓.
+- حقل `outline-none focus:ring-2` → `outline` شفاف + ظل `rgba(16,185,129,0.4)` — مؤشر واحد ✓.
+- حقل auth مع `no-focus-floor` → `outline: none` والـwrapper ورّم `rgb(6,182,212)` — مؤشر واحد ✓.
+- الحقل اللي أبوه متقص (`overflow-hidden`) → `box-shadow … rgb(166,124,46) 0 0 0 2px inset` و
+  `clipsParent: false` — عشان كده الوصف كان inset ring مش outline (الأوفسيت برا الصندوق كان
+  بيتقص بـ`overflow-hidden` الأب).
+- صف `<tr tabindex=0>` → `:focus-visible` = true و`outline solid 2px` نحاسي، وارتفاع
+  **44.5px** (مطابق لـ45px الموثق في المرحلة 5 — الـ`tabIndex` ما زودش سطر)، والـ`<caption>`
+  `position: absolute; width: 1px; clip: rect(0,0,0,0)` = صفر تأثير على التخطيط.
+- الداكن: `--brass = 39.3 58.5% 63.1%` → `rgb(216,178,106)` من غير ما تلمس صفحة ✓.
+- `npx tsc --noEmit` = **0** · `vite build` = **✓ (6.02s)** · وجود القواعد الأربع في
+  `dist/assets/index-DisdLXl_.css` بـ`indexOf` (مش grep في shell): الأرضية @92337، التنحي
+  @92392، `no-focus-floor` بعدها، `prefers-reduced-motion` @92451.
+
+**فجوة موثقة (تحقق حيّ ناقص):** نصفي React (الصفحة الحقيقية بعد الدخول: الـskip link جنب
+الـSidebar، وEnter على صف يفتح مودال التعديل، وحبس الفوكس في `Modal`) **ما اتقِش في التطبيق
+الشغّان** — قاعدة `staff_users` فيها **63 حساب، 62 منهم `is_active = false`** (السيد بيخلقهم
+موقوفين)، والحساب النشط الوحيد هو بريد المالك الشخصي. دخول المدير المؤسس بيتكد بمسار
+`!staff.is_active` بيرجع **401** عام، فما سجّلتش بدخول المالك ولا عملت حساب بديل. اللي عايز
+يكمّل النقص ده: يفعّل حساب واحد (`update staff_users set is_active = true where email = '…'`)
+أو يدّي بيانات دخول شغّالة، وبعدين على `http://127.0.0.1:9100` يتأكد إن أول Tab بيوقع على
+«انتقل إلى المحتوى»، وإن Enter على أول صف في `/gym-admin/members` بيفتح نفس المودال اللي
+الماوس بيفتحه، وإن `role=dialog` + `aria-modal="true"` موجودين و`document.activeElement` جواه
+بعد الفتح.
+
+**فرضية مرفوضة مسجلًا:** `prefers-reduced-motion` اتأكدت من الحزمة المبنية (النص موجود
+بالتصريحات الخمسة)، بس ما اتعملش لها emulation في المتصفح — `browser-use` مفيش عنده
+`emulateMedia`، فسلوك نظام التشغيل نفسه متحققش.
+
+**باقيات معلنة:** `dist/a11y-harness.html` اتمسح؛ مفيش أي سطر DB اتكتب أو اتعدل؛ مفيش ملف
+في نطاق الجلسة التانية اتلمس (`git status` قدام ونص: `server/src/*` و`ToastContext.tsx`
+و`routes/index.tsx` و`SettingsPage.tsx` فضلت زي ما هي).
+
+**ديون مُورثة:** عناصر `dropdown-menu.tsx` (2 موضع `outline-none`) بقت تاخد Outline نحاسي مع
+الأسهم لأن `focus:bg-accent` مش في قائمة التنحي — مقصود دلوقتي (مؤشر قائمة الأسهم كان ناقص
+أصلًا)، ولو المالك عايز رجوعها بتضاف `[class*="focus:bg-"]` للتنحي بس ده يدي نفس الحق في
+`focus:bg-` الضعيف. وكمان ~1700 كلاس حرفي في الصفحات لسه بيطغى على التوكنات (موجة 5/11)،
+و`--ring` نفسه لسه 2.29 (قرار D-gate).
