@@ -3443,3 +3443,69 @@ first-gym` حالتها `is_active = f, tenant_status = active, deleted = t`. ي
 **الوثايق اللي اتحدّثت في الدور ده (add-only، بروتوكول §5):** `SESSIONS.md` §1 (تسجيل
 الإسناد)، `TODO.md` سطر 2026-10-17، `LOCAL_TESTING_REPORT.md` (البند ده)،
 `AUDIT_REPORT_2026-10-17.md` §10 (عدد العملات غير المدفوعة).
+
+---
+
+## §48 — أمني (§34ج-أ): تنقية `platform_admins.onboarding_data` تكراريًا + حارس مخزني (2026-10-17 — جلسة B)
+
+**كان:** العمود كان يخزّن كلمة مرور مدير الصالة **نصًا صريحًا** في عمقين:
+`admin.password` و`step_2_data.password`. القياس قبل الإصلاح (أسماء مفاتيح فقط، صفر قراءة
+لأي قيمة): `count(*) FROM platform_admins WHERE onboarding_data::text ~* '"…"'` = **1** صف،
+والتعداد الجانبي للمفاتيح أعطى `admin|password` و`step_2_data|password` بجوار مفاتيح بريئة
+(`gym|name` · `config|platform_name` · `step_3_data|vat_percentage`). والأهم من ده: **بلوك 8 في
+`068_platform_contracts.sql` كان يقتطع الطبقة الأولى فقط** (`- 'password' - 'token' …` بلا
+توابع)، فما مسحش ولا مفتاح من الاتنين — يعني تعليق `onboarding.ts` («العمود القديم نَقَّته
+migration 068») كان واهم: الـmigration موجودة بس غير فاعلية على العمق اللي فيه السر فعلًا.
+
+**بقى:**
+- `server/src/utils/scrubSecrets.ts` — منطق الاقتطاع بقى وحدة قابلة للاختبار ومستوردة من
+  `onboarding.ts`، بنمط أوسع من القديم:
+  `/pass|pwd|secret|token|otp|hash|credential|api[_-]?key|\bpin\b/i`.
+- `server/migrations/081_scrub_onboarding_data_secrets.sql` — دالة تكرارية
+  `scrub_secret_json_keys(jsonb)` (كائن/مصفوفة/قيمة)، بتنقّي الصفوف القائمة، و**بتفضل معلّقة
+  مع trigger** `trg_scrub_onboarding_data_secrets` (`BEFORE INSERT OR UPDATE OF onboarding_data`)
+  → أي مسار كود مستقبلي — نسي الاقتطاع أو اتضاف جديد — مش هيقدر يخزّن سر في العمود. النمط
+  مكتوب في الملف صراحةً أنه توأم `scrubSecrets()` ولازم يتعدّل معاه في نفس الـcommit.
+- تعليق `onboarding.ts` اتصحح: كلمة المرور بتوصل في جسم طلب الإكمال نفسه
+  (`final_data.admin.password`) فمسار إنشاء المدير **مش بيعتمد** على العمود المخزّن — التنقية
+  ما كسرتش إنشاء الصالة. وده متأكد من الكود: `completeOnboarding` بيقرا `req.body`،
+  والويزارد (`OnboardingWizard.tsx:208`) بيبعت `adminForm` الحي، و`canProceed` في خطوة المدير
+  بيطلب `password.length >= 6` — فلو الجلسة اتجدّدت بعد التنقية المستخدم بيكتبها من جديد.
+
+**القياس (بعد):**
+
+| التحقق | الأمر/الطريقة | النتيجة |
+| --- | --- | --- |
+| الأسرار المتبقية | `count(*) … ~* '"[^"]*(pass\|pwd\|secret\|token\|otp\|hash\|credential\|api[_-]?key\|pin)"'` | **0** (كان 1) |
+| غير السرّ سليم | `jsonb_object_keys(onboarding_data)` على كل الصفوف | **22** مفتاح علوي كلها موجودة (`gym` · `admin` · `config` · `step_0_data`…`step_3_data` · `completed_at` · `created_gym_id`) |
+| تطابق SQL ↔ JS | نفس الـfixture (قيم dummy) عدّى على `scrub_secret_json_keys()` وعلى `scrubSecrets()` | مخرجهوم واحد: اتمسح `password` · `api_key` · `pin` · `token` · `pwd` · `credential` على أي عمق وجوه المصفوفة، وفضلت `pincode` و`pinned` وكل المفاتيح البريئة |
+| الحارس المخزني | `BEGIN; UPDATE … '{"admin":{"email":…,"password":"DUMMY","pwd":"DUMMY"}, …}'; SELECT; ROLLBACK;` | المخزّن رجّع `{"gym":{…},"admin":{"email":…}}` — السر اتمسح عند الكتابة. وبعدها `probe_residue = 0` |
+| idempotency | إعادة تشغيل ملف 081 كاملًا `psql -v ON_ERROR_STOP=1 < …` | `UPDATE 0` (مفيش صفوف محتاجة تنقية تاني) والنجاح كامل |
+| أنواع | `npx tsc --noEmit` (server) | **0** أخطاء |
+| اختبارات | `npx vitest run tests/unit` | **4 ملفات / 20 اختبار** ناجح (منها 7 جديدة لـ`scrubSecrets.test.ts`) |
+
+**نقطتين لازم يتسجلوا (مش أخطاء بس يحكموا الشغل الجاي):**
+1. **خادم التطوير بيطبّق الـmigrations لوحده في نص الكتابة:** `ts-node-dev --respawn` بيعيد
+   تشغيل `src/app.ts` مع أي حفظ في `src/`، والـboot بيعمل `runMigrations()`. النتيجة: `081`
+   اتطبّق لوحده الساعة **08:20:59Z** بنسخة الملف الأولى (النمط الضيّق) قبل ما خلّصها.
+   و`schema_migrations` بيتتبّع **الاسم** مش البصمة (md5 للأرشفة بس)، فالملف بعد التطبيق
+   **ما بيتعادش تشغيله**. الطقس الصح: اكتب ملف الـmigration بآخر نص في كتابة واحدة، ولو اتغيّر
+   بعد التطبيق نفّذه يدويًا (`CREATE OR REPLACE` + `UPDATE … WHERE` محروسى = آمن) وحدّث
+   `md5_hash` يدويًا — وده اللي اتعمل فعلًا: id 83 بقى `13d87a9d59face63635e197459c91cac`
+   مطابق للنسخة النهائية.
+2. **`\b` في Postgres مش حد كلمة:** `\bpin\b` رجّعت `f` حتى على `'pin'` نفسها. الصحيح `\y`
+   (`\ypin\y` = t لـ`pin`، f لـ`step_pin` و`spine`) — وده مطابق لسلوك `\b` بتاع JS لأن `_`
+   حرف كلمة في الاتنين.
+
+**مطلوب من المالك (مش شغل كود):**
+1. باسورد مدير الصالة اللي اتخزّن نص لفترة **لازم يتغيّر** من شاشة المدير. الأداة ما بتقرأش
+   أي قيمة سرية، فالتغيير عنده مش عندي.
+2. أي **dump/نسخة احتياطية** اتعملت قبل اليوم لسه فيها النص الصريح — التنقية دي حيّة على
+   القاعدة بس. لو عايز نتعامل مع النسخ، يعدّد أماكنها.
+3. على staging `081` لسه **ما اتطبقتش** (قاعدة مستقلة)؛ هتنفّذ نفسها أول ما يتنشر الكود —
+   النشر أمر منفصل بموافقة المالك.
+
+**بقايا مقرّ:** اللي اتمسح هو المفاتيح السرّية نفسها فقط؛ الـprobe اتلفّ في `ROLLBACK`
+(0 بقايا)؛ مفيش `pg_temp` اتستخدم؛ ولا ملف في نطاق جلسة A اتلمس. سجل واحد محتمل للملاحظة:
+النمط بيقطع أي مفتاح فيه `pass` كـsubstring (زي `passenger`) — مفيش مفتاح كه دلوقتي في
+الـschema، ولو اتضاف مستقبلًا يبقى قرار واعٍ مش مصادفة.

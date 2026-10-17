@@ -4,27 +4,19 @@ import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/database';
 import { getAdminClient } from '../config/database';
 import logger from '../config/logger';
+import { scrubSecrets } from '../utils/scrubSecrets';
 
 /**
  * §34ج-أ — onboarding_data كان يخزّن كلمات مرور الخطوات كنص صريح داخل
- * عمود jsonb. كلمة المرور تُستهلك أثناء إنشاء الحساب بشكل مشروع، لكن
- * لا يحق لها البقاء في سجل الخطوات: تُقتطع هنا قبل كل حفظ (بما فيها
- * التفرعات داخل step_N_data)، والعمود القديم نَقَّته migration 068.
+ * عمود jsonb. كلمة المرور تُستهلك أثناء إنشاء الحساب بشكل مشروع (تصل في
+ * جسم طلب الإكمال نفسه، فلا يعتمد إنشاء المدير على العمود المخزّن)، لكن لا
+ * يحق لها البقاء في سجل الخطوات: تُقتطع هنا قبل كل حفظ وقبل كل إكمال، على
+ * أي عمق بما فيها التفرعات داخل step_N_data.
+ *
+ * تاريخ التنقية: migration 068 (بلوك 8) كانت تقتطع الطبقة الأولى فقط فسقطت
+ * admin.password وstep_2_data.password؛ migration 081 تنقّي المتبقي
+ * تكراريًا وتُعلّق trigger على العمود حتى لا يرجع التسريب من أي مسار آخر.
  */
-const SENSITIVE_KEY_PATTERN = /pass(word)?|secret|token|otp|hash|\bpin\b/i;
-
-function scrubSecrets<T>(value: T): T {
-  if (Array.isArray(value)) return value.map((v) => scrubSecrets(v)) as unknown as T;
-  if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (SENSITIVE_KEY_PATTERN.test(k)) continue;
-      out[k] = scrubSecrets(v);
-    }
-    return out as unknown as T;
-  }
-  return value;
-}
 
 /**
  * GET /platform/onboarding
