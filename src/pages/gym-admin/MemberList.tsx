@@ -92,7 +92,9 @@ export default function MemberList() {
       sortDescFirst: false,
       cell: (m) => (
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-shell bg-brass-soft text-pine text-sm font-bold">
+          {/* نفس قاعدة MembersReport.countChip: --brass-soft الداكن مفتاح hover
+              مش خلفية نص — text-pine فوقه = 2.66، والـchalk = 5.83 (AA). */}
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-shell bg-brass-soft text-pine text-sm font-bold dark:text-foreground">
             {(m.full_name || '?').charAt(0)}
           </span>
           <span className="font-medium text-foreground">{m.full_name}</span>
