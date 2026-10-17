@@ -4351,3 +4351,122 @@ CDP مش `taskkill /IM chrome.exe` (الحادثة القديمة)، وبروف�
 استعادة صالة حيّة للتحقق داخل التطبيق + `manager@first-gym.com` `is_active=false` ·
 reflow الجداول على 390 كبند في موجة 4 · **`push` (D7) وإعادة بناء `:9000` (D8)** — ولا واحدة اتعملت في الجلسة دي.
 
+## §56 — موجة 3 / دفعة 6: ثلاث لوحات `gym-admin` على `shared/Modal` (2026-10-17 — جلسة A+C، **أول جلسة بصالة حقيقية**)
+
+### ١) إيه اتحوّل بالضبط (٣ لوحات في ٣ ملفات)
+
+| الملف | اللوحة | `size` | العرض المقاس | ملاحظة |
+|---|---|---|---|---|
+| `src/pages/gym-admin/marketing/AnnouncementsPanel.tsx` | «إضافة إعلان» (تبويب التسويق) | `lg` | **512×488** | كانت `Card shadow-xl` + `fixed inset-0 bg-black/40` |
+| `src/pages/gym-admin/ExpensesPage.tsx` | `AddExpenseModal` («إضافة مصروف») | `md` | **448×483** | **مُصدَّرة** ومستخدَمة حرفيًا في `CashboxPage` فتحوّلها يغطّي الشاشتين |
+| `src/pages/gym-admin/crm/LeadForm.tsx` | «إضافة/تعديل عميل محتمل» (من `LeadKanban`) | `lg` | **512×690** | كان `fixed inset-0` + حجرة `Card` |
+
+**آلية التحويل (صدفة، بلا redesign):** طبقة `fixed inset-0` + الـscrim + `Escape` اليدوي + قفل السكرول
+اتحذفوا وبقوا `<Modal open onClose dir={rtl?'rtl':'ltr'} disableDismiss={…isPending} title footer>`؛
+الطفل الوحيد = `<form onSubmit>` الأصلي كما هو. **فرق معلن عن دفعة 5:** الزر الأساسي بقى
+`type="button" + onClick={() => submit()}` (مش `type="submit" form="…"`) لأن الفوتر برّه الـ`form`
+وحالة الاستمارة داخل نفس المكوّن، و`onSubmit` اتساب فالمساران (نقر / Enter) شغالان. في `ExpensesPage`
+اتشال استيراد `X` من `@phosphor-icons/react` بعد ما بقى بلا usage. **مفيش أي نص أو سلوك أو تحقّق
+اتزوّد** — مرة جرّبت أزوّد سطر «الحقول المؤشرة بـ* إلزامية» في `LeadForm` واتمسح فورًا (مخالفة تكافؤ العقد).
+
+### ٢) البيئة: إزاي الجلسة الحقيقية اتفتّتت (وإيه اللي كان مانعها)
+
+المالك أعطى صالة رملية للاختبار والتعديل (`FRONTEND_MASTER_PLAN.md` بوابة «رجّع tenant حيّة» اتقفلت).
+الحالة المقاسة قبل الشغل: `حامد جيم` = `b37861be-4898-40cf-aa2a-e4111dc18cdf`، `manager` نشط،
+`0 members · 0 announcements · 0 financial_transactions · 0 gym_leads`. أربع عقبات اتشخصت بالقياس:
+
+1. **CORS على `:9100`** (32 خطأ في الـconsole): `.env` غير متتبَّع فيه `VITE_API_URL=http://localhost:4000/api/v1`
+   بيمرّر النداءات برّه بروكسي Vite، بينما `server/.env` بيقول `CORS_ORIGIN=http://localhost:9000` فقط.
+   **ما لمسناش حاجة حد** — اتشغّل `:9110` لنفس الشجرة بـ`VITE_API_URL=""` فتبقى كل النداءات same-origin
+   من خلال البروكسي (`vite.config.ts` بيبروكسي `/api` و`/auth` و`/platform`). **الأهم:** `VITE_API_URL="/api/v1"`
+   غلط — instance تاني (`:9111`) رجّع `Cannot GET /api/v1/api/announcements` لأن مسارات `api.ts` بتبدأ
+   بـ`/api/…` بالفعل فبيتضاعف البادئ.
+2. **`AuthContext` في الذاكرة بس** (`src/context/AuthContext.tsx:26-66` — مفيش restore): أي تحميل
+   مستند بيرجعك `/login` حتى مع كوكي صالح، فكل التنقل بـ`history.pushState` + `popstate` (SPA) بدل reload.
+3. **سقوط الإدخال الموثوق بعد `pushState`**: متقيس بأربع محاولات (`Emulation.setFocusEmulationEnabled`
+   · `Page.setWebLifecycleState('active')` · `Page.bringToFront` · بروتوكولات `pointerdown/mouseup` مختلفة)
+   = **صفر** أحداث على `window` في مرحلة الـcapture. قبل التنقل الشغال طبيعي (دخول بالماوس الموثوق:
+   `click=3` و`POST /auth/login` و`me=200`). **الاستنتاج المعلَّن:** القياس ده اتعمل بـ`el.click()`
+   و`KeyboardEvent` اصطناعي للـEscape — ونفس معالِجات React ونفس `DismissableLayer` في Radix بتشتغل
+   في الحالتين، والكتابة نفسها هي كتابة التطبيق فوق الـAPI الحقيقي؛ والإدخال ظلّ موثوقًا
+   (`Input.insertText` مع asserted field length). **الفخ القديم اللي اتمسك تاني:** `Browser.setWindowBounds`
+   بيكسر إدخال الماوس للجلسة كلها — مفيش منه في أي سكريبت دلوقتي.
+4. **الـharness كان معلق 9 دقايق**: `Fetch.enable` بيحبس كل الطلبات المطابقة للـpattern — بما فيها
+   قراءات التحقق `GET` — فـ`await fetch()` جوّه `Runtime.evaluate` معلّق بلا رد. الإصلاح: أي طلب
+   مش POST بيتكمّل فورًا في الـhandler.
+
+### ٣) القياس (٣/٣ لوحات — الصدفة والتوكنات والعزل والفوكس)
+
+| الطبقة | الإعلانات | المصروف | العميل المحتمل |
+|---|---|---|---|
+| العرض × الارتفاع | 512×488 (`lg`) | 448×483 (`md`) | 512×690 (`lg`) |
+| `centreDelta` | `[0,0]` | `[0,0]` | `[0,0]` |
+| `radius` / `border` / `bg` / `shadow` | `10px` · `1px rgb(239,233,221)` · `rgb(255,253,249)` · none | نفس القيم | نفس القيم |
+| حشو / `dir` / `htmlDir` | 24px · `rtl` · `rtl` | 24px · `rtl` · `rtl` | 24px · `rtl` · `rtl` |
+| عزل الخلفية | `#root aria-hidden="true"` | نفس | نفس |
+| `aria-labelledby` / `aria-describedby` | موجود / **مغيب** (بلا `description`) | موجود / مغيب | موجود / مغيب |
+| X القشرة | `[26,26]` «إغلاق» | `[26,26]` | `[26,26]` |
+| الارتفاعات | input 38 · textarea 98 · select 39 · checkbox 16 | number 44 · date 44 · select 44 · textarea 66 | text 42×3 · select 43 · textarea 82 |
+| Escape وهي فاضية | تقفل ✓ | تقفل ✓ | تقفل ✓ |
+| الفوكس راجع للفاتح | ✓ | ✓ | ✓ (بعد `focus()` قبل `click()` — الـclick الاصطناعي ما بينقلش الفوكس لوحده) |
+| الزر الأساسي `disabled` لحد الصلاحية | ✓ («نشر») | ✓ («حفظ المصروف») | ✓ (بلا تحقق server-side) |
+
+**مسار pending الحقيقي** (`Fetch` بيحبس الـPOST): في التلاتة `إلغاء` و«حفظ/نشر» بقوا `disabled`
+والنص اتحوّل «جارٍ الحفظ…»، و**مسارات القفل الأربعة مرفوضة: Escape · scrim · X · إلغاء**
+(`{afterEsc:true, afterScrim:true, afterX:true, afterCancel:true}` = اللوحة لسه مفتوحة). التحوّط
+المحلي هنا — وهو مش إصلاح القشرة — إن `disabled={saving}` اتحطّ على زر «إلغاء» في اللوحات التلاتة؛
+عيب `shared/Modal` نفسه (`disableDismiss` يحرس `onOpenChange` بس) لسه **بوابة مالك** مفتوحة.
+
+**§34و على 390** (mobile emulation، بلا كتابة): اللوحة **358px** و`overflowX=false` في التلاتة،
+وأزرار الفوتر **48/48** كلها، والمحتوى الوحيد تحت 48 = **checkbox التثبيت 16px** في لوحة الإعلانات
+(مورَّث من الاستمارة القديمة، مش من التحويل — نفس نمط `<input type=checkbox>` جوه `<label>`).
+
+### ٤) الكتابة والتنظيف (معلَن بالكامل)
+
+اتعملت **كتابة حقيقية** في الصالة الرملية بس، بوسم `brp1042` في كل سطر:
+
+| الكيان | النتيجة | الحذف | الحالة النهائية |
+|---|---|---|---|
+| إعلان | `POST /api/announcements` → الظهور في `GET` + توست «تم نشر الإعلان» | **مفيش endpoint حذف** → `DELETE FROM announcements` (سطر واحد بـid) | `0` |
+| مصروف | `POST /api/finance/expenses` → في `GET` + توست «تم إضافة المصروف» (`−12.5 ج.م`) | **مفيش endpoint حذف** → `DELETE FROM financial_transactions` (سطرين) | `0` |
+| عميل محتمل | مسار الشاشة **فشل** (`400`) — والاتنين اللي نجحوا من الـAPI مباشرة اتحذفوا | `DELETE /api/crm/leads/:id` → **200 ×٢** | `0` |
+
+بعد التنظيف: `announcements=0 · financial_transactions=0 · gym_leads=0 · members=0` على نفس الـgym_id،
+وصفر سطر فيه `brp1042` في أي جدول. **الباقيات: صفر.** (الملاحظة للمالك: غياب `DELETE` للإعلانات
+والمصروفات معناه إن أي فضلة اختبار — أو أي خطأ إدخال من الاستقبال — مالوش مسار حذف من المنتج نفسه.)
+
+### ٥) عيب منتج طلع من مسار النجاح (مش من التحويل، وما اتصلحش)
+
+`crm/LeadForm.tsx:58` بيبعت `assigned_to: assignedTo.trim()` أي **`''`** لما خانة «مسؤول» تتساب فاضية
+— ودي الحالة الافتراضية. النتيجة: `400 {"error":"Validation failed","details":[{"field":"assigned_to","message":"Invalid uuid"}]}`
+وأي «إضافة عميل» من شاشة CRM بيفشل إلا لو مليت «مسؤول». إعادة تشغيل نفس الـpayload بالعقد:
+
+| Payload | الحالة |
+|---|---|
+| `assigned_to: ''` (زي ما بتبعت الشاشة) | **400** `Invalid uuid` |
+| `assigned_to: null` | **400** `Expected string, received null` |
+| المفتاح محذوف نهائيًا | **201** ✓ |
+| `email: ''` محذوف أو فاضي | مقبول (بيتخزن `null`) |
+
+الإصلاح سطر واحد (`assigned_to: assignedTo.trim() || undefined`) أو تسامح في الـschema — **قرار مالك**
+لإنه خارج تكافؤ العقد اللي اتفقنا عليه للدفعة، و`server/**` في شجرة جلسة B حاليًا.
+
+### ٦) أرقام البوابات بعد الدفعة
+
+`npx tsc --noEmit` = **0** · `npm run build` ✓ **6.08s** · مؤشر موجة 3 في `src/pages`:
+**17 ملفًا / 22 موضعًا** (السلسلة: 34/41 → 30/37 → 27/34 → 25/32 → 23/30 → 20/25 → **17/22**)،
+وفي `src/**` **22/28**. المتبقي كله `gym-admin` **16 ملفًا / 21 موضعًا** +
+`super-admin/AddGymModal` (١ — على قائمة موجة 1 / `D6`)؛ **صدفيات `super-admin` الحيّة = صفر**.
+
+### ٧) مستني المالك (بلا تنفيذ unilateral)
+
+نفس البوابات: `D7 push` · `D8` بناء `:9000` · `AddGymModal` (حذف ولا تحويل) · `D9 AddSubscription` ·
+عرض X القشرة + `aria-label="إغلاق"` العربي في `shadcn/dialog.tsx` · دفعة `htmlFor`/`id` للأسماء
+المختفية · خرائط ألوان `D1/D2` · الكود الميت `D6` · موخيبايت `PlatformMarketing.tsx` ·
+`manager@first-gym.com` `is_active=false` · reflow الجداول على 390 (موجة 4) · هل `report-site/` يتعمله
+commit · وهل `.env VITE_API_URL` يتظبط (أو `:9100` يتضاف لـ`CORS_ORIGIN`). **بوابتان جديدتان من
+الدفعة دي:** (١) إصلاح `assigned_to` الفاضي في `LeadForm` (سطر واحد، يفتح مسار نجاح الـCRM)؛
+(٢) إضافة `DELETE` للإعلانات والمصروفات ولا قبول إن فضلات الاختبار تتمسح بـSQL بس.
+**وأمر صحي:** كلمة مرور `goda123@gmail.com` اتبدّلت في نص الشات — يُنصح بتدويرها (و`JWT_SECRET`) بعد
+ماخلص القياسات؛ محلولها محلي ولا مرة اتكتب في ملف بالريبو (اتمرّر بمتغيرات بيئة بس).
+

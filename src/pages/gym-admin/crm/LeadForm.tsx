@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../../../context/GymBrandContext';
 import Button from '../../../components/ui/Button';
+import Modal from '../../../components/shared/Modal';
 
 interface Lead {
   id: string;
@@ -45,8 +46,8 @@ export default function LeadForm({ lead, onSubmit, onCancel, loading }: LeadForm
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!validate()) return;
     onSubmit({
       name: name.trim(),
@@ -59,15 +60,39 @@ export default function LeadForm({ lead, onSubmit, onCancel, loading }: LeadForm
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-xl max-h-[90vh] overflow-y-auto border border-gray-100">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">
-          {lead
-            ? (language === 'ar' ? 'تعديل العميل المحتمل' : 'Edit Lead')
-            : (language === 'ar' ? 'إضافة عميل محتمل' : 'Add Lead')}
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal
+      open
+      onClose={onCancel}
+      size="lg"
+      dir={language === 'ar' ? 'rtl' : 'ltr'}
+      disableDismiss={loading}
+      title={lead
+        ? (language === 'ar' ? 'تعديل العميل المحتمل' : 'Edit Lead')
+        : (language === 'ar' ? 'إضافة عميل محتمل' : 'Add Lead')}
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={loading}
+          >
+            {language === 'ar' ? 'إلغاء' : 'Cancel'}
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => handleSubmit()}
+            disabled={loading}
+          >
+            {loading
+              ? (language === 'ar' ? 'جاري الحفظ…' : 'Saving…')
+              : (language === 'ar' ? 'حفظ' : 'Save')}
+          </Button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {language === 'ar' ? 'الاسم' : 'Name'} *
@@ -147,28 +172,7 @@ export default function LeadForm({ lead, onSubmit, onCancel, loading }: LeadForm
             />
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <Button
-              type="submit"
-              variant="primary"
-              fullWidth
-              disabled={loading}
-            >
-              {loading
-                ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...')
-                : (language === 'ar' ? 'حفظ' : 'Save')}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={loading}
-            >
-              {language === 'ar' ? 'إلغاء' : 'Cancel'}
-            </Button>
-          </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

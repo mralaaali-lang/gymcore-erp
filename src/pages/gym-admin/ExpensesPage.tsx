@@ -10,10 +10,10 @@ import { escapeHtml, printDocument } from '../../utils/print';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
 import DataTable, { type TableColumn } from '../../components/ui/DataTable';
+import Modal from '../../components/shared/Modal';
 import {
   Plus,
   FileText,
-  X,
   Wallet,
   Bank as Banknote,
   HandCoins,
@@ -338,30 +338,52 @@ export function AddExpenseModal({
 
   const canSubmit = Number(amount) > 0;
 
+  const submit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!canSubmit) return;
+    onSubmit({
+      amount: Number(amount),
+      description: description.trim() || undefined,
+      category_id: categoryId || null,
+      // only send when it is NOT today — today lets the server stamp
+      // its own honest created_at (§44).
+      date: date !== todayMax ? date : undefined,
+    });
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-gray-900">{rtl ? 'إضافة مصروف' : 'Add Expense'}</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label={rtl ? 'إغلاق' : 'Close'}>
-            <X size={18} />
+    <Modal
+      open
+      onClose={onClose}
+      size="md"
+      dir={rtl ? 'rtl' : 'ltr'}
+      disableDismiss={saving}
+      title={rtl ? 'إضافة مصروف' : 'Add Expense'}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+          >
+            {rtl ? 'إلغاء' : 'Cancel'}
           </button>
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!canSubmit) return;
-            onSubmit({
-              amount: Number(amount),
-              description: description.trim() || undefined,
-              category_id: categoryId || null,
-              // only send when it is NOT today — today lets the server stamp
-              // its own honest created_at (§44).
-              date: date !== todayMax ? date : undefined,
-            });
-          }}
-          className="space-y-4"
-        >
+          <button
+            type="button"
+            onClick={() => submit()}
+            disabled={!canSubmit || saving}
+            className="min-h-[48px] px-5 rounded-xl bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-sm font-bold transition"
+          >
+            {saving ? (rtl ? 'جاري الحفظ…' : 'Saving…') : (rtl ? 'حفظ المصروف' : 'Save expense')}
+          </button>
+        </>
+      }
+    >
+      <form
+        onSubmit={submit}
+        className="space-y-4"
+      >
           <div>
             <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'المبلغ' : 'Amount'} *</label>
             <div className="relative">
@@ -437,24 +459,7 @@ export function AddExpenseModal({
             </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={!canSubmit || saving}
-              className="flex-1 min-h-[48px] rounded-xl bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-sm font-bold transition"
-            >
-              {saving ? (rtl ? 'جاري الحفظ…' : 'Saving…') : (rtl ? 'حفظ المصروف' : 'Save expense')}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition"
-            >
-              {rtl ? 'إلغاء' : 'Cancel'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

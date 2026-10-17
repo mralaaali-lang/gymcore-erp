@@ -5,6 +5,7 @@ import { useApp } from '../../../context/GymBrandContext';
 import { useToast } from '../../../context/ToastContext';
 import { listAnnouncements, createAnnouncement } from '../../../services/api';
 import PageLoader from '../../../components/shared/PageLoader';
+import Modal from '../../../components/shared/Modal';
 import Button from '../../../components/ui/Button';
 import Card from '../../../components/ui/Card';
 import StatusBadge from '../../../components/ui/StatusBadge';
@@ -148,57 +149,60 @@ export default function AnnouncementsPanel() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowForm(false)}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <Card className="shadow-xl">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">{rtl ? 'إضافة إعلان' : 'Add Announcement'}</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'العنوان' : 'Title'}</label>
-                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'المحتوى' : 'Content'}</label>
-                  <textarea value={content} onChange={(e) => setContent(e.target.value)} className={inputCls} rows={4} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الجمهور المستهدف' : 'Target Audience'}</label>
-                  <select value={targetAudience} onChange={(e) => setTargetAudience(e.target.value)} className={inputCls}>
-                    {Object.entries(audienceLabels).map(([key, lbl]) => (
-                      <option key={key} value={key}>{rtl ? lbl.ar : lbl.en}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="pinToggle"
-                    checked={isPinned}
-                    onChange={(e) => setIsPinned(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 accent-emerald-500"
-                  />
-                  <label htmlFor="pinToggle" className="text-sm text-gray-700">
-                    {rtl ? 'إعلان مثبت' : 'Pinned announcement'}
-                  </label>
-                </div>
-              </div>
-              <div className="flex gap-3 mt-6">
-                <Button variant="outline" fullWidth onClick={() => setShowForm(false)} className="px-4 py-2 text-sm">
-                  {rtl ? 'إلغاء' : 'Cancel'}
-                </Button>
-                <Button
-                  variant="primary"
-                  fullWidth
-                  onClick={() => createMutation.mutate()}
-                  disabled={createMutation.isPending || !title || !content}
-                  className="px-4 py-2 text-sm"
-                >
-                  {createMutation.isPending ? '...' : (rtl ? 'نشر' : 'Publish')}
-                </Button>
-              </div>
-            </Card>
+        <Modal
+          open
+          onClose={() => setShowForm(false)}
+          size="lg"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={createMutation.isPending}
+          title={rtl ? 'إضافة إعلان' : 'Add Announcement'}
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setShowForm(false)} disabled={createMutation.isPending} className="px-4 py-2 text-sm">
+                {rtl ? 'إلغاء' : 'Cancel'}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => createMutation.mutate()}
+                disabled={createMutation.isPending || !title || !content}
+                className="px-4 py-2 text-sm"
+              >
+                {createMutation.isPending ? '…' : (rtl ? 'نشر' : 'Publish')}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'العنوان' : 'Title'}</label>
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'المحتوى' : 'Content'}</label>
+              <textarea value={content} onChange={(e) => setContent(e.target.value)} className={inputCls} rows={4} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الجمهور المستهدف' : 'Target Audience'}</label>
+              <select value={targetAudience} onChange={(e) => setTargetAudience(e.target.value)} className={inputCls}>
+                {Object.entries(audienceLabels).map(([key, lbl]) => (
+                  <option key={key} value={key}>{rtl ? lbl.ar : lbl.en}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="pinToggle"
+                checked={isPinned}
+                onChange={(e) => setIsPinned(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 accent-emerald-500"
+              />
+              <label htmlFor="pinToggle" className="text-sm text-gray-700">
+                {rtl ? 'إعلان مثبت' : 'Pinned announcement'}
+              </label>
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
