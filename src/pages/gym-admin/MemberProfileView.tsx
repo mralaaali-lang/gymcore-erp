@@ -5,6 +5,7 @@ import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { getMember, getCustomer360, updateMember, resetMemberPin, uploadMemberPhoto, type Customer360Data } from '../../services/api';
 import PageLoader from '../../components/shared/PageLoader';
+import Modal from '../../components/shared/Modal';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -529,10 +530,19 @@ export default function MemberProfileView() {
 
       {/* نافذة الاتصال: الرقم المسجل بخط كبير + زر اتصال (مريحة للموبايل) */}
       {callOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setCallOpen(false)}>
-          <div className="absolute inset-0 bg-black/40" aria-hidden />
-          <div dir={rtl ? 'rtl' : 'ltr'} className="relative w-full max-w-xs bg-white rounded-3xl shadow-2xl p-6 text-center space-y-4">
-            <p className="text-sm text-gray-500">{fullName}</p>
+        <Modal
+          open
+          onClose={() => setCallOpen(false)}
+          size="sm"
+          dir={rtl ? 'rtl' : 'ltr'}
+          title={fullName}
+          footer={
+            <Button variant="outline" className="min-h-[48px] px-5" onClick={() => setCallOpen(false)}>
+              {rtl ? 'إغلاق' : 'Close'}
+            </Button>
+          }
+        >
+          <div className="space-y-4 text-center">
             {hasPhone ? (
               <>
                 <p dir="ltr" className="text-3xl font-mono font-extrabold tracking-wider text-gray-900">{phone}</p>
@@ -549,86 +559,84 @@ export default function MemberProfileView() {
                 {rtl ? 'لا يوجد رقم مسجل لهذا العضو' : 'No phone number saved for this member'}
               </p>
             )}
-            <button
-              type="button"
-              onClick={() => setCallOpen(false)}
-              className="w-full rounded-2xl border border-gray-200 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
-            >
-              {rtl ? 'إغلاق' : 'Close'}
-            </button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* §34ج — real member edit (centered modal per project convention) */}
       {editOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setEditOpen(false)}>
-          <div className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-xl border border-gray-100 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-gray-900 mb-4">
-              {rtl ? 'تعديل بيانات العضو' : 'Edit Member'}
-            </h2>
-            <div className="space-y-4">
-              {(
-                [
-                  { key: 'full_name', labelAr: 'الاسم الكامل', labelEn: 'Full name', type: 'text' },
-                  { key: 'phone_number', labelAr: 'رقم الهاتف', labelEn: 'Phone', type: 'tel' },
-                  { key: 'email', labelAr: 'البريد الإلكتروني', labelEn: 'Email', type: 'email' },
-                  { key: 'birth_date', labelAr: 'تاريخ الميلاد', labelEn: 'Birth date', type: 'date' },
-                ] as const
-              ).map((f) => (
-                <div key={f.key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? f.labelAr : f.labelEn}</label>
-                  <input
-                    type={f.type}
-                    value={editForm[f.key]}
-                    onChange={(e) => setEditForm((p) => ({ ...p, [f.key]: e.target.value }))}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    dir={f.key === 'phone_number' || f.key === 'email' || f.key === 'birth_date' ? 'ltr' : undefined}
-                  />
-                </div>
-              ))}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'رابط الصورة' : 'Photo URL'}</label>                <input
-                  type="url"
-                  value={editForm.photo_url}
-                  onChange={(e) => setEditForm((p) => ({ ...p, photo_url: e.target.value }))}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  dir="ltr"
-                  placeholder="https://…"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الجنس' : 'Gender'}</label>
-                <select
-                  value={editForm.gender}
-                  onChange={(e) => setEditForm((p) => ({ ...p, gender: e.target.value }))}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                >
-                  <option value="">{rtl ? 'بدون تحديد' : 'Not set'}</option>
-                  <option value="male">{rtl ? 'ذكر' : 'Male'}</option>
-                  <option value="female">{rtl ? 'أنثى' : 'Female'}</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الملاحظات الطبية' : 'Medical notes'}</label>
-                <textarea
-                  value={editForm.medical_notes}
-                  onChange={(e) => setEditForm((p) => ({ ...p, medical_notes: e.target.value }))}
-                  rows={3}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <Button variant="outline" fullWidth onClick={() => setEditOpen(false)}>
+        <Modal
+          open
+          onClose={() => setEditOpen(false)}
+          size="lg"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={editSaving}
+          title={rtl ? 'تعديل بيانات العضو' : 'Edit Member'}
+          footer={
+            <>
+              <Button variant="outline" className="min-h-[48px] px-5" onClick={() => setEditOpen(false)} disabled={editSaving}>
                 {rtl ? 'إلغاء' : 'Cancel'}
               </Button>
-              <Button variant="primary" fullWidth onClick={saveEdit} disabled={editSaving}>
-                {editSaving ? '…' : (rtl ? 'حفظ التعديلات' : 'Save changes')}
+              <Button variant="primary" className="min-h-[48px] px-5" onClick={saveEdit} disabled={editSaving}>
+                {editSaving ? (rtl ? 'جارٍ الحفظ…' : 'Saving…') : (rtl ? 'حفظ التعديلات' : 'Save changes')}
               </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            {(
+              [
+                { key: 'full_name', labelAr: 'الاسم الكامل', labelEn: 'Full name', type: 'text' },
+                { key: 'phone_number', labelAr: 'رقم الهاتف', labelEn: 'Phone', type: 'tel' },
+                { key: 'email', labelAr: 'البريد الإلكتروني', labelEn: 'Email', type: 'email' },
+                { key: 'birth_date', labelAr: 'تاريخ الميلاد', labelEn: 'Birth date', type: 'date' },
+              ] as const
+            ).map((f) => (
+              <div key={f.key}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? f.labelAr : f.labelEn}</label>
+                <input
+                  type={f.type}
+                  value={editForm[f.key]}
+                  onChange={(e) => setEditForm((p) => ({ ...p, [f.key]: e.target.value }))}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  dir={f.key === 'phone_number' || f.key === 'email' || f.key === 'birth_date' ? 'ltr' : undefined}
+                />
+              </div>
+            ))}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'رابط الصورة' : 'Photo URL'}</label>
+              <input
+                type="url"
+                value={editForm.photo_url}
+                onChange={(e) => setEditForm((p) => ({ ...p, photo_url: e.target.value }))}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                dir="ltr"
+                placeholder="https://…"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الجنس' : 'Gender'}</label>
+              <select
+                value={editForm.gender}
+                onChange={(e) => setEditForm((p) => ({ ...p, gender: e.target.value }))}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              >
+                <option value="">{rtl ? 'بدون تحديد' : 'Not set'}</option>
+                <option value="male">{rtl ? 'ذكر' : 'Male'}</option>
+                <option value="female">{rtl ? 'أنثى' : 'Female'}</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{rtl ? 'الملاحظات الطبية' : 'Medical notes'}</label>
+              <textarea
+                value={editForm.medical_notes}
+                onChange={(e) => setEditForm((p) => ({ ...p, medical_notes: e.target.value }))}
+                rows={3}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
+              />
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

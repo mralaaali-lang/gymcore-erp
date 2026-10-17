@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Plus, X, Trash as Trash2, Eye } from '@phosphor-icons/react';
+import { ArrowRight, Plus, Trash as Trash2, Eye } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -11,6 +11,7 @@ import { listHrContracts, createHrContract, deleteHrContract, listStaff, type St
 import { Panel, EmptyState } from '../../components/dashboard';
 import { StaffAvatar } from './HrMainPage';
 import PageLoader from '../../components/shared/PageLoader';
+import Modal from '../../components/shared/Modal';
 import StatusBadge from '../../components/ui/StatusBadge';
 
 // ====================================================================
@@ -175,56 +176,73 @@ export default function ContractsPage() {
 
       {/* عقد جديد */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">{rtl ? 'عقد جديد' : 'New contract'}</h2>
-              <button onClick={() => setShowForm(false)} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <div className="space-y-3">
-              <select value={fStaff} onChange={(e) => setFStaff(e.target.value)} className={inputCls}>
-                <option value="">{rtl ? 'الموظف *' : 'Staff *'}</option>
-                {staff.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-              </select>
-              <div className="grid grid-cols-2 gap-3">
-                <input value={fType} onChange={(e) => setFType(e.target.value)} className={inputCls} placeholder={rtl ? 'النوع (دائم)' : 'Type'} />
-                <input type="number" min={0} value={fSalary} onChange={(e) => setFSalary(e.target.value)} className={inputCls} placeholder={rtl ? 'الراتب *' : 'Salary *'} />
-                <input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} className={inputCls} />
-                <input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} className={inputCls} />
-              </div>
-              <button onClick={() => create.mutate()} disabled={!fStaff || !fFrom || !fSalary || create.isPending}
-                className="w-full min-h-[48px] rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold disabled:opacity-50">
-                {rtl ? 'إنشاء برقم مسلسل' : 'Create'}
+        <Modal
+          open
+          onClose={() => setShowForm(false)}
+          size="md"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={create.isPending}
+          title={rtl ? 'عقد جديد' : 'New contract'}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                disabled={create.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+              >
+                {rtl ? 'إلغاء' : 'Cancel'}
               </button>
+              <button
+                type="button"
+                onClick={() => create.mutate()}
+                disabled={!fStaff || !fFrom || !fSalary || create.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition disabled:opacity-50"
+              >
+                {create.isPending ? (rtl ? 'جارٍ الإنشاء…' : 'Creating…') : (rtl ? 'إنشاء برقم مسلسل' : 'Create')}
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <select value={fStaff} onChange={(e) => setFStaff(e.target.value)} className={inputCls}>
+              <option value="">{rtl ? 'الموظف *' : 'Staff *'}</option>
+              {staff.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+            </select>
+            <div className="grid grid-cols-2 gap-3">
+              <input value={fType} onChange={(e) => setFType(e.target.value)} className={inputCls} placeholder={rtl ? 'النوع (دائم)' : 'Type'} />
+              <input type="number" min={0} value={fSalary} onChange={(e) => setFSalary(e.target.value)} className={inputCls} placeholder={rtl ? 'الراتب *' : 'Salary *'} />
+              <input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} className={inputCls} />
+              <input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} className={inputCls} />
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* عرض */}
       {viewing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setViewing(null)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-mono font-bold text-gray-900" dir="ltr">{viewing.contract_no}</h2>
-              <button onClick={() => setViewing(null)} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <dl className="space-y-2 text-sm">
-              {([
-                [rtl ? 'الموظف' : 'Staff', viewing.staff_name || '—'],
-                [rtl ? 'النوع' : 'Type', viewing.contract_type],
-                [rtl ? 'المدة' : 'Period', `${viewing.start_date} → ${viewing.end_date || '…'} `],
-                [rtl ? 'الراتب' : 'Salary', money(viewing.salary)],
-                [rtl ? 'ملاحظات' : 'Notes', viewing.notes || '—'],
-              ] as [string, string][]).map(([k, v]) => (
-                <div key={k} className="flex items-center justify-between gap-2 border-b border-gray-50 pb-1.5">
-                  <dt className="text-gray-500">{k}</dt>
-                  <dd className="font-semibold">{v}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </div>
+        <Modal
+          open
+          onClose={() => setViewing(null)}
+          size="md"
+          dir={rtl ? 'rtl' : 'ltr'}
+          title={<span className="font-mono" dir="ltr">{viewing.contract_no}</span>}
+        >
+          <dl className="space-y-2 text-sm">
+            {([
+              [rtl ? 'الموظف' : 'Staff', viewing.staff_name || '—'],
+              [rtl ? 'النوع' : 'Type', viewing.contract_type],
+              [rtl ? 'المدة' : 'Period', `${viewing.start_date} → ${viewing.end_date || '…'} `],
+              [rtl ? 'الراتب' : 'Salary', money(viewing.salary)],
+              [rtl ? 'ملاحظات' : 'Notes', viewing.notes || '—'],
+            ] as [string, string][]).map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between gap-2 border-b border-gray-50 pb-1.5">
+                <dt className="text-gray-500">{k}</dt>
+                <dd className="font-semibold">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </Modal>
       )}
     </div>
   );
