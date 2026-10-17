@@ -280,8 +280,11 @@ export const createGymSchema = z.object({
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
     .regex(/[0-9]/, 'Password must contain at least one number'),
-  contact_email: z.string().email().optional().nullable(),
-  gym_email: z.string().email().optional().nullable(),
+  contact_email: z.string().email().or(z.literal('')).optional().nullable(),
+  // السلسلة الفاضية اختيارية زي undefined: معالج إضافة الصالة بيبعت '' لما
+  // الحقل يتساب فاضي، ورفضها كان يمنع الإنشاء بـ«Validation failed».
+  // الكونترولر بيطبّق fallback (gym_email || contact_email || owner_email || null).
+  gym_email: z.string().email().or(z.literal('')).optional().nullable(),
   phone: z.string().max(50).optional().nullable(),
   password: z.string().min(8).max(128).optional(),
   billing_cycle: z.enum(['monthly', 'yearly']).optional(),

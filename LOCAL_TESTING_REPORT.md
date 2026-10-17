@@ -2737,3 +2737,52 @@ value, cell, sortable, sortDescFirst, numeric, align, width }`، والـ`{key,l
 **التحقق:** front `tsc --noEmit` = 0 · back `tsc --noEmit` = 0 · `vite build` ✓ 6.1s · كلاسات
 `dist` المطلوبة كلها موجودة: `text-table-fg`، `text-table-head`، `text-ink-faint`، `text-pine`،
 `bg-brass-soft`، `rounded-shell`، `.dark\:text-foreground`.
+
+---
+
+## إصلاحان في جلسة السوبر ادمن (2026-10-17)
+
+### 1) دخول السوبر ادمن بيرمي بره المنصة (`4e3b691`)
+
+**العطل:** بعد `POST /platform/auth/login` بنجاح، فتح `/super-admin/dashboard` كان بيرجع تاني
+لصفحة `/login` (توجيه **قسري**، لسه كامل من `window.location.href`).
+
+**السبب:** `Sidebar:155` كان بيجيب لون البراند من `getSettings()` = `GET /api/settings`، وده
+`requireRole('manager')` على السيرفر فبيرفض كوكي المنصة. الفرع بتاع السوبر ادمن في `api.ts`
+(مفيش `refresh_token` + الدور `super-admin`) بيشوف أي 401 فيعمل `clearTokens()` + خروج قسري.
+**القياس:** بنفس الكوكي `/platform/auth/session` → **200** (الجلسة سليمة) بينما `/api/settings` →
+**401**. السردي الحيّ قبل الإصلاح: `fetch< /platform/auth/login 200` → `xhr> /api/settings` →
+`UNLOAD` عند `/super-admin/dashboard` → `xhr< /api/settings 401`.
+
+**الإصلاح:** `enabled: role === 'gym-admin'` + `retry: false` (زي `AppLayout` و`TopNav` اللي
+كانوا مقَيّدين صح). **المتحقق بعد الإصلاح:** `/api/settings` ما ظهرش خالص في السردي، ومفيش
+`UNLOAD`، والصفحة فضلت `/super-admin/dashboard` بـ`app_role=super-admin`، والسبع requests بتوع
+المنصة كلهم **200** (`overview`, `gyms`, `billing/plans`, `billing/contracts`, `enforcement`,
+`security/audit`, `onboarding`) واللوحة ترسّمت (11 كارت + 17 رابط).
+
+### 2) إضافة صالة جديدة = «Validation failed» (هذا الكوميت)
+
+**العطل:** معالج إضافة الصالة بيرفض أي صالة جديدة برسالة «Validation failed» من غير تفاصيل.
+
+**السبب:** `CreateGymWizard` كان يبعت `gym_email: form.gym_email` وقيمته الافتراضية `''`،
+و`createGymSchema` يعرّفه `z.string().email().optional().nullable()` — و`.optional()` بيقبل
+`undefined` مش السلسلة الفاضية. القياس كان بتفعيل الـschema نفسها على الـpayload الحقيقي
+(بره السيرفر، من غير أي كتابة): الحالة الحالية → **fail** وحيد على `gym_email`؛ بنفس الـpayload
+مع `gym_email: undefined` → **ok**؛ و`'not-an-email'` → **fail** (فالرفض الحقيقي لسه شغال).
+
+**الإصلاح:** (أ) الواجهة تبعت `form.gym_email || undefined`، و`onError` يقرأ `details` من
+`middleware/validate.ts` بدل `error` لوحدها. (ب) تشديد العقد: `gym_email` و`contact_email`
+يقبلوا `''` زي بقية الحقول الاختيارية في الملف. الكونترولر ما اتلمسش — هو أصلاً
+`gym_email || contact_email || owner_email || null`.
+
+**المتحقق:** `POST /platform/gyms` بنفس جسد المعالج (بريد الصالة فاضي وكل العنوان فاضي) →
+**201** والصف رجّع `email = owner_email` (الـfallback) و`phone/address_* = null`؛ ثم
+`DELETE /platform/gyms/:id` والصالة اختفت (`GET` بعدها → **404**) فالـDB ما اتلوّتش.
+الـprobe على السيرفر الحيّ بعد التعديل: `gym_email:''` + `owner_password:'weak'` → 400 فيه
+`details: [owner_password ×3]` **بس** — يعني السلسلة الفاضية بقت تعدي الـzod والسيرفر فعلاً
+حمّل الكود الجديد. front `tsc` = 0 · back `tsc` = 0 · `vite build` ✓ 6.0s.
+
+**مزلق جديد اتسجل:** المتصفح بيعمل **autofill** على نموذج الصالة الجديدة — حطّ بريدًا شخصيًا
+محفوظًا في خانة بريد المدير وكلمة سر محفظتك في خانة كلمة السر. تجربة الواجهة الحيّة لازم
+تتوقف عند ظهور ده، والتحقق يتحوّل لـAPI ببيانات اختبار صريحة (`probe-ui@example.com`).
+

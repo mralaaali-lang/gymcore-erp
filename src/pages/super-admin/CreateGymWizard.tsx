@@ -188,8 +188,19 @@ export default function CreateGymWizard() {
       navigate('/super-admin/tenants');
     },
     onError: (err: unknown) => {
-      const axiosErr = err as { response?: { data?: { error?: string } } };
-      setError(axiosErr?.response?.data?.error || (isRtl ? 'فشل حفظ بيانات النادي' : 'Failed to save gym'));
+      // middleware/validate.ts بيرجع { error, details: [{field, message}] } —
+      // بدون details كانت رسالة المستخدم بتفضل «Validation failed» غامضة.
+      const axiosErr = err as {
+        response?: { data?: { error?: string; details?: Array<{ field?: string; message?: string }> } };
+      };
+      const raw = axiosErr?.response?.data;
+      const details = Array.isArray(raw?.details)
+        ? (raw!.details as Array<{ field?: string; message?: string }>)
+            .filter((d) => d && (d.field || d.message))
+            .map((d) => `${d.field || ''}${d.field ? ': ' : ''}${d.message || ''}`)
+            .join(' · ')
+        : '';
+      setError(details || raw?.error || (isRtl ? 'فشل حفظ بيانات النادي' : 'Failed to save gym'));
     },
   });
 
@@ -247,7 +258,10 @@ export default function CreateGymWizard() {
       is_active: form.is_active,
       dba_name: form.dba_name || undefined,
       phone: form.phone,
-      gym_email: form.gym_email,
+      // حقل اختياري بـ z.string().email() على السيرفر: سلسلة فاضية = 400
+      // «Validation failed» (و.optional() بيقبل undefined بس)، فالفاضي
+      // يتبعت undefined مش ''. الكونترولر كذا بيحوّله لبريد المدير أو null.
+      gym_email: form.gym_email || undefined,
       address_street: form.address_street,
       address_city: form.address_city,
       address_state: form.address_state,

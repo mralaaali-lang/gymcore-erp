@@ -137,6 +137,17 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
   `getSettings` بغير قيد، فالسوبر ادمن كان بيطير بره المنصة في نفس لحظة فتح اللوحة؛ اتصلح بـ
   `enabled: role === 'gym-admin'` + `retry: false` (`AppLayout` و`TopNav` كانوا صح بالفعل).
   القاعدة: `role` هنا أدوار الواجهة (`ROLE_MAP`: manager/owner → `gym-admin`) مش أدوار السيرفر.
+- **الحقل الاختياري بالـ`''` يسقط في zod (إضافة صالة 2026-10-17):** `z.string().email().optional()`
+  بيقبل `undefined` **مش** `''`، فالمعالج اللي بيبعت الحقول الفاضية كان بيرفض كل محاولة إنشاء
+  صالة بـ«Validation failed». العقد بقى `.or(z.literal(''))` لـ`gym_email`/`contact_email`
+  (زي `loginSchema`)، والواجهة تبعت `form.gym_email || undefined`. **وما تطمسش `details`:**
+  `middleware/validate.ts` بيرجع `{error, details:[{field,message}]}` — اقرأ `details` في
+  `onError` وإلا المستخدم يفضل شايف كلمة واحدة غامضة.
+- **المتصفح بيعمل autofill لنماذج المنصة (2026-10-17):** في `/super-admin/tenants/new` Chrome
+  حطّ بريدًا شخصيًا محفوظًا في خانة بريد المدير وكلمة سر محفظتك في خانة كلمة السر. أي تجربة حيّة
+  على النموذج ده لازم تتوقف عند ظهوره، والتحقق يتحوّل لـAPI ببيانات اختبار صريحة ثم
+  `DELETE /platform/gyms/:id` (مطلوب `{"confirmation":"DELETE"}` + `X-CSRF-Token`) فما تسيبش
+  صالة زائدة في الـDB المشترك.
 - **Railway staging (2026-10-12):** النشر بـ `railway up` من الجذر (سياق build = repo root).
   بروكسي Railway يوصل للـ replica على **منفذ 8080** إن لم يُضبط Application Port — nginx يlisten على 80+8080 معاً. بعد كل redeploy للـ backend **أعد نشر الـ frontend** (nginx يظلّم DNS لـ `backend.railway.internal` عند الإقلاع وإلا يجمّد البروكسي) — مع الرفع التلقائي (§29) كل push يبني الخدمةين معاً فتنتهي هذه المشكلة جانبياً؛ تبقى عند إعادة نشر backend وحده يدوياً. `railway service restart` يتعطّل أحياناً — `railway up -d` أضمن.
 
