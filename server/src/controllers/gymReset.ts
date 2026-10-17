@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { query, getClient } from '../config/database';
 import logger from '../config/logger';
 import { runTenantBackup } from './backup';
-import { seedDefaultSports, seedDefaultOffers } from '../seed/seedNewGym';
+import { seedFactoryCatalog } from '../seed/seedNewGym';
 
 // تصفير الصالة (factory reset): نسخة احتياطية أولًا (الفشل يوقف العملية)،
 // ثم مسح بيانات التشغيل بترتيب FK آمن، ثم إعادة بذر الكتالوجات، مع بقاء:
@@ -91,8 +91,9 @@ export const resetGym = async (req: Request, res: Response): Promise<void> => {
     );
 
     // 2) Reseed operating catalogs (sports + default plans carry sport='gym')
-    await seedDefaultSports(client, gym_id);
-    await seedDefaultOffers(client, gym_id);
+    // §55: نفس مصلح إنشاء الصالة — التصفير حذف gym_sports وmembership_offers
+    // أعلاه فالحرّاس تجد الطريق فارغًا وتبذره، ولو نُدِيَت مرتين لا تتضاعف.
+    await seedFactoryCatalog(client, gym_id);
 
     await client.query(
       `INSERT INTO activity_logs (gym_id, staff_user_id, action_description, ip_address)

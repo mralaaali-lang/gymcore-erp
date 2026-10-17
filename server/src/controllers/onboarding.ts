@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/database';
 import { getAdminClient } from '../config/database';
 import logger from '../config/logger';
+import { seedFactoryCatalog } from '../seed/seedNewGym';
 import { scrubSecrets } from '../utils/scrubSecrets';
 
 /**
@@ -141,14 +142,11 @@ export async function completeOnboarding(req: Request, res: Response) {
         [uuidv4(), gym.id, ownerEmail, passwordHash, ownerFullName]
       );
 
-      // ── 3. Seed the default membership-offer catalog ────────────
-      // Catalog data a gym needs to operate from day one: without it
-      // createMember(plan_id) can never succeed, members can never hold
-      // a subscription, and manual check-in is blocked ("no active
-      // subscription found"). Demo members/products are intentionally
-      // NOT seeded here — factory-fresh gyms stay clean.
-      const { seedDefaultOffers } = await import('../seed/seedNewGym');
-      await seedDefaultOffers(client, gym.id);
+      // ── 3. Seed the day-zero operating catalog ───────────────────
+      // §55: مسار واحد لكل طرق الإنشاء — `seedFactoryCatalog` (ألعاب +
+      // العروض الأربعة، بلا أي بيانات تجريبية). بدونها createMember(plan_id)
+      // لا ينجح ولا check-in يدوي («no active subscription found»).
+      await seedFactoryCatalog(client, gym.id);
 
       // ── 4. Activity log ─────────────────────────────────────────
       await client.query(

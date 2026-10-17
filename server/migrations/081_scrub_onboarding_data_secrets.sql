@@ -27,7 +27,10 @@ BEGIN;
 CREATE OR REPLACE FUNCTION scrub_secret_json_keys(input jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
-IMMUTABLE
+-- STABLE لا IMMUTABLE: القرار بيعتمد على `~*`، والمطابقة غير حساسة لحالة
+-- الأحرف تتأثر بـlc_ctype/الكوليشن، فالوعود بـimmutable بيضلّ المخطّط
+-- (طي ثوابت، وأي فهرس تعبييري لاحق على العمود).
+SET search_path = public, pg_temp
 AS $fn$
 DECLARE
   out   jsonb := '{}'::jsonb;
@@ -77,6 +80,7 @@ UPDATE platform_admins
 CREATE OR REPLACE FUNCTION scrub_onboarding_data_secrets()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = public, pg_temp
 AS $trg$
 BEGIN
   NEW.onboarding_data := scrub_secret_json_keys(NEW.onboarding_data);

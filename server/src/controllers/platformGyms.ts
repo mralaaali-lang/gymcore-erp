@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/node';
 import { getAdminClient, query } from '../config/database';
 import logger from '../config/logger';
 import { logPlatformAudit } from '../utils/platformAudit';
+import { seedFactoryCatalog } from '../seed/seedNewGym';
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
@@ -151,13 +152,12 @@ export const createGym = async (req: Request, res: Response): Promise<void> => {
       [gym.id, null, req.platformAdmin?.platform_admin_id, `Gym created: ${gym.name} — owner: ${owner.email}`, req.ip]
     );
 
-    await client.query('COMMIT');
+    // §55 — كتالوج اليوم صفر (الألعاب + العروض الأربعة) داخل نفس الـtransaction:
+    // صالة بلا عروض لا تسجّل عضوًا على باقة ولا تعمل check-in. الفشل هنا يلفّ
+    // الإنشاء كله بدل بذرة خلفية تبتلع خطأها بصمت.
+    await seedFactoryCatalog(client, gym.id);
 
-    // Fire-and-forget auto-seed with minimal demo data for the new gym
-    // These are deliberately outside the try/catch since COMMIT already succeeded.
-    // If they fail, the gym creation is NOT rolled back — only the background
-    // seeding is affected, which is non-critical.
-    seedNewGymAsync(gym.id, gym.name);
+    await client.query('COMMIT');
 
     // Fire-and-forget onboarding webhook trigger log
     logger.info('Onboarding webhook trigger', {
@@ -186,16 +186,6 @@ export const createGym = async (req: Request, res: Response): Promise<void> => {
     client.release();
   }
 };
-
-/** Async helper to seed a new gym without affecting the main flow */
-async function seedNewGymAsync(gymId: string, gymName: string) {
-  try {
-    const { seedNewGym } = await import('../seed/seedNewGym');
-    await seedNewGym(gymId, gymName);
-  } catch {
-    // seedNewGym module may not exist yet — non-critical
-  }
-}
 
 // ====================================================================
 // List all gyms (platform-wide directory)

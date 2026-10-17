@@ -1,6 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { PoolClient } from 'pg';
-import logger from '../config/logger';
 
 const OFFER_TEMPLATES = [
   { title: 'شهر واحد', duration_days: 30, price: 200 },
@@ -35,10 +34,13 @@ export async function seedDefaultSports(client: PoolClient, gymId: string): Prom
  * Seeds the standard membership-offer catalog for a gym. This is operating
  * catalog data (NOT demo junk): without it createMember(plan_id) can never
  * succeed and members can never hold a subscription — which blocks manual
- * check-in entirely ("no active subscription found"). Callers today: the
- * self-service onboarding wizard and `gymReset`. The platform "add gym"
- * wizard no longer calls it — see `seedNewGym` below.
+ * check-in entirely ("no active subscription found").
  * Returns the created offer ids so callers can reference them.
+ *
+ * ⚠️ لا نداء عاري لها بعد §55: كل الطرق (المعالج الذاتي، شاشة إضافة صالة،
+ * التصفير المصنعي) تمرّ عبر `seedFactoryCatalog` — وهي التي تضيف الألعاب
+ * وتحرُس التكرار. لو أضفت نداءً مباشرًا، اسأل أولًا: هل الكتالوج أُفرغ
+ * فعلًا؟ بلا ذلك ستضاعف العروض.
  */
 export async function seedDefaultOffers(client: PoolClient, gymId: string): Promise<string[]> {
   const offerIds: string[] = [];
@@ -55,30 +57,36 @@ export async function seedDefaultOffers(client: PoolClient, gymId: string): Prom
 }
 
 /**
- * Factory state for a gym created from the platform "add gym" wizard.
+ * §55 — كتالوج اليوم صفر الوحيد لكل طرق إنشاء الصالة.
  *
- * It is intentionally **empty**: a new tenant must open with zero members,
- * zero subscriptions, zero attendance, zero products and zero expense
- * categories. The previous version of this function injected 15 fabricated
- * members (Saudi-style names, `+966…` phones, `ui-avatars.com` photos) with
- * `active` subscriptions and 7 days of check-ins, plus 6 products and 4
- * expense categories, and then bumped `gym_usage_counters.current_members_count`
- * to 15 — so a real gym's first dashboard showed data nobody entered.
- * That is demo data in a production path and is not coming back.
+ * القرار: صفر بيانات تجريبية، لكن **الكتالوج التشغيلي مطلوب** — وإلا الصالة
+ * المفتوحة حديثًا ما تقدر تسجّل عضوًا على باقة (`createMember(plan_id)`) ولا
+ * تعمل check-in («no active subscription found»). قبل التوحيد كان المعالج
+ * الذاتي (onboarding) يبذر العروض الأربعة، بينما شاشة «إضافة صالة» في
+ * المنصة ما تبذرش شيئًا — فصارت صالة منشأة من المنصة تفتح بـ0 عروض و0 ألعاب
+ * (مقيس على `zz-fresh-mvbuhpxa`) وصالة منشأة بالمعالج تفتح بـ4 عروض.
  *
- * The call site in `platformGyms.createGym` is kept as the seam (that file is
- * owned by another session's uncommitted diff); removing it entirely is the
- * follow-up when that file is free.
+ * تاريخ: النسخة القديمة من هذا الملف كانت تحقن 15 عضوًا مختلقًا (أسماء
+ * وأرقام `+966…` وصور `ui-avatars.com`) باشتراكات نشطة و7 أيام حضور + 6
+ * منتجات + 4 فئات مصروفات، وترفع `gym_usage_counters.current_members_count`
+ * إلى 15 — أي ديمو في مسار إنتاجي. ده راح ولن يرجع: الدالة دي **كتالوج
+ * فقط**، ولا عضو ولا حضور ولا منتج.
  *
- * The catalog helpers above (`seedDefaultSports`, `seedDefaultOffers`) stay
- * exported and are used by `gymReset` and the self-service `onboarding`
- * controller. Note the divergence that remains after this change: the
- * self-service onboarding path seeds the 4 default offers, this path does
- * not — so a gym created from the platform wizard must create its own offers
- * before `createMember(plan_id)` / manual check-in can succeed.
+ * آمنة على التكرار: الألعاب بـ`ON CONFLICT DO NOTHING`، والعروض تُتخطّى إن
+ * كان للصالة أي عرض موجود (فإعادة التشغيل أو إنشاء صالة بعد تنقية يدوية
+ * ما يضاعفش الكتالوج). تُنادى داخل نفس transaction الإنشاء — لو البذر فشل
+ * يفشل الإنشاء كله ويتلفّ، بدل fire-and-forget كان يبلع الخطأ بصمت.
  */
-export async function seedNewGym(gymId: string, gymName: string): Promise<void> {
-  logger.info('New gym created factory-fresh (no demo data seeded)', { gymId, gymName });
+export async function seedFactoryCatalog(client: PoolClient, gymId: string): Promise<void> {
+  await seedDefaultSports(client, gymId);
+
+  const existingOffers = await client.query(
+    `SELECT 1 FROM membership_offers WHERE gym_id = $1 LIMIT 1`,
+    [gymId],
+  );
+  if (existingOffers.rowCount === 0) {
+    await seedDefaultOffers(client, gymId);
+  }
 }
 
 
