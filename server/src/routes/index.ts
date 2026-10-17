@@ -198,6 +198,12 @@ import { resetGym } from '../controllers/gymReset';
 import { getSetupProgress } from '../controllers/setup';
 import { getPublicBranding } from '../controllers/branding';
 import { listWorkflows, updateWorkflow, triggerWorkflow } from '../controllers/workflows';
+// §63 — التبويبات الناقصة (تقارير POS / محتوى الموقع / حملات الصالة)
+import { getPosReport } from '../controllers/posReports';
+import { getWebsiteContent } from '../controllers/websiteContent';
+import {
+  listGymCampaigns, createGymCampaign, updateGymCampaignStatus, deleteGymCampaign,
+} from '../controllers/gymMarketing';
 
 const router = Router();
 
@@ -395,6 +401,15 @@ router.get('/api/reports/attendance', requireRole('manager'), getAttendanceRepor
 router.get('/api/reports/subscriptions', requireRole('manager'), getSubscriptionsReport);
 router.get('/api/reports/absent', requireRole('manager'), getAbsentReport);
 router.get('/api/reports/employee-sales', requireRole('manager'), getEmployeeSalesReport);
+// §63 — تقرير POS: كل مقياس من pos_orders/pos_order_items بنفس نافذة الفلتار.
+router.get('/api/reports/pos', requireRole('manager'), getPosReport);
+// §63 — محتوى الموقع: قراءات حيه لتبويبات كانت «قيد التطوير».
+router.get('/api/website/content', requireRole('manager'), getWebsiteContent);
+// §63 — حملات الصالة على نفس جدول المنصة، معزولة بالحرف في WHERE (الجدول بلا RLS).
+router.get('/api/marketing/campaigns', requireRole('manager'), listGymCampaigns);
+router.post('/api/marketing/campaigns', requireRole('manager'), createGymCampaign);
+router.patch('/api/marketing/campaigns/:id/status', requireRole('manager'), updateGymCampaignStatus);
+router.delete('/api/marketing/campaigns/:id', requireRole('manager'), deleteGymCampaign);
 
 // ====================================================================
 // MANAGER DASHBOARD — "needs your action" feeds (§24, read-only)

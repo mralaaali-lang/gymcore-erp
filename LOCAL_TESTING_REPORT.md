@@ -5194,3 +5194,92 @@ Vite على `http://127.0.0.1:9110` ← بروكسي `/api` ← باكند Docke
 - **ولا `push` ولا deploy ولا rebuild على `:9000`** (قاعدة المالك). `git rev-list --count origin/main..HEAD` = **26** قبل commit الدفعة (**D7** لسه مفتوح — منها `e7efa18` لجلسة B).
 - **البوابات المُعلَنة اللي الدفعة ما غطّاشها:** X القشرة **26px** + `aria-label="إغلاق"` مكتوب حرفي عربي (`components/shadcn/dialog.tsx:66`) · `htmlFor` ناقص في كل لوحات الدفعة · أزرار صف (36–44px) وحذف بـ`window.confirm()` في صفحات تانية · الفوكس على `<body>` أثناء pending · **carry-over سبب الإلغاء**: `cancelReason` بيتصفّر في `onSuccess` بس (`SubscriptionsPage.tsx:164`) مش عند الإغلاق (`:379`) ⇒ لو المستخدم قفل اللوحة بسبب مكتوب، اللوحة التالية بتفتح بنفس السبب و**الزر بيتفعّل** (مقاس: `ctaDisabledWhenEmpty: false` في الفتح التاني) — عيب منتج مقاس وما اتصلحش (إصلاحه سطر في `onClose`).
 - **الدفعات المتحقق عليها حيًّا: 12** (بما فيها دفعة الاستكشاف).
+
+---
+
+## §63 — ثلاث endpoints للتبويبات الناقصة: تقرير POS · محتوى الموقع · حملات الصالة (2026-10-18 — جلسة B)
+
+> **الترقيم:** البلوك ده اتكتب وهو `§62`، والرقم اتنقل لـ`§63` لأن `§62` حجزته الجلسة الموازية
+> (موجة 3 / دفعة 11) قبل ماخلص — نفس حالة `§60→§61` اللي فوق. أسماء المسبارات المخزّنة في القاعدة
+> (`probe campaign 62`) سِبتُها حرفية زي ما اتقاست، ومش مقصودة بالترقيم.
+
+**كان (جرد بأم رقم):**
+- `TODO.md` سطر «ب) ربط التبويبات الناقصة» فيه تلاتة مفتوحين: **الموقع / التسويق / تقارير POS**.
+- `src/pages/gym-admin/WebsiteGenerator.tsx` — من عشر تبويبات، **واحد** (Settings) له endpoint؛
+  التسعة الباقين بيرسموا `WebsiteGenerator.tsx:250` `{rtl ? 'قيد التطوير' : 'Coming soon'}`
+  (سطر واحد بيتكرر على التسعة). الداتا نفسها كانت في القاعدة بلا قارئ: `fitness_classes` =
+  **60 حصة**، `class_bookings` = **679**، `membership_offers` = **135 نشط**، `gym_sports`، وعناوين
+  `gyms`.
+- `SalesPage.tsx:403-414` `renderReport()` = **3 كروت** من `/api/finance/summary`
+  (مبيعات الشهر/مصروفات الشهر/الفرق) — أي أرقام الخزنة، ومفيش أي endpoint يقيس `pos_orders`
+  + `pos_order_items` (400 فاتورة / 779 صنف في التطوير).
+- `marketing_campaigns` + `marketing_broadcasts` (migration 045) كانا مقروءين من
+  `routes/platform.ts:272-280` بس؛ القياس: `git show HEAD:server/src/routes/index.ts | grep -c "marketing/campaigns"` =
+  **0**. فمدير الصالة ما كانش ليه حملة ولا مقياس أثر.
+
+**بقى:**
+- `server/src/controllers/posReports.ts` → `GET /api/reports/pos?from=&to=` — `totals` (فواتير/وحدات/
+  إجمالي/صافي بعد المرتجعات/متوسط الفاتورة/تكلفة/هامش/`cost_coverage_pct`) + `daily` + `top_products`
+  (أول 15) + `payment_methods` + `staff` + `hourly`. الإجماليات بتتجمع من سلسلة الأيام نفسها
+  (`buildPosTotals`)، والحدود `(::date)::timestamp AT TIME ZONE tz` بتوقيت الصالة (§34ث)، والعملة
+  من `gyms.currency`.
+- `server/src/controllers/websiteContent.ts` → `GET /api/website/content` — `identity` (اسم/شعار/
+  تليفون/إيميل/عنوان بخمسة حقول/عملة/توقيت) + `theme` (مفاتيح `website_*` من `gym_settings`) +
+  `sports` + `instructors` (بلا بيانات شخصية) + `schedule` (نمط أسبوعي من حصص واقعية في آخر 56 يوم
+  بملء المقاعد) + `pricing` (عروض نشطة بالترتيب بالسعر) + `proof` (أعضاء نشطون/حصص/حجوزات/دخول في
+  90 يوم + `seat_fill_pct`) + `sections` (أمانة: `gallery`/`forms`/`pages` = `false` لأنها بلا جداول).
+- `server/src/controllers/gymMarketing.ts` → `GET/POST /api/marketing/campaigns` +
+  `PATCH /:id/status` + `DELETE /:id` — نفس جدول المنصة بعزل `WHERE c.gym_id = $1` (الجدول **بلا RLS**:
+  `pg_class.relrowsecurity` = `false` مقابل `true` على `pos_orders`)، وأثر متجمّع من
+  `marketing_broadcasts`، والحذف **409** لو الحملة ليها إرسالات (`campaign_id … ON DELETE CASCADE`
+  كان بيمسح سجل الإرسال). الكتابة بتسيب سطر في `activity_logs` زي نمط `auth.ts`.
+- 6 مسارات جديدة في `routes/index.ts` بـ`requireRole('manager')`.
+
+**القياس (بعد — `ts-node` على القاعدة المحلية، صالة واحدة لكل توقيت):**
+
+| التحقق | الطريقة | النتيجة |
+| --- | --- | --- |
+| مسارات مسجّلة فعلًا | مسح `router.stack` (الـHTTP بلا جلسة بيرجع 401 لكل حاجة) | `GET /api/reports/pos` · `GET /api/website/content` · `GET+POST /api/marketing/campaigns` · `PATCH /:id/status` · `DELETE /:id` |
+| تقرير POS مقابل SQL خام | قياس مستقل بـpsql بنفس الحدود (`+02`) | فواتير **40** · إجمالي **7173.19** · وحدات **153** · تكلفة **4304.05** · أصناف **8** — مطابقة 100% للمخرج |
+| سلامة البنود | `SUM(quantity*unit_price)` من `pos_order_items` | **7173.19** = إجمالي الفواتير (لا فرق بند/فاتورة) |
+| توقيت وعملة لكل صالة | `pos:default` على 4 صالات | `Africa/Cairo/EGP` · `Asia/Riyadh/SAR` · `Asia/Dubai/AED` — الساعة المحلية للذروة 7/7/7/8 |
+| حالة فاضية صادقة | صالة نشطة بلا مبيعات | كل الإجماليات **0**، `daily/methods/staff/hours` = `[]`، بلا NaN |
+| فلتار مقلوب/غير صالح | `from>to` · `from=xx` | **200** — بيعكس النطاق ويرجع للشهر الحالي |
+| محتوى الموقع | `site` على صالة داتا | رياضات **7** · جدول **6 أنماط** (أول نمط: تمارين وظيفية، الأحد 14:00، سعة 28، محجوز 10، ملء **35.7%**) · أسعار **4** (أرخص 350) · `proof`: أعضاء **213** · حصص **6** · حجوزات **71** · دخول **2259** · ملء **58.7%** |
+| أرقام `proof` مقابل SQL خام | قياس مستقل بـpsql | **213 / 2259 / 71 / 121 مقعدًا** — مطابقة، و`71/121 = 58.7%` |
+| المدرسون | الاستعلام جوه `BEGIN … ROLLBACK` (ولا مدرّب `is_active` في التطوير) | **3 مدرسين** بـ**2** حصة لكل واحد في النافذة — والمعاملة اترجعت |
+| دورة الحملات | create → list → status → delete | `201` · `200` · `200` · **409** وفيها إرسالات · `200` بعد مسح الإرسالات |
+| مرفوضات | نوع غلط/تاريخ غلط/بداية>نهاية/حالة غلط/معرّف لصالة تانية | **400 ×4** و**404** — عزل المستأجر شغال |
+| تجميع الأثر | قائمة بعد إضافة إرسال تجريبي | `recipients 100 · delivered 98 · opened 30` ⇒ `open_rate_pct` **30.6** (على المسلَّم مش على المستقبل) |
+| أنواع + اختبارات | `npx tsc --noEmit` · `npx vitest run tests/unit` | **0** أخطاء · **34/34** (9 جديدة: `buildPosTotals` ×5 · `buildCampaignImpact` ×4) |
+
+**عقد الربط لجلسة A (الشغل ده ملك `src/pages/**`):**
+1. `SalesPage.tsx` تبويب Report ← `GET /api/reports/pos?from=&to=` (مش `finance/summary`): كروت
+   `totals` + عمود `daily` + `top_products` + `payment_methods` + `staff` + `hourly`، والهامش يُعرض
+   بمصاحبة `cost_coverage_pct` («الهامش محسوب على X% من الكميات»).
+2. `WebsiteGenerator.tsx` التبويبات التسعة ← `GET /api/website/content`: `Homepage`←`proof`+`sports`،
+   `Instructors`←`instructors`، `Schedule`←`schedule`، `Pricing`←`pricing`، `Location`←`identity.address`،
+   `Bookings`←`proof.bookings_90d`؛ و`Pages`/`Gallery`/`Forms` حالة فاضية صادقة (`sections.*` = `false`)
+   لأن مفيش جدول ليهم.
+3. تسويق ← `GET/POST /api/marketing/campaigns` + `PATCH /:id/status` + `DELETE /:id`؛ بلا إرسال
+   حقيقي لسه، فالأثر المعروض «0» يعني «ما اتبعتش» (`impact.open_rate_pct = null`).
+
+**معلَنات:**
+1. مسار HTTP بمستخدم حقيقي ما اتقيسش: كل المسارات ورا `authenticate`+`requireRole('manager')`،
+   ودخول مدير صالة بحساب المالك مش في إيدي؛ التحقق اتعمل على طبقتين — مسح `router.stack` للتسجيل،
+   واستدعاء الدوال نفسها جوه `runWithTenant` بنفس `pool` القاعدة المحلية.
+2. **مخلفات ما بتتمسحش:** `activity_logs` عليه trigger `block_immutable_logs()` بيرفض أي
+   UPDATE/DELETE (اتقاس: `TABLE_IS_IMMUTABLE`). المسبار سابه **6 صفوف** تدقيق بحملة نصها
+   `probe campaign 62` (3 من تشغيلين) — باقية دي الدفتر، وحذفها مستحيل بنيويًا.
+3. الصالات اللي ليها داتا في التطوير كلها `deleted_at IS NOT NULL` (الحلزونة القديمة: 10 صالات ×
+   40 فاتورة)، والصالات النشطة (24) ما ليهاش POS ولا حصص — فالأرقام دي بتقيس صحة الاستعلام لا
+   حال صالة حيّة؛ صالة «Another Test Gym» النشطة استخدمت لمسار الحالة الفاضية.
+4. `instructors` رجع `[]` في المسبار العادي لأن ولا موظف `role='coach'` في القاعدة `is_active`
+   (`count(*) FILTER (WHERE role IN ('coach','trainer') AND is_active)` = **0**) — الفلتر سليم،
+   والمسار اتغطى بـtransaction ملغي (ROLLBACK).
+5. مفيش pipeline إرسال تسويقي على مستوى الصالة: الإندبوينت بيخزّن ويقيس بس. تشغيله محتاج قرار
+   من المالك (بوابة بريد/رسايل) — مرفوع كقرار مستقل.
+6. `website_pages`/`website_gallery`/`website_forms`: جداولها مش موجودة (`information_schema` =
+   **0 صفوف**)، والتبويبات التلاتة هتفضل حالة فاضية صادقة لحد ما تاخد قرار + migration.
+7. `server/src/scripts/probe-62.ts` و`dbcheck-62.ts` اتكتبوا للقياس و**اتمسنوا** بعده؛
+   `server/src/scripts/` رجعت لـ`bootstrap-platform-admin.ts` بس. ولا `push` ولا deploy.

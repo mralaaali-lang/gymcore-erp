@@ -865,3 +865,39 @@ Docker `:4001`/`:9000` ← `gymcore-db` (`:5433`). الصالة الرملية �
 deploy ولا rebuild على `:9000`** — الانتظار لأمر المالك. قبل أي commit: `git diff --cached --numstat` — بلوكات
 `## §50`/`### ٨)` في التقرير وبلوك `TODO.md` بتاع جلسة C لسه **unstaged** في شجرة العمل، فالتوثيق بيتعمل ببروتوكول
 الـblob المُخلَّق (`git show HEAD:<doc>` + بلوكي → `git hash-object -w --path=<doc>` → `git update-index --cacheinfo`).
+
+## 20) شاشات «قيد التطوير» وراؤها داتا جاهزة — المسارات قبل الفرونت (2026-10-18 — جلسة B، §63)
+
+- **قبل ما تكتب «قيد التطوير» على تبويب، عدّ الصفوف اللي ممكن يقرأها.** التسعة تبويبات في
+  `WebsiteGenerator.tsx` كانوا كداب محليًا: `fitness_classes` = 60 حصة، `class_bookings` = 679،
+  `membership_offers` = 135، `gym_sports` + عناوين `gyms` كلهم موجودين — كان ناقص endpoint واحد
+  بس. القاعدة: `SELECT count(*) FROM <جدول> WHERE gym_id = <صالة>` قبل أي قرار «مفيش داتا».
+- **`marketing_campaigns` و`marketing_broadcasts` بلا RLS** (`pg_class.relrowsecurity = false`)
+  عكس `pos_orders`/`members`/`gym_settings`. أي كانتربولر جديد على جدول بلا سياسة = العزل كله في
+  حرف `WHERE gym_id = $n`؛ وأي تعديل لاحق يشيل الشرط ده يفتح قاعدة كاملة على صالة تانية. القياس:
+  `SELECT relname, relrowsecurity FROM pg_class WHERE relname IN ('marketing_campaigns','pos_orders')`.
+- **`activity_logs` جدول ممنوع المس (trigger `block_immutable_logs()`):** أي `UPDATE`/`DELETE`
+  بيرمي `TABLE_IS_IMMUTABLE`. عمليًا: البروب اللي بينادي مسارات بتكتب تدقيق ما يقدرش ينضّف
+  سطورها — المخلفات تُعلَّن في التقرير، ما تتحذفش. والمقابل: سطور الـprobe اللي في `marketing_campaigns`
+  اتمحت فعلاً (الحذف عليه مسموح) وبضلّت 6 سطور تدقيق بس.
+- **الحذف المعلَّق بـ`ON DELETE CASCADE` لازم يترفض في الكانتربولر:** `marketing_broadcasts.campaign_id`
+  cascade على الحملة، فـ`DELETE /campaigns/:id` بيرجع **409** لو ليها إرسالات. أي endpoint حذف على
+  جدول له children cascade = اسأل `COUNT(*)` الأول قبل `DELETE`.
+- **ما تساوِش «0» بـ`null` في المقاييس:** نسبة الفتح على صفر مُسلَّم بترجع `null` («ما كانش في إرسال»)،
+  مش `0` («ولا حد فتح») — والواجهة تحتاج الفرق ده عشان تعرض حالة فاضية صادقة. نفس المنطق على
+  `seat_fill_pct` و`avg_order_value`.
+- **توقيت الصالة جزء من الأرقام لا عرض:** حدود اليوم/الشهر كلها `(::date)::timestamp AT TIME ZONE $tz`
+  (§34ث). المقياس: نفس الفاتورة بترجع في ساعة ذروة 7 لثلاث صالات Cairo/Riyadh و**8** لدبي —
+  لو استخدمت `CURRENT_DATE` الخام كنت هتوزّع المبيعات على يومين غلط.
+- **بروب من غير HTTP جلسة:** `query()` بيطبّق `app.gym_id` من `AsyncLocalStorage`، فاستدعاء
+  كانترولر مباشرة لازم يتلفّ بـ`runWithTenant(gymId, …)` (`src/config/tenantContext.ts`)، وإلا
+  `gyms` بترجع **0 صفوف** (الـrole عليه BYPASSRLS لكن سياسة `gyms` بتقرا `current_setting`).
+  والطبقة اللي فوق `authenticate` ما بتفرّقش: `curl` بلا بيسة بيرجع **401** للمسار المسجّل
+  وغير المسجّل — فالتسجيل بيتقاس بمسح `router.stack`، مش بكود الحالة.
+- **الـcommit اللي بيتعمل من الـindex بس بيسيب شجرة العمل ناقصة:** الجلسة الموازية بتمرّر بلوكات
+  الوثايق بـ`git apply --cached`، فالنسخة في HEAD فيها بلوكها والنسخة في شجرة العمل **ما فيهاوش**
+  (مقاس: `git diff HEAD -- AGENT_HANDOVER.md` ورّى حذف البلوك `## 19)` الكامل اللي هو في HEAD).
+  النتيجة: أي `git add LOCAL_TESTING_REPORT.md` بعدها **يمسح دفعة كاملة** من السجل من غير ما حد
+  ياخد باله. البروتوكول الآمن: `git show :<file>` → ضيف بلوكك للنسخة دي → `diff -u` بينها وبين
+  الأصل → `git apply --cached` → و`git diff --cached --stat` لازم يورّي إضافات بس (صفر حذوفات في
+  ملف مش ملكك). والترقيم بيتثبّت من HEAD مش من الشجرة: `git show HEAD:<file> | grep -n "^## "`.
