@@ -151,8 +151,17 @@ export default function Sidebar({ items }: SidebarProps) {
   // here in the brand block — the dashboard no longer repeats it. Platform
   // sessions (no gym profile) keep the generic GymCore branding.
   const brandName = gymProfile?.name || 'GymCore';
-  // لون البراند من الإعدادات (بيانات الصالة ← الشعار والهوية)
-  const { data: brandSettings } = useApiQuery(['settings'], getSettings, { staleTime: 5 * 60_000 });
+  // لون البراند من الإعدادات (بيانات الصالة ← الشعار والهوية).
+  // /api/settings على السيرفر manager-only (`requireRole('manager')`)، فأي
+  // جلسة تانية بتجيب 401. في جلسة السوبر ادمن الـ 401 ده كان بيوقّع الفرع
+  // بتاع api.ts (لا refresh token + الدور super-admin) → clearTokens +
+  // إعادة توجيه قسوية لـ /login، يعني الدخول للمنصة بيرمي بره فورًا.
+  // الطلب نفسه لسه بيطير في الصالات فقط، والبراند العام بيفضل fallback.
+  const { data: brandSettings } = useApiQuery(['settings'], getSettings, {
+    staleTime: 5 * 60_000,
+    retry: false,
+    enabled: role === 'gym-admin',
+  });
   const brandColor = String(brandSettings?.data?.gym_brand_color || '#10b981');
   const brandNameEn = String(brandSettings?.data?.gym_name_en || '').trim();
   const displayBrand = !rtl && brandNameEn ? brandNameEn : brandName;

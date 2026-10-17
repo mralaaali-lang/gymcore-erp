@@ -128,6 +128,15 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
   والباكند native اللي شغال بـ`npm run dev` بيؤدّي كرونو `subscriptionCleanup`/`subscriptionEnforcement`
   على نفس البيانات. أي قياس حي لازم ياخد في حسبانه إن صالة التطوير دي مش محتكرة لجلسة واحدة،
   ويفضّل إعادة اللوجين وقراءة الاستجابة (`fetch` بنفس الجلسة) قبل الاستنتاج من الـDOM.
+- **أي 401 من endpoint خاص بالصالات في جلسة السوبر ادمن = طرد من المنصة (2026-10-17):** فرع الـ 401 في
+  `src/services/api.ts` بيقول: مفيش `refresh_token` + `getStoredRole() === 'super-admin'` →
+  `clearTokens()` ثم `window.location.href = '/login'` (توجيه **قسري** بيهدم سياق المتصفح كله).
+  فالمطلوب إن أي مكوّن مشترك بينادي على endpoint من `/api/*` (ده `requireRole('manager')` على
+  السيرفر، وكوكي المنصة مرفوض فيها — قِيس: `/api/settings` → 401 بينما `/platform/auth/session` →
+  200 بنفس الكوكي) يقيّد الطلب بـ`enabled` مربوط بالدور. `Sidebar:155` كان بيجيب لون البراند من
+  `getSettings` بغير قيد، فالسوبر ادمن كان بيطير بره المنصة في نفس لحظة فتح اللوحة؛ اتصلح بـ
+  `enabled: role === 'gym-admin'` + `retry: false` (`AppLayout` و`TopNav` كانوا صح بالفعل).
+  القاعدة: `role` هنا أدوار الواجهة (`ROLE_MAP`: manager/owner → `gym-admin`) مش أدوار السيرفر.
 - **Railway staging (2026-10-12):** النشر بـ `railway up` من الجذر (سياق build = repo root).
   بروكسي Railway يوصل للـ replica على **منفذ 8080** إن لم يُضبط Application Port — nginx يlisten على 80+8080 معاً. بعد كل redeploy للـ backend **أعد نشر الـ frontend** (nginx يظلّم DNS لـ `backend.railway.internal` عند الإقلاع وإلا يجمّد البروكسي) — مع الرفع التلقائي (§29) كل push يبني الخدمةين معاً فتنتهي هذه المشكلة جانبياً؛ تبقى عند إعادة نشر backend وحده يدوياً. `railway service restart` يتعطّل أحياناً — `railway up -d` أضمن.
 
