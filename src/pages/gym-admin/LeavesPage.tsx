@@ -10,6 +10,7 @@ import { listLeaves, requestLeave, decideLeave, leaveBalances, listStaff, type S
 import { Panel, EmptyState } from '../../components/dashboard';
 import { StaffAvatar } from './HrMainPage';
 import PageLoader from '../../components/shared/PageLoader';
+import Modal from '../../components/shared/Modal';
 import StatusBadge from '../../components/ui/StatusBadge';
 
 // ====================================================================
@@ -204,33 +205,50 @@ export default function LeavesPage() {
 
       {/* طلب إجازة */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">{rtl ? 'طلب إجازة' : 'Request leave'}</h2>
-              <button onClick={() => setShowForm(false)} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <div className="space-y-3">
-              <select value={fStaff} onChange={(e) => setFStaff(e.target.value)} className={inputCls}>
-                <option value="">{rtl ? 'الموظف *' : 'Staff *'}</option>
-                {staff.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-              </select>
-              <select value={fType} onChange={(e) => setFType(e.target.value)} className={inputCls}>
-                <option value="annual">{rtl ? 'سنوية' : 'Annual'}</option>
-                <option value="sick">{rtl ? 'مرضية' : 'Sick'}</option>
-                <option value="unpaid">{rtl ? 'بدون راتب' : 'Unpaid'}</option>
-              </select>
-              <div className="grid grid-cols-2 gap-3">
-                <input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} className={inputCls} />
-                <input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} className={inputCls} />
-              </div>
-              <button onClick={() => create.mutate()} disabled={!fStaff || !fFrom || !fTo || create.isPending}
-                className="w-full min-h-[48px] rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold disabled:opacity-50">
-                {rtl ? 'إرسال الطلب' : 'Send request'}
+        <Modal
+          open
+          onClose={() => setShowForm(false)}
+          size="md"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={create.isPending}
+          title={rtl ? 'طلب إجازة' : 'Request leave'}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                disabled={create.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+              >
+                {rtl ? 'إلغاء' : 'Cancel'}
               </button>
+              <button
+                type="button"
+                onClick={() => create.mutate()}
+                disabled={!fStaff || !fFrom || !fTo || create.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition disabled:opacity-50"
+              >
+                {create.isPending ? (rtl ? 'جارٍ الإرسال…' : 'Sending…') : (rtl ? 'إرسال الطلب' : 'Send request')}
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <select value={fStaff} onChange={(e) => setFStaff(e.target.value)} className={inputCls}>
+              <option value="">{rtl ? 'الموظف *' : 'Staff *'}</option>
+              {staff.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+            </select>
+            <select value={fType} onChange={(e) => setFType(e.target.value)} className={inputCls}>
+              <option value="annual">{rtl ? 'سنوية' : 'Annual'}</option>
+              <option value="sick">{rtl ? 'مرضية' : 'Sick'}</option>
+              <option value="unpaid">{rtl ? 'بدون راتب' : 'Unpaid'}</option>
+            </select>
+            <div className="grid grid-cols-2 gap-3">
+              <input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} className={inputCls} />
+              <input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} className={inputCls} />
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

@@ -8,9 +8,9 @@ import { formatMoney } from '../../utils/currency';
 import { formatDate, fmtNum } from '../../utils/date';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
+import Modal from '../../components/shared/Modal';
 import {
   Plus,
-  X,
   MagnifyingGlass as Search,
   ArrowsClockwise as RefreshCw,
   Bank as Banknote,
@@ -428,79 +428,81 @@ function SettleDebtModal({
   const [note, setNote] = useState('');
   const canSubmit = Number(amount) > 0;
 
+  const handleSubmit = (event?: React.FormEvent) => {
+    event?.preventDefault();
+    if (!canSubmit) return;
+    onSubmit(Number(amount), note.trim() || undefined);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-gray-900">{rtl ? 'سداد الدين' : 'Settle Debt'}</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label={rtl ? 'إغلاق' : 'Close'}>
-            <X size={18} />
+    <Modal
+      open
+      onClose={onClose}
+      size="md"
+      dir={rtl ? 'rtl' : 'ltr'}
+      disableDismiss={saving}
+      title={rtl ? 'سداد الدين' : 'Settle Debt'}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+          >
+            {rtl ? 'إلغاء' : 'Cancel'}
           </button>
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!canSubmit) return;
-            onSubmit(Number(amount), note.trim() || undefined);
-          }}
-          className="space-y-4"
-        >
-          <div>
-            <label className="block text-sm font-semibold text-gray-500 mb-1">{rtl ? 'اسم العضو' : 'Member'}</label>
-            <p className="h-11 px-3 flex items-center rounded-xl bg-gray-50 border border-gray-200 text-base font-bold text-gray-900">
-              {debt.member_name || '—'}
-            </p>
-          </div>
-          <p className="text-base font-bold text-red-600">
-            {rtl ? `المبلغ المتبقي ${remainingLabel}` : `Remaining ${remainingLabel}`}
+          <button
+            type="button"
+            onClick={() => handleSubmit()}
+            disabled={!canSubmit || saving}
+            className="min-h-[48px] px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition disabled:opacity-50"
+          >
+            {rtl ? 'تأكيد السداد' : 'Confirm payment'}
+          </button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold text-gray-500 mb-1">{rtl ? 'اسم العضو' : 'Member'}</label>
+          <p className="h-11 px-3 flex items-center rounded-xl bg-gray-50 border border-gray-200 text-base font-bold text-gray-900">
+            {debt.member_name || '—'}
           </p>
-          <div>
-            <label className="block text-sm font-semibold text-gray-500 mb-1.5">
-              {rtl ? 'مبلغ السداد' : 'Payment amount'} *
-            </label>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
-            />
-            <p className="mt-1.5 text-xs text-gray-500">
-              {rtl ? 'يمكنك سداد المبلغ كاملاً أو جزءه' : 'You may settle the full amount or part of it'}
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'ملاحظة' : 'Note'}</label>
-            <textarea
-              value={note}
-              maxLength={500}
-              rows={2}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={rtl ? 'ملاحظة اختيارية…' : 'Optional note…'}
-              className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white text-base text-gray-900 resize-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
-            />
-          </div>
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              type="submit"
-              disabled={!canSubmit || saving}
-              className="flex-1 h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
-            >
-              {rtl ? 'تأكيد السداد' : 'Confirm payment'}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-11 px-6 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold transition min-h-[44px]"
-            >
-              {rtl ? 'إلغاء' : 'Cancel'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+        <p className="text-base font-bold text-red-600">
+          {rtl ? `المبلغ المتبقي ${remainingLabel}` : `Remaining ${remainingLabel}`}
+        </p>
+        <div>
+          <label className="block text-sm font-semibold text-gray-500 mb-1.5">
+            {rtl ? 'مبلغ السداد' : 'Payment amount'} *
+          </label>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
+          />
+          <p className="mt-1.5 text-xs text-gray-500">
+            {rtl ? 'يمكنك سداد المبلغ كاملاً أو جزءه' : 'You may settle the full amount or part of it'}
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'ملاحظة' : 'Note'}</label>
+          <textarea
+            value={note}
+            maxLength={500}
+            rows={2}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={rtl ? 'ملاحظة اختيارية…' : 'Optional note…'}
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white text-base text-gray-900 resize-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
+          />
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -524,95 +526,97 @@ function AddDebtModal({
   const [reason, setReason] = useState('');
   const canSubmit = !!memberId && Number(amount) > 0 && !!dueDate;
 
+  const handleSubmit = (event?: React.FormEvent) => {
+    event?.preventDefault();
+    if (!canSubmit) return;
+    onSubmit({
+      member_id: memberId,
+      amount: Number(amount),
+      due_date: dueDate,
+      reason: reason.trim() || undefined,
+    });
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-gray-900">{rtl ? 'إضافة دين' : 'Add Debt'}</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label={rtl ? 'إغلاق' : 'Close'}>
-            <X size={18} />
+    <Modal
+      open
+      onClose={onClose}
+      size="md"
+      dir={rtl ? 'rtl' : 'ltr'}
+      disableDismiss={saving}
+      title={rtl ? 'إضافة دين' : 'Add Debt'}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+          >
+            {rtl ? 'إلغاء' : 'Cancel'}
           </button>
+          <button
+            type="button"
+            onClick={() => handleSubmit()}
+            disabled={!canSubmit || saving}
+            className="min-h-[48px] px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition disabled:opacity-50"
+          >
+            {rtl ? 'حفظ الدين' : 'Save debt'}
+          </button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'العضو' : 'Member'} *</label>
+          <select
+            value={memberId}
+            onChange={(e) => setMemberId(e.target.value)}
+            required
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
+          >
+            <option value="">{rtl ? 'اختر عضوًا…' : 'Select a member…'}</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>{m.full_name}</option>
+            ))}
+          </select>
         </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!canSubmit) return;
-            onSubmit({
-              member_id: memberId,
-              amount: Number(amount),
-              due_date: dueDate,
-              reason: reason.trim() || undefined,
-            });
-          }}
-          className="space-y-4"
-        >
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'العضو' : 'Member'} *</label>
-            <select
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
+            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'المبلغ' : 'Amount'} *</label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
               required
               className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
-            >
-              <option value="">{rtl ? 'اختر عضوًا…' : 'Select a member…'}</option>
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>{m.full_name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'المبلغ' : 'Amount'} *</label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-                className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'تاريخ الاستحقاق' : 'Due date'} *</label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                required
-                className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'الوصف / السبب' : 'Description / reason'}</label>
-            <textarea
-              value={reason}
-              maxLength={500}
-              rows={2}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={rtl ? 'مثال: رصيد باقة شهري' : 'e.g. remaining balance — monthly plan'}
-              className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white text-base text-gray-900 resize-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
             />
           </div>
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              type="submit"
-              disabled={!canSubmit || saving}
-              className="flex-1 h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
-            >
-              {rtl ? 'حفظ الدين' : 'Save debt'}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-11 px-6 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold transition min-h-[44px]"
-            >
-              {rtl ? 'إلغاء' : 'Cancel'}
-            </button>
+          <div>
+            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'تاريخ الاستحقاق' : 'Due date'} *</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              required
+              className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
+            />
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'الوصف / السبب' : 'Description / reason'}</label>
+          <textarea
+            value={reason}
+            maxLength={500}
+            rows={2}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={rtl ? 'مثال: رصيد باقة شهري' : 'e.g. remaining balance — monthly plan'}
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white text-base text-gray-900 resize-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
+          />
+        </div>
+      </form>
+    </Modal>
   );
 }

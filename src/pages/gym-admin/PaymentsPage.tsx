@@ -10,10 +10,10 @@ import { escapeHtml, printDocument } from '../../utils/print';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
 import DataTable, { type TableColumn } from '../../components/ui/DataTable';
+import Modal from '../../components/shared/Modal';
 import {
   Plus,
   FileText,
-  X,
   Wallet,
   Bank as Banknote,
   HandCoins,
@@ -369,97 +369,99 @@ function RecordPaymentModal({
 
   const canSubmit = !!memberId && Number(amount) > 0;
 
+  const handleSubmit = (event?: React.FormEvent) => {
+    event?.preventDefault();
+    if (!canSubmit) return;
+    onSubmit({
+      member_id: memberId,
+      amount: Number(amount),
+      payment_method: method,
+      description: note.trim() || undefined,
+    });
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-gray-900">{rtl ? 'تسجيل دفعة' : 'Record Payment'}</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label={rtl ? 'إغلاق' : 'Close'}>
-            <X size={18} />
+    <Modal
+      open
+      onClose={onClose}
+      size="md"
+      dir={rtl ? 'rtl' : 'ltr'}
+      disableDismiss={saving}
+      title={rtl ? 'تسجيل دفعة' : 'Record Payment'}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+          >
+            {rtl ? 'إلغاء' : 'Cancel'}
           </button>
+          <button
+            type="button"
+            onClick={() => handleSubmit()}
+            disabled={!canSubmit || saving}
+            className="min-h-[48px] px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition disabled:opacity-50"
+          >
+            {saving ? (rtl ? 'جارٍ الحفظ…' : 'Saving…') : (rtl ? 'حفظ الدفعة' : 'Save payment')}
+          </button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'العضو' : 'Member'} *</label>
+          <select
+            value={memberId}
+            onChange={(e) => setMemberId(e.target.value)}
+            required
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
+          >
+            <option value="">{rtl ? 'اختر عضوًا…' : 'Select a member…'}</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>{m.full_name}</option>
+            ))}
+          </select>
         </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!canSubmit) return;
-            onSubmit({
-              member_id: memberId,
-              amount: Number(amount),
-              payment_method: method,
-              description: note.trim() || undefined,
-            });
-          }}
-          className="space-y-4"
-        >
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'العضو' : 'Member'} *</label>
-            <select
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
-              required
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
-            >
-              <option value="">{rtl ? 'اختر عضوًا…' : 'Select a member…'}</option>
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>{m.full_name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'المبلغ' : 'Amount'} *</label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-                className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'طريقة الدفع' : 'Method'}</label>
-              <select
-                value={method}
-                onChange={(e) => setMethod(e.target.value as PaymentMethod)}
-                className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
-              >
-                {PAYMENT_METHODS.map((m) => (
-                  <option key={m} value={m}>{METHOD_LABELS[m][rtl ? 'ar' : 'en']}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'ملاحظات' : 'Notes'}</label>
+            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'المبلغ' : 'Amount'} *</label>
             <input
-              type="text"
-              maxLength={200}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={rtl ? 'مثال: دفعة اشتراك شهري' : 'e.g. monthly renewal'}
+              type="number"
+              min={0}
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
               className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
             />
           </div>
-          <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={!canSubmit || saving}
-              className="flex-1 min-h-[48px] rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-bold transition"
+          <div>
+            <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'طريقة الدفع' : 'Method'}</label>
+            <select
+              value={method}
+              onChange={(e) => setMethod(e.target.value as PaymentMethod)}
+              className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
             >
-              {saving ? (rtl ? 'جاري الحفظ…' : 'Saving…') : (rtl ? 'حفظ الدفعة' : 'Save payment')}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition"
-            >
-              {rtl ? 'إلغاء' : 'Cancel'}
-            </button>
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m} value={m}>{METHOD_LABELS[m][rtl ? 'ar' : 'en']}</option>
+              ))}
+            </select>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'ملاحظات' : 'Notes'}</label>
+          <input
+            type="text"
+            maxLength={200}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={rtl ? 'مثال: دفعة اشتراك شهري' : 'e.g. monthly renewal'}
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none"
+          />
+        </div>
+      </form>
+    </Modal>
   );
 }
