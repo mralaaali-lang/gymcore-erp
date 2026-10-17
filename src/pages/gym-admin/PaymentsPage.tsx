@@ -9,6 +9,7 @@ import { formatDate, fmtNum, formatTime } from '../../utils/date';
 import { escapeHtml, printDocument } from '../../utils/print';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
 import {
   Plus,
   FileText,
@@ -111,6 +112,57 @@ export default function PaymentsPage() {
 
   const methodLabel = (m: string | null) =>
     m ? (METHOD_LABELS[m]?.[rtl ? 'ar' : 'en'] ?? m) : '—';
+
+  // بلا `sortable`: `/api/finance/payments` ما بيقبلش sort/order خالص (صفحة +
+  // نطاق + طريقة بس)، فأي رأس مضغوط كان هيرتّب الـ100 صف المحمّولة ويسيب باقي
+  // السجل في محله — نفس قاعدة جدول المبيعات.
+  const columns: TableColumn<PaymentRow>[] = [
+    {
+      id: 'created_at',
+      label: rtl ? 'التاريخ' : 'Date',
+      value: (r) => r.created_at,
+      cell: (r) => <span className="whitespace-nowrap">{formatDate(r.created_at)}</span>,
+    },
+    {
+      id: 'member_name',
+      label: rtl ? 'العضو' : 'Member',
+      value: (r) => r.member_name,
+      cell: (r) => <span className="font-medium text-foreground">{r.member_name || '—'}</span>,
+    },
+    {
+      id: 'member_phone',
+      label: rtl ? 'الهاتف' : 'Phone',
+      value: (r) => r.member_phone,
+      cell: (r) => <span dir="ltr" className="whitespace-nowrap">{r.member_phone || '—'}</span>,
+    },
+    {
+      id: 'amount',
+      label: rtl ? 'المبلغ' : 'Amount',
+      numeric: true,
+      value: (r) => Number(r.amount),
+      cell: (r) => <span className="font-bold whitespace-nowrap text-primary">+{money(r.amount)}</span>,
+    },
+    {
+      id: 'payment_method',
+      label: rtl ? 'الطريقة' : 'Method',
+      value: (r) => r.payment_method,
+      cell: (r) => (
+        <span className="inline-block rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-table-head">
+          {methodLabel(r.payment_method)}
+        </span>
+      ),
+    },
+    {
+      id: 'description',
+      label: rtl ? 'ملاحظات' : 'Notes',
+      value: (r) => r.description,
+      cell: (r) => (
+        <span className="block max-w-[280px] truncate" title={r.description || undefined}>
+          {r.description || '—'}
+        </span>
+      ),
+    },
+  ];
 
   // §43 — PDF prints exactly the sheet currently on screen (attendance rule).
   const exportPdf = () => {
@@ -248,57 +300,36 @@ export default function PaymentsPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-gray-900">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'التاريخ' : 'Date'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'العضو' : 'Member'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الهاتف' : 'Phone'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'المبلغ' : 'Amount'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الطريقة' : 'Method'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'ملاحظات' : 'Notes'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(r.created_at)}</td>
-                      <td className="px-4 py-3 font-medium">{r.member_name || '—'}</td>
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap" dir="ltr">{r.member_phone || '—'}</td>
-                      <td className="px-4 py-3 font-bold text-emerald-600 whitespace-nowrap">+{money(r.amount)}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-block bg-gray-100 text-gray-600 rounded-full px-2.5 py-1 text-xs font-semibold">
-                          {methodLabel(r.payment_method)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 max-w-[280px] truncate" title={r.description || undefined}>{r.description || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-3 mt-4">
-                <button
-                  onClick={() => setPage((v) => Math.max(1, v - 1))}
-                  disabled={page <= 1}
-                  className="min-h-[44px] px-4 py-1.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-200"
-                >
-                  {rtl ? 'السابق' : 'Prev'}
-                </button>
-                <span className="text-xs text-gray-500">
-                  {rtl ? `صفحة ${page} من ${totalPages}` : `Page ${page} of ${totalPages}`}
-                </span>
-                <button
-                  onClick={() => setPage((v) => Math.min(totalPages, v + 1))}
-                  disabled={page >= totalPages}
-                  className="min-h-[44px] px-4 py-1.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-200"
-                >
-                  {rtl ? 'التالي' : 'Next'}
-                </button>
-              </div>
-            )}
+            <DataTable
+              columns={columns}
+              data={rows}
+              bare
+              footer={
+                totalPages > 1 ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPage((v) => Math.max(1, v - 1))}
+                      disabled={page <= 1}
+                      className="min-h-[44px] rounded-shell border border-hairline bg-card px-4 py-1.5 text-sm font-medium text-table-fg hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {rtl ? 'السابق' : 'Prev'}
+                    </button>
+                    <span className="text-xs text-table-head">
+                      {rtl ? `صفحة ${page} من ${totalPages}` : `Page ${page} of ${totalPages}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPage((v) => Math.min(totalPages, v + 1))}
+                      disabled={page >= totalPages}
+                      className="min-h-[44px] rounded-shell border border-hairline bg-card px-4 py-1.5 text-sm font-medium text-table-fg hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {rtl ? 'التالي' : 'Next'}
+                    </button>
+                  </div>
+                ) : undefined
+              }
+            />
           </>
         )}
       </Panel>

@@ -259,21 +259,6 @@ html {
   textarea:not(.touch-auto) {
     min-height: 48px;
   }
-
-  /* Members table on phones: 16px type + horizontal scroll allowed. */
-  .members-table {
-    font-size: 16px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .members-table table {
-    font-size: 16px;
-  }
-}
-
-/* Desktop (≥769px): scroll only if the min-width table overflows (narrow windows). */
-.members-table {
-  overflow-x: auto;
 }
 
 /* Shift report printing: window.print() on the report view — hide the app

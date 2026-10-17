@@ -10,6 +10,7 @@ import { buildExportMatrix, downloadMatrixXlsx } from '../../utils/csv';
 import { StatCard, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
 import StatusBadge from '../../components/ui/StatusBadge';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
 import { FileText, Users, User, CreditCard, FileCsv as FileSpreadsheet } from '@phosphor-icons/react';
 import EditMemberModal from './EditMemberModal';
 import type { MemberResponse } from '../../services/api';
@@ -39,13 +40,9 @@ const SUBS_OPTIONS = [
   { value: 'none', ar: 'بدون اشتراك', en: 'No subscription' },
 ];
 
-// الأعمدة القابلة للترتيب + الاتجاه الافتراضي الذكي لكل عمود.
-const SORTABLE: Record<string, { labelAr: string; labelEn: string; def: 'asc' | 'desc' }> = {
-  member_name: { labelAr: 'الاسم', labelEn: 'Name', def: 'asc' },
-  subs_count: { labelAr: 'الاشتراكات', labelEn: 'Subscriptions', def: 'desc' },
-  visits: { labelAr: 'الحضور', labelEn: 'Visits', def: 'desc' },
-  active_end_date: { labelAr: 'انتهاء الاشتراك', labelEn: 'Sub ends', def: 'asc' },
-};
+// الأعمدة القابلة للترتيب = قائمة `SORTS` البيضا في `getMembersReport`
+// (member_name · active_end_date · visits · subs_count) بالظبط، والاتجاه
+// الافتراضي الذكي بقى `sortDescFirst` جوّه تعريف العمود.
 
 const inputCls =
   'h-11 min-w-[150px] px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none';
@@ -67,7 +64,7 @@ export default function MembersReport() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [sort, setSort] = useState('member_name');
-  const [order, setOrder] = useState('asc');
+  const [order, setOrder] = useState<'asc' | 'desc'>('asc');
   const [editing, setEditing] = useState<MembersReportRow | null>(null);
   const [exporting, setExporting] = useState(false);
 
@@ -86,57 +83,99 @@ export default function MembersReport() {
   const pagination = data?.pagination;
   const pages = pagination ? pagination.total_pages : 0;
 
-  const toggleSort = (key: string) => {
-    if (sort === key) {
-      setOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSort(key);
-      setOrder(SORTABLE[key].def);
-    }
-    setPage(1);
-  };
-
-  const sortTh = (key: string) => {
-    const cfg = SORTABLE[key];
-    const active = sort === key;
-    return (
-      <th key={key} className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">
-        <button
-          type="button"
-          onClick={() => toggleSort(key)}
-          title={rtl ? 'اضغط للترتيب' : 'Click to sort'}
-          className={`inline-flex items-center gap-1 hover:text-gray-900 ${active ? 'text-emerald-700' : ''}`}
-        >
-          {rtl ? cfg.labelAr : cfg.labelEn}
-          <span className="material-symbols-outlined text-base">
-            {active ? (order === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more'}
-          </span>
-        </button>
-      </th>
-    );
-  };
-
   const statusCell = (r: MembersReportRow) => {
     if (r.is_blacklisted) return <StatusBadge status={rtl ? 'محظور' : 'Blacklisted'} variant="error" />;
     if (r.active_end_date) return <StatusBadge status={rtl ? 'نشط' : 'Active'} variant="success" />;
-    return <span />;
+    return <span className="text-ink-faint">—</span>;
   };
 
   const endCell = (end: string | null) => {
-    if (!end) return <span className="text-gray-400">—</span>;
+    if (!end) return <span className="text-ink-faint">—</span>;
     const left = daysUntil(end);
     const soon = left !== null && left <= 7;
     return (
-      <span className={soon ? 'text-red-600 font-bold' : 'text-gray-700'}>
+      <span className={soon ? 'font-bold text-destructive' : undefined}>
         {formatDate(end)}{' '}
         {left !== null && left >= 0 && (
-          <span className={`text-xs font-bold ${soon ? 'text-red-600' : 'text-emerald-600'}`}>
+          <span className={`text-xs font-bold ${soon ? 'text-destructive' : 'text-primary'}`}>
             ({rtl ? `${left} يوم` : `${left}d`})
           </span>
         )}
       </span>
     );
   };
+
+  // brass-soft في الداكن (#6b5a33) مفتاح hover مش خلفية نص: pine فوقه = 2.66
+  // (مقيس computed). chalk (#eef0e8) على نفس الخلفية = 5.83، وهو نفس مستوى
+  // الاقتران في الفاتح (9.96).
+  const countChip = (value: number | null | undefined) => (
+    <span className="inline-flex min-w-8 items-center justify-center rounded-full bg-brass-soft px-2 py-1 text-xs font-bold text-pine tabular-nums dark:text-foreground">
+      {fmtNum(value ?? 0)}
+    </span>
+  );
+
+  const columns: TableColumn<MembersReportRow>[] = [
+    {
+      id: '__n',
+      label: rtl ? 'م' : '#',
+      width: '2.5rem',
+      cell: (_r, i) => (
+        <span className="text-xs text-ink-faint tabular-nums">
+          {((pagination?.page ?? 1) - 1) * (pagination?.limit ?? limit) + i + 1}
+        </span>
+      ),
+    },
+    {
+      // الكود بطاقة العضو: LTR دايماً (أرقام وحروف لاتينية) جوه خلية الجدول RTL.
+      id: 'card_code',
+      label: rtl ? 'الكود' : 'Code',
+      value: (r) => r.card_code,
+      cell: (r) => (
+        <span dir="ltr" className="font-extrabold text-foreground tabular-nums whitespace-nowrap">
+          {r.card_code ?? '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'member_name',
+      label: rtl ? 'الاسم' : 'Name',
+      sortable: true,
+      value: (r) => r.full_name,
+      cell: (r) => <span className="font-semibold text-foreground whitespace-nowrap">{r.full_name}</span>,
+    },
+    {
+      id: 'phone_number',
+      label: rtl ? 'الهاتف' : 'Phone',
+      value: (r) => r.phone_number,
+      cell: (r) => (
+        <span dir="ltr" className="whitespace-nowrap">{r.phone_number || '—'}</span>
+      ),
+    },
+    { id: 'gender', label: rtl ? 'الجنس' : 'Gender', cell: (r) => genderLabel(r.gender, rtl) },
+    {
+      id: 'subs_count',
+      label: rtl ? 'الاشتراكات' : 'Subscriptions',
+      sortable: true,
+      sortDescFirst: true,
+      numeric: true,
+      cell: (r) => countChip(r.subs_count),
+    },
+    {
+      id: 'visits',
+      label: rtl ? 'الحضور' : 'Visits',
+      sortable: true,
+      sortDescFirst: true,
+      numeric: true,
+      cell: (r) => countChip(r.visits),
+    },
+    {
+      id: 'active_end_date',
+      label: rtl ? 'انتهاء الاشتراك' : 'Sub ends',
+      sortable: true,
+      cell: (r) => endCell(r.active_end_date),
+    },
+    { id: 'status', label: rtl ? 'الحالة' : 'Status', cell: (r) => statusCell(r) },
+  ];
 
   const exportColumns = [
     { key: '__n', label: rtl ? 'م' : '#' },
@@ -278,99 +317,68 @@ export default function MembersReport() {
             <StatCard icon={CreditCard} label={rtl ? 'اشتراك نشط' : 'Active subscription'} value={fmtNum(stats?.with_active ?? 0)} accent="violet" />
           </div>
 
-          {/* 4) جدول الأعضاء — نفس خواص جدول المشتركين */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100 text-start">
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 w-10">#</th>
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'الكود' : 'Code'}</th>
-                    {sortTh('member_name')}
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'الهاتف' : 'Phone'}</th>
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'الجنس' : 'Gender'}</th>
-                    {sortTh('subs_count')}
-                    {sortTh('visits')}
-                    {sortTh('active_end_date')}
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'الحالة' : 'Status'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.length === 0 && (
-                    <tr><td colSpan={10} className="p-10 text-center text-gray-400 text-sm">
-                      {rtl ? 'لا أعضاء مطابقين للفلاتر' : 'No members match the filters'}
-                    </td></tr>
-                  )}
-                  {rows.map((r, idx) => (
-                    <tr
-                      key={r.id}
-                      onClick={() => setEditing(r)}
-                      title={rtl ? 'اضغط للتعديل السريع' : 'Click for quick edit'}
-                      className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors cursor-pointer"
+          {/* 4) جدول الأعضاء — نفس الصدفة والعقد اللي بقوا لباقي الجداول. */}
+          <DataTable
+            columns={columns}
+            data={rows}
+            manualSorting
+            sorting={[{ id: sort, desc: order === 'desc' }]}
+            onSortingChange={(next) => {
+              const picked = next[0];
+              if (!picked) return;
+              setSort(picked.id);
+              setOrder(picked.desc ? 'desc' : 'asc');
+              setPage(1);
+            }}
+            onRowClick={(r) => setEditing(r)}
+            rowTitle={() => (rtl ? 'اضغط للتعديل السريع' : 'Click for quick edit')}
+            minWidth="900px"
+            empty={rtl ? 'لا أعضاء مطابقين للفلاتر' : 'No members match the filters'}
+            footer={
+              rows.length > 0 && pagination ? (
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    {rtl ? 'عرض' : 'Show'}
+                    <select
+                      className="rounded-shell border border-hairline bg-card px-2 py-1.5 text-sm min-h-[40px]"
+                      value={limit}
+                      onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
                     >
-                      <td className="py-3 px-3 text-start text-gray-400 tabular-nums text-xs">
-                        {((pagination?.page ?? 1) - 1) * ((pagination?.limit) ?? limit) + idx + 1}
-                      </td>
-                      <td className={`py-3 px-3 font-extrabold text-gray-900 tabular-nums whitespace-nowrap ${rtl ? 'text-right' : 'text-left'}`} dir="ltr">{r.card_code ?? '—'}</td>
-                      <td className="py-3 px-3 font-semibold text-gray-900 text-start whitespace-nowrap">{r.full_name}</td>
-                      <td className={`py-3 px-3 text-gray-500 whitespace-nowrap ${rtl ? 'text-right' : 'text-left'}`} dir="ltr">{r.phone_number || '—'}</td>
-                      <td className="py-3 px-3 text-gray-600 text-start whitespace-nowrap">{genderLabel(r.gender, rtl)}</td>
-                      <td className="py-3 px-3 text-start">
-                        <span className="inline-flex items-center justify-center min-w-8 h-7 px-2 rounded-full bg-orange-50 text-orange-600 text-xs font-bold tabular-nums">
-                          {fmtNum(r.subs_count)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-start">
-                        <span className="inline-flex items-center justify-center min-w-8 h-7 px-2 rounded-full bg-sky-50 text-sky-700 text-xs font-bold tabular-nums">
-                          {fmtNum(r.visits)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-start whitespace-nowrap">{endCell(r.active_end_date)}</td>
-                      <td className="py-3 px-3 text-start">{statusCell(r)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* ترقيم + مقاس */}
-            {rows.length > 0 && pagination && (
-              <div className="flex items-center justify-between gap-3 p-4 border-t border-gray-100 flex-wrap">
-                <label className="flex items-center gap-1.5 text-sm text-gray-500">
-                  {rtl ? 'عرض' : 'Show'}
-                  <select
-                    className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm min-h-[40px]"
-                    value={limit}
-                    onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-                  >
-                    <option value={10}>10</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                    <option value={300}>300</option>
-                  </select>
-                </label>
-                {pages > 1 && (
-                  <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
-                    {Array.from({ length: Math.min(pages, 5) }, (_, i) => {
-                      const start = pages <= 5 ? 1 : Math.max(1, Math.min(page - 2, pages - 4));
-                      const p = start + i;
-                      if (p > pages) return null;
-                      return (
-                        <button
-                          key={p}
-                          onClick={() => setPage(p)}
-                          aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
-                          className={`w-9 h-9 rounded-xl text-sm font-medium transition min-w-[44px] ${page === p ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                        >
-                          {p}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                      <option value={10}>10</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={300}>300</option>
+                    </select>
+                  </label>
+                  {pages > 1 && (
+                    <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
+                      {Array.from({ length: Math.min(pages, 5) }, (_, i) => {
+                        const start = pages <= 5 ? 1 : Math.max(1, Math.min(page - 2, pages - 4));
+                        const p = start + i;
+                        if (p > pages) return null;
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setPage(p)}
+                            aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
+                            aria-current={page === p ? 'page' : undefined}
+                            className={`w-9 h-9 rounded-shell text-sm font-medium transition min-w-[44px] ${
+                              page === p
+                                ? 'bg-primary text-primary-foreground'
+                                : 'border border-hairline text-muted-foreground hover:bg-muted'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : undefined
+            }
+          />
         </>
       )}
 

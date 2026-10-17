@@ -9,6 +9,7 @@ import { formatDate, fmtNum, formatTime } from '../../utils/date';
 import { escapeHtml, printDocument } from '../../utils/print';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Spinner from '../../components/ui/Spinner';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
 import {
   Plus,
   FileText,
@@ -88,6 +89,50 @@ export default function ExpensesPage() {
     },
     onError: () => showToast(rtl ? 'فشل إضافة المصروف' : 'Could not add the expense', 'error'),
   });
+
+  // بلا `sortable`: `/api/finance/expenses` بيقبل page/from/to بس، فمفيش ترتيب
+  // حقيقي يعرض عليه (نفس قاعدة جدول المدفوعات والمبيعات).
+  const columns: TableColumn<ExpenseRow>[] = [
+    {
+      id: 'created_at',
+      label: rtl ? 'التاريخ' : 'Date',
+      value: (r) => r.created_at,
+      cell: (r) => <span className="whitespace-nowrap">{formatDate(r.created_at)}</span>,
+    },
+    {
+      id: 'category_name',
+      label: rtl ? 'التصنيف' : 'Category',
+      value: (r) => r.category_name,
+      cell: (r) => (
+        <span className="inline-block rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-table-head">
+          {r.category_name || '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'description',
+      label: rtl ? 'الوصف' : 'Description',
+      value: (r) => r.description,
+      cell: (r) => (
+        <span className="block max-w-[280px] truncate" title={r.description || undefined}>
+          {r.description || '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'staff_name',
+      label: rtl ? 'الموظف' : 'Staff',
+      value: (r) => r.staff_name,
+      cell: (r) => <span>{r.staff_name || '—'}</span>,
+    },
+    {
+      id: 'amount',
+      label: rtl ? 'المبلغ' : 'Amount',
+      numeric: true,
+      value: (r) => Number(r.amount),
+      cell: (r) => <span className="font-bold whitespace-nowrap text-destructive">−{money(r.amount)}</span>,
+    },
+  ];
 
   // §44 — PDF prints exactly the sheet currently on screen (payments rule).
   const exportPdf = () => {
@@ -218,55 +263,36 @@ export default function ExpensesPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-gray-900">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'التاريخ' : 'Date'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'التصنيف' : 'Category'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الوصف' : 'Description'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الموظف' : 'Staff'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'المبلغ' : 'Amount'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(r.created_at)}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-block bg-gray-100 text-gray-600 rounded-full px-2.5 py-1 text-xs font-semibold">
-                          {r.category_name || '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 max-w-[280px] truncate" title={r.description || undefined}>{r.description || '—'}</td>
-                      <td className="px-4 py-3 text-gray-500">{r.staff_name || '—'}</td>
-                      <td className="px-4 py-3 font-bold text-red-600 whitespace-nowrap">−{money(r.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-3 mt-4">
-                <button
-                  onClick={() => setPage((v) => Math.max(1, v - 1))}
-                  disabled={page <= 1}
-                  className="min-h-[44px] px-4 py-1.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-200"
-                >
-                  {rtl ? 'السابق' : 'Prev'}
-                </button>
-                <span className="text-xs text-gray-500">
-                  {rtl ? `صفحة ${page} من ${totalPages}` : `Page ${page} of ${totalPages}`}
-                </span>
-                <button
-                  onClick={() => setPage((v) => Math.min(totalPages, v + 1))}
-                  disabled={page >= totalPages}
-                  className="min-h-[44px] px-4 py-1.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-200"
-                >
-                  {rtl ? 'التالي' : 'Next'}
-                </button>
-              </div>
-            )}
+            <DataTable
+              columns={columns}
+              data={rows}
+              bare
+              footer={
+                totalPages > 1 ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPage((v) => Math.max(1, v - 1))}
+                      disabled={page <= 1}
+                      className="min-h-[44px] rounded-shell border border-hairline bg-card px-4 py-1.5 text-sm font-medium text-table-fg hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {rtl ? 'السابق' : 'Prev'}
+                    </button>
+                    <span className="text-xs text-table-head">
+                      {rtl ? `صفحة ${page} من ${totalPages}` : `Page ${page} of ${totalPages}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPage((v) => Math.min(totalPages, v + 1))}
+                      disabled={page >= totalPages}
+                      className="min-h-[44px] rounded-shell border border-hairline bg-card px-4 py-1.5 text-sm font-medium text-table-fg hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {rtl ? 'التالي' : 'Next'}
+                    </button>
+                  </div>
+                ) : undefined
+              }
+            />
           </>
         )}
       </Panel>

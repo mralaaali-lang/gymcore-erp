@@ -7,6 +7,7 @@ import FilterBar from '../../components/shared/FilterBar';
 import PageLoader from '../../components/shared/PageLoader';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Card from '../../components/ui/Card';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
 import { formatDate, daysUntil } from '../../utils/date';
 import { buildExportMatrix, downloadMatrixXlsx } from '../../utils/csv';
 import { Plus } from '@phosphor-icons/react';
@@ -45,14 +46,9 @@ function calcAge(dob: string): string {
   return `${years}`;
 }
 
-// الأعمدة القابلة للترتيب + الاتجاه الافتراضي الذكي لكل عمود
-// (ينتهي في: الأقرب أولاً؛ الزيارات/آخر زيارة: الأعلى/الأحدث أولاً).
-const SORTABLE: Record<string, { labelAr: string; labelEn: string; def: 'asc' | 'desc' }> = {
-  member_name: { labelAr: 'المشترك', labelEn: 'MEMBER', def: 'asc' },
-  remaining: { labelAr: 'المتبقي', labelEn: 'LEFT', def: 'asc' },
-  last_visit: { labelAr: 'آخر زيارة', labelEn: 'LAST VISIT', def: 'desc' },
-  visits: { labelAr: 'الزيارات', labelEn: 'VISITS', def: 'desc' },
-};
+// الأعمدة القابلة للترتيب هي مفاتيح الـwhitelist في `/api/members` بالظبط
+// (member_name · end_date · remaining · visits · last_visit)، والاتجاه الافتراضي
+// الذكي لكل عمود بيتعمل بـ sortDescFirst جوّه العقد مش بماكينة ترتيب هنا.
 
 export default function MembersPage() {
   const { language } = useApp();
@@ -74,7 +70,7 @@ export default function MembersPage() {
   const [limit, setLimit] = useState(10);
   // الترتيب: العمود + الاتجاه — الافتراضي الأحدث انضمامًا (نفس ترتيب السيرفر القديم).
   const [sort, setSort] = useState('created_at');
-  const [order, setOrder] = useState('desc');
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [editing, setEditing] = useState<MemberResponse | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -193,36 +189,119 @@ export default function MembersPage() {
     }
   };
 
-  // الضغط على عمود مرتّب يعكس الاتجاه، والضغط على عمود جديد يبدأ باتجاهه الذكي.
-  const toggleSort = (key: string) => {
-    if (sort === key) {
-      setOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSort(key);
-      setOrder(SORTABLE[key].def);
-    }
-    setPage(1);
+  // الضغط على رأس مرتّب يعكس الاتجاه ويصفّح من الأول — الماكينة دي كلها بقت
+  // جوّه `ui/DataTable`، والصفحة بتبعت المفتاح للسيرفر بس (manualSorting).
+  const remainingText = (m: MemberResponse, endDays: number | null): string => {
+    if (!m.subscription_end_date) return '—';
+    if (m.subscription_status === 'cancelled') return rtl ? 'ملغي' : 'Cancelled';
+    if (m.subscription_status === 'frozen') return rtl ? 'مجمّد' : 'Frozen';
+    if (m.subscription_status === 'suspended') return rtl ? 'موقوف' : 'Suspended';
+    if (endDays === null || endDays < 0 || m.subscription_status === 'expired') return rtl ? 'منتهي' : 'Expired';
+    return rtl ? `${endDays} يوم` : `${endDays}d`;
   };
 
-  const sortTh = (key: string) => {
-    const cfg = SORTABLE[key];
-    const active = sort === key;
-    return (
-      <th key={key} className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider" aria-sort={active ? (order === 'asc' ? 'ascending' : 'descending') : undefined}>
-        <button
-          type="button"
-          onClick={() => toggleSort(key)}
-          title={rtl ? 'اضغط للترتيب' : 'Click to sort'}
-          className={`inline-flex items-center gap-1 hover:text-gray-900 uppercase ${active ? 'text-emerald-700' : ''}`}
-        >
-          {rtl ? cfg.labelAr : cfg.labelEn}
-          <span className="material-symbols-outlined text-base">
-            {active ? (order === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more'}
+  const isEndingSoon = (m: MemberResponse, endDays: number | null): boolean =>
+    m.subscription_status === 'active' && endDays !== null && endDays <= 7;
+
+  const columns: TableColumn<MemberResponse>[] = [
+    {
+      id: '__n',
+      label: rtl ? 'م' : '#',
+      width: '2.5rem',
+      cell: (_m, i) => (
+        <span className="text-xs text-ink-faint tabular-nums">{(page - 1) * limit + i + 1}</span>
+      ),
+    },
+    {
+      id: 'status',
+      label: rtl ? 'الحالة' : 'Status',
+      width: '8rem',
+      cell: (m) => {
+        const meta = subMeta(m.subscription_status, m.is_blacklisted, rtl);
+        return <StatusBadge status={meta.label} variant={meta.variant} />;
+      },
+    },
+    {
+      // المتبقي = الأيام لحد الانتهاء؛ السيرفر بيرتّبه بنفس عمود end_date.
+      id: 'remaining',
+      label: rtl ? 'المتبقي' : 'Left',
+      sortable: true,
+      numeric: true,
+      width: '6.5rem',
+      value: (m) => m.subscription_end_date,
+      cell: (m) => {
+        const endDays = daysUntil(m.subscription_end_date);
+        return (
+          <span className={isEndingSoon(m, endDays) ? 'font-bold text-destructive' : 'whitespace-nowrap'}>
+            {remainingText(m, endDays)}
           </span>
-        </button>
-      </th>
-    );
-  };
+        );
+      },
+    },
+    {
+      id: 'member_name',
+      key: 'full_name',
+      label: rtl ? 'المشترك' : 'Member',
+      sortable: true,
+      cell: (m) => (
+        <div>
+          <p className="font-semibold text-foreground leading-tight whitespace-nowrap">{m.full_name}</p>
+          <p className="text-xs text-ink-faint whitespace-nowrap">{rtl ? 'كود' : 'Code'} {m.code ?? '—'}</p>
+        </div>
+      ),
+    },
+    {
+      id: 'contact',
+      label: rtl ? 'جهة الاتصال' : 'Contact',
+      cell: (m) =>
+        m.email || m.phone_number ? (
+          // الأرقام والإيميلات LTR بطبيعتها: الاتجاه جوه الخلية، مش اتجاه الجدول.
+          <div dir="ltr" className="space-y-0.5 text-ink-faint">
+            {m.email && <p className="leading-tight">{m.email}</p>}
+            {m.phone_number && <p className="leading-tight">{m.phone_number}</p>}
+          </div>
+        ) : (
+          '—'
+        ),
+    },
+    { id: 'plan', key: 'plan_name', label: rtl ? 'الاشتراك' : 'Plan' },
+    {
+      id: 'end_date',
+      label: rtl ? 'ينتهي في' : 'Ends',
+      sortable: true,
+      width: '8.5rem',
+      value: (m) => m.subscription_end_date,
+      cell: (m) => {
+        const endDays = daysUntil(m.subscription_end_date);
+        return (
+          <span className={isEndingSoon(m, endDays) ? 'font-bold text-destructive whitespace-nowrap' : 'whitespace-nowrap'}>
+            {m.subscription_end_date ? formatDate(m.subscription_end_date) : '—'}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'age',
+      label: rtl ? 'العمر / تاريخ الميلاد' : 'Age / DOB',
+      cell: (m) => (m.birth_date ? `${calcAge(m.birth_date)} · ${formatDate(m.birth_date)}` : '—'),
+    },
+    {
+      id: 'last_visit',
+      label: rtl ? 'آخر زيارة' : 'Last visit',
+      sortable: true,
+      sortDescFirst: true,
+      cell: (m) => (m.last_checkin ? formatDate(m.last_checkin) : '—'),
+    },
+    {
+      id: 'visits',
+      label: rtl ? 'الزيارات' : 'Visits',
+      sortable: true,
+      sortDescFirst: true,
+      numeric: true,
+      value: (m) => Number(m.visit_count ?? 0),
+      cell: (m) => (m.visit_count != null ? Number(m.visit_count) : '—'),
+    },
+  ];
 
   // §34ح — the old six-tab strip (المشتركين/الحضور/الباقات/المحتوى/النمو/
   // الإعدادات) is gone by design: every one of those pages has its own
@@ -358,121 +437,75 @@ export default function MembersPage() {
         </Card>
       )}
 
-      {/* Members Directory Table */}
+      {/* Members Directory Table — صدفة ui/DataTable الواحدة: الحبر من التوكنات،
+          والرؤوس القابلة للضغط هي مفاتيح الـwhitelist في السيرفر بالظبط. */}
       {!loading && members.length > 0 && (
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="members-table">
-            <table className="w-full min-w-[880px] text-sm text-gray-900">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider w-10">#</th>
-                  <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'الحالة' : 'STATUS'}</th>
-                  {sortTh('remaining')}
-                  {sortTh('member_name')}
-                  <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'جهة الاتصال' : 'CONTACT'}</th>
-                  <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'الاشتراك' : 'PLAN'}</th>
-                  <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'ينتهي في' : 'ENDS IN'}</th>
-                  <th className="p-3 text-start font-semibold text-gray-500 uppercase text-xs tracking-wider">{rtl ? 'العمر / تاريخ الميلاد' : 'AGE / DOB'}</th>
-                  {sortTh('last_visit')}
-                  {sortTh('visits')}
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((m, idx) => {
-                  const meta = subMeta(m.subscription_status, m.is_blacklisted, rtl);
-                  const endDays = daysUntil(m.subscription_end_date);
-                  const endSoon = m.subscription_status === 'active' && endDays !== null && endDays <= 7;
-                  return (
-                    <tr
-                      key={m.id}
-                      className="border-t border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => setEditing(m)}
-                      title={rtl ? 'اضغط للتعديل السريع' : 'Click for quick edit'}
-                    >
-                      <td className="p-3 text-start text-gray-400 tabular-nums text-xs">
-                        {(page - 1) * limit + idx + 1}
-                      </td>
-                      <td className="p-3 text-start">
-                        <StatusBadge status={meta.label} variant={meta.variant} />
-                      </td>
-                      <td className={`p-3 text-start whitespace-nowrap tabular-nums ${endSoon ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                        {(() => {
-                          if (!m.subscription_end_date) return '—';
-                          if (m.subscription_status === 'cancelled') return rtl ? 'ملغي' : 'Cancelled';
-                          if (m.subscription_status === 'frozen') return rtl ? 'مجمّد' : 'Frozen';
-                          if (m.subscription_status === 'suspended') return rtl ? 'موقوف' : 'Suspended';
-                          if (endDays === null || endDays < 0 || m.subscription_status === 'expired') return rtl ? 'منتهي' : 'Expired';
-                          return rtl ? `${endDays} يوم` : `${endDays}d`;
-                        })()}
-                      </td>
-                      <td className="p-3 text-start">
-                        <p className="font-semibold text-gray-900 leading-tight whitespace-nowrap">{m.full_name}</p>
-                        <p className="text-xs text-gray-500 whitespace-nowrap">{rtl ? 'كود' : 'Code'} {m.code ?? '—'}</p>
-                      </td>
-                      <td className={`p-3 text-gray-500 ${rtl ? 'text-right' : 'text-left'}`}>
-                        <div dir="ltr">
-                          {m.email && <p className="leading-tight">{m.email}</p>}
-                          {m.phone_number && <p className="leading-tight">{m.phone_number}</p>}
-                          {!m.email && !m.phone_number && <span>-</span>}
-                        </div>
-                      </td>
-                      <td className="p-3 text-start text-gray-500">{m.plan_name || '-'}</td>
-                      <td className={`p-3 text-start whitespace-nowrap ${endSoon ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                        {m.subscription_end_date ? formatDate(m.subscription_end_date) : '-'}
-                      </td>
-                      <td className="p-3 text-start text-gray-500 whitespace-nowrap">
-                        {m.birth_date ? `${calcAge(m.birth_date)} · ${formatDate(m.birth_date)}` : '-'}
-                      </td>
-                      <td className="p-3 text-start text-gray-500 whitespace-nowrap">{formatDate(m.last_checkin)}</td>
-                      <td className="p-3 text-start text-gray-500 tabular-nums">{m.visit_count != null ? Number(m.visit_count) : '-'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between gap-3 p-4 border-t border-gray-100 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500">
-                {rtl ? `${total} مشترك` : `${total} member${total !== 1 ? 's' : ''}`}
-              </span>
-              <label className="flex items-center gap-1.5 text-sm text-gray-500">
-                {rtl ? 'عرض' : 'Show'}
-                <select
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm min-h-[40px]"
-                  value={limit}
-                  onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-                >
-                  <option value={10}>10</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value={300}>300</option>
-                </select>
-              </label>
-            </div>
-            {pages > 1 && (
-              <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
-                {Array.from({ length: Math.min(pages, 5) }, (_, i) => {
-                  const start = pages <= 5 ? 1 : Math.max(1, Math.min(page - 2, pages - 4));
-                  const p = start + i;
-                  if (p > pages) return null;
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => setPage(p)}
-                      aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
-                      className={`w-9 h-9 rounded-xl text-sm font-medium transition min-w-[44px] ${page === p ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
+        <DataTable
+          columns={columns}
+          data={members}
+          manualSorting
+          sorting={[{ id: sort, desc: order === 'desc' }]}
+          onSortingChange={(next) => {
+            const picked = next[0];
+            if (!picked) return;
+            setSort(picked.id);
+            setOrder(picked.desc ? 'desc' : 'asc');
+            setPage(1);
+          }}
+          onRowClick={(m) => setEditing(m)}
+          rowTitle={() => (rtl ? 'اضغط للتعديل السريع' : 'Click for quick edit')}
+          // نفس أرضية العرض القديمة (min-w-[880px] + 16px على الموبايل) من غير
+          // غلاف .members-table: الصدفة والصندوق المتحرك بقوا ملك المكوّن.
+          minWidth="880px"
+          className="max-md:text-base"
+          footer={
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {rtl ? `${total} مشترك` : `${total} member${total !== 1 ? 's' : ''}`}
+                </span>
+                <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  {rtl ? 'عرض' : 'Show'}
+                  <select
+                    className="rounded-shell border border-hairline bg-card px-2 py-1.5 text-sm min-h-[40px]"
+                    value={limit}
+                    onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={300}>300</option>
+                  </select>
+                </label>
               </div>
-            )}
-          </div>
-        </div>
+              {pages > 1 && (
+                <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
+                  {Array.from({ length: Math.min(pages, 5) }, (_, i) => {
+                    const start = pages <= 5 ? 1 : Math.max(1, Math.min(page - 2, pages - 4));
+                    const p = start + i;
+                    if (p > pages) return null;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPage(p)}
+                        aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
+                        aria-current={page === p ? 'page' : undefined}
+                        className={`w-9 h-9 rounded-shell text-sm font-medium transition min-w-[44px] ${
+                          page === p
+                            ? 'bg-primary text-primary-foreground'
+                            : 'border border-hairline text-muted-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          }
+        />
       )}
 
       {editing && (

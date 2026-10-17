@@ -34,7 +34,8 @@ export interface TableColumn<T> {
   /** Which direction the first click applies. Defaults to ascending. */
   sortDescFirst?: boolean;
   align?: 'start' | 'center' | 'end';
-  /** Money, counts, ids: right-aligned in both directions, so digits form a column. */
+  /** Money, counts, ids: pushed to the end edge in both directions plus
+   * tabular figures, so the digits of one column stack on the same edge. */
   numeric?: boolean;
   width?: string;
   headerClassName?: string;
@@ -47,6 +48,9 @@ export interface DataTableProps<T> {
   /** Defaults to `row.id`, then the row index. */
   rowKey?: (row: T, index: number) => string;
   onRowClick?: (row: T) => void;
+  /** Hover hint on a clickable row — the per-row `title` the hand-rolled
+   * tables used for "اضغط للتعديل السريع". Only meaningful with `onRowClick`. */
+  rowTitle?: (row: T) => string | undefined;
   /**
    * Controlled sorting, for the screens where the SERVER re-runs the query
    * (the `/api/members` whitelist). Pair it with `manualSorting`.
@@ -67,6 +71,12 @@ export interface DataTableProps<T> {
   footer?: ReactNode;
   /** Scroll body (e.g. `max-h-80`) with a sticky header. Omit for auto height. */
   maxHeight?: string;
+  /**
+   * Floor for the `<table>` itself (e.g. `880px`). The shell already scrolls
+   * horizontally, so this is how a ten-column grid keeps its shape on a phone
+   * instead of crushing every cell.
+   */
+  minWidth?: string;
   dense?: boolean;
   /**
    * Drop the card (keyline, radius, surface) so the table can live inside a
@@ -87,8 +97,18 @@ const ALIGN: Record<NonNullable<TableColumn<unknown>['align']>, string> = {
   end: 'text-end',
 };
 
+/** End edge + equal-width digits: the two things a column of numbers needs. */
+const NUMERIC = 'text-end tabular-nums';
+
 /** The dash every empty cell shows. Same glyph the previous DataTable settled on. */
 const DASH = '—';
+
+/** Explicit `align` wins; otherwise a numeric column goes to the end edge. */
+function alignFor(def: { align?: TableColumn<unknown>['align']; numeric?: boolean }): string {
+  if (def.align) return ALIGN[def.align];
+  if (def.numeric) return NUMERIC;
+  return 'text-start';
+}
 
 function readValue<T>(col: TableColumn<T>, row: T): unknown {
   if (col.value) return col.value(row);
@@ -120,12 +140,14 @@ export default function DataTable<T>({
   data,
   rowKey,
   onRowClick,
+  rowTitle,
   sorting,
   onSortingChange,
   manualSorting = false,
   empty,
   footer,
   maxHeight,
+  minWidth,
   dense = false,
   bare = false,
   className = '',
@@ -197,7 +219,7 @@ export default function DataTable<T>({
         className,
       )}
     >
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full border-collapse text-sm" style={minWidth ? { minWidth } : undefined}>
         <thead>
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id} className="bg-muted">
@@ -225,7 +247,7 @@ export default function DataTable<T>({
                     className={cn(
                       'whitespace-nowrap border-b border-hairline text-xs font-semibold text-table-head',
                       headPad,
-                      def?.align ? ALIGN[def.align] : def?.numeric ? 'text-end' : 'text-start',
+                      alignFor(def ?? {}),
                       def?.headerClassName,
                       maxHeight && 'sticky top-0 z-10 bg-muted',
                     )}
@@ -258,6 +280,7 @@ export default function DataTable<T>({
             <tr
               key={row.id}
               onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+              title={onRowClick ? rowTitle?.(row.original) : undefined}
               className={cn(
                 'border-b border-hairline transition-colors duration-150 last:border-b-0 hover:bg-muted/50',
                 onRowClick && 'cursor-pointer',
@@ -271,7 +294,7 @@ export default function DataTable<T>({
                     className={cn(
                       'text-table-fg',
                       bodyPad,
-                      def?.align ? ALIGN[def.align] : def?.numeric ? 'text-end' : 'text-start',
+                      alignFor(def ?? {}),
                       def?.cellClassName,
                     )}
                   >

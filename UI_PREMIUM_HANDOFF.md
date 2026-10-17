@@ -16,10 +16,13 @@
 | `51f1e9d` | المرحلة 2: عائلة `Skeleton` + `CountUp` (61 موضع skeleton، والـKPI بيعدّ) |
 | `104954d` | المرحلة 3 دفعة 1: الداكن + جسر الكلاسات الحرفية + محرك السمة |
 | HEAD بعد `104954d` | المرحلة 4 دفعة 1: `shared/Modal` + `shadcn/dropdown-menu` على رادكس — 7 مودالات + قائمتين (الدليل: `LOCAL_TESTING_REPORT.md` §المرحلة 4) |
-| HEAD بعد تلك (المرحلة 5 دفعة 1) | `ui/DataTable` من جديد فوق `@tanstack/react-table` — MemberList · SalesPage · CashboxPage، وترتيب من السيرفر على اللي يقبله (الدليل: §المرحلة 5) |
+| `1636b8d` | المرحلة 5 دفعة 1: `ui/DataTable` من جديد فوق `@tanstack/react-table` — MemberList · SalesPage · CashboxPage، وترتيب من السيرفر على اللي يقبله (الدليل: §المرحلة 5) |
+| `f505ce9` | إصلاح سطرين مكسورين في السيرفر جوه دفعة غير مُcommitة (`let total` في `createSale` + استيراد `execSync` في `backup.ts`) — كان بيوقّع `tsc` الخلفي |
+| HEAD بعد `f505ce9` | المرحلة 5 دفعة 2: MembersPage · MembersReport · PaymentsPage · ExpensesPage على العقد نفسه، + `numeric`/`rowTitle`/`minWidth`، وحذف `.members-table` الميتة، وقياس حيّ على متصفح حقيقي في الوضعين |
 
-**الحالة:** المرحلة 0 و1 و3 (بنية) و4 (دفعة 1) و5 (دفعة 1) تمام. المرحلة 2 خلصت ما عدا التوستات
-(لها ملف تسليم مستقل: `TASK_TOASTS_SONNER.md`). المتبقي: **المرحلة 6** + تكملة 4 و5 — تفصيلها في §4.
+**الحالة:** المرحلة 0 و1 و3 (بنية) و4 (دفعة 1) و5 (دفعتين) تمام. المرحلة 2 خلصت ما عدا التوستات
+(لها ملف تسليم مستقل: `TASK_TOASTS_SONNER.md`). المتبقي: **المرحلة 6** + تكملة 4 (32 صفحة لسه
+`fixed inset-0` يدوي) و5 (51 ملف فيه `<table>`) — تفصيلها في §4.
 
 ---
 
@@ -79,7 +82,7 @@ src/components/layout/ThemeControl.tsx · src/context/ThemeContext.tsx
   الملفات التلاتة معاه (وإلا يبقى في الملف نمطان)، ولأن `ThemeControl` كان بيعيد نفس
   مستمعات `mousedown/Escape` اللي القائمة بتعملهم.
 
-### المرحلة 5 — `@tanstack/react-table` على 3 شاشات حصراً (خلصت دفعة 1)
+### المرحلة 5 — `@tanstack/react-table` (خلصت دفعة 1 + دفعة 2)
 
 - الشاشات المتحوّلة: `MemberList` · `SalesPage` · `CashboxPage` (جدول اليوم في اللوحتين + لوحة
   البحث المتقدم). المكوّن: `src/components/ui/DataTable.tsx` فوق `@tanstack/react-table@8.21.3`
@@ -95,13 +98,20 @@ src/components/layout/ThemeControl.tsx · src/context/ThemeContext.tsx
     177 مقابل 177 على عرض 900px) فمفيش قفز — بس الرقم ده صح **لأن عرض الحاوية مربوط حرفياً**:
     الـviewport بتاع بيئة التحقق `innerWidth = 0` والأرقام من غيره مغلوطة.
   - `react-virtual` مش مثبتة ولا لزم: مفيش شاشة في التلاتة بتعرض أكثر من 20 صف.
-- **الباقي من المرحلة 5 (المرشّح التاني، بنفس المكوّن وبنفس السطر):** `MembersPage` — هي شاشة
-  الأدمن و**موجودة فيها يدويًا نفس ماكينة الترتيب** (`SORTABLE` + `toggleSort` + `aria-sort` +
-  أزرار في الـ`<th>`)، فتحويلها يشيل ~90 سطر مكرر ويوحّد السلوك مع `MemberList`، وبعدها
-  `MembersReport`/`PaymentsPage`/`ExpensesPage` (نفس وصف الـ`<th>` المكرر). الرقم المقاس دلوقتي:
-  55 ملف لسه فيه `<table>` يدوي.
-- **ممنوع تعميمها على الـ55 ملف** في دفعة — تحويل الكل شهر، والدفعات تُقاس بالشاشة اللي بتلمسها
-  المرحلة 6.
+- **دفعة 2 (2026-10-17) خلّصت المرشّحين التانين:** `MembersPage` (إزالة `SORTABLE`/`toggleSort`/
+  `sortTh` اليدوية كلها، ~90 سطر مكرر) · `MembersReport` · `PaymentsPage` · `ExpensesPage`. مجموع
+  المتحوّل الآن **7 شاشات**، و`DataTable` بقى عنده 3 إضافات من شغل الميدان: `numeric` (نهاية +
+  `tabular-nums` افتراضيًا)، `rowTitle` (الـ`title` اللي كان على كل `<tr>`)، `minWidth` (880/900px
+  بدل قاعدة `.members-table` في `index.css` — اتحذفت مع كل مواضع استخدامها). الترتيب متوثّق مقابل كل endpoint:
+  `reports/members` 4 أعمدة من `SORTS` البيضا، و`payments`/`expenses` **صفر** زرار لأن السيرفر
+  ما بيقبلش `sort` خالص. القياس بقى **حيًّا على متصفح حقيقي** (جولة `npm run dev` :9100 + باكند
+  :4000 بجلسة مديرة) بدل حاوية `vite preview`: خلايا `rgb(74,66,57)`/`rgb(238,240,232)`، ضغطة رأس
+  فعلية → `sort=member_name&order=asc` [200] و`sort=remaining&order=asc` [200]، مؤشر نحاسي
+  `rgb(166,124,46)`/`rgb(216,178,106)`. طلع منها عيب تباين واحد اتصلّح: `bg-brass-soft text-pine`
+  = **2.66** في الداكن → `dark:text-foreground` = **5.83**. المتبقي من النمط اليدوي: **51 ملف فيه
+  `<table>`** — والمرحلة 5 دي مش هتتعمم في دفعة واحدة.
+- **ممنوع تعميمها على الباقي (51 ملف)** في دفعة واحدة — تحويل الكل شهر، والدفعات تُقاس بالشاشة اللي
+  بتلمسها المرحلة 6.
 
 ### المرحلة 6 — نماذج / بحث / POS / حيّ
 
@@ -181,6 +191,22 @@ src/components/layout/ThemeControl.tsx · src/context/ThemeContext.tsx
     `/api/members` عنده whitelist من ست مفاتيح (`member_name|created_at|end_date|remaining|
     visits|last_visit`). عمود مش في المفيدين = `sortable:false`؛ لو محتاجة ترتيب له، يتعمل
     مفتاح عند السيرفر (قاعدة «ممنوع mocks») مش reduce في المتصفح.
+17. **`bg-brass-soft text-pine` كذاب في الداكن:** المتغيّر الداكن `#6b5a33` مفتاح hover مش خلفية
+    نص، والاقتران طالع **2.66** مقيس computed رغم إن نفس الكلاس في الفاتح = **9.96**. أي شارة/أفاتار
+    `bg-brass-soft` فيه نص يحتاج `dark:text-foreground` (5.83). اتصلّح في `MembersReport`، ولسه
+    موجود في `MemberList` (أفاتار الحرف الأول).
+18. **المتصفح الحقيقي ليه عقد مخصوصة (اكتُشفت في قياس دفعة 2):** نقرة MCP على زرار `submit`
+    **ما بتشغّلش** معالج React — القيم اتحطّت والنقر حصل ومع ذلك مفيش أي `POST /auth/login` في
+    الشبكة؛ الحل `form.requestSubmit()` من `evaluate_script` (بينما `.click()` على أزرار رءوس
+    الجدول وروابط السايدبار بيشتغل عادي). والتاني: `grep` من الشيل بياكل escape كلاسات Tailwind
+    (`hover\:bg-muted`، `max-md\:text-base`، `dark\:text-foreground`) و بيرجع **false-negative** —
+    افحصي `dist/assets/*.css` بـnode `indexOf`.
+19. **البيئة مش محتكرة لجلستك:** في نص القياس الحيّ رجعت كل الجلسات `Session has been revoked`
+    وفاضت قاعدة الأعضاء (`/api/members` → `total: 0`) لأن جلسة موازية شغّالة على نفس الـDB،
+    والباكند native بيقود كرونو `subscriptionCleanup`/`subscriptionEnforcement` على نفس البيانات.
+    اللوجاوت كمان بيمسح `localStorage` كلها — بمن فيهم `gymcore-theme` (فالرجوع light مش عيب في
+    الثيم). أي قياس حي: سجّلي دخولًا من جديد أولًا، واقرئي الاستجابة بـ`fetch` بنفس الجلسة قبل ما
+    تستنتجي من الـDOM.
 
 ---
 
@@ -230,17 +256,18 @@ src/services/api.ts
 
 ## 10) نقطة البداية
 
-1. اقرئي `AGENT_HANDOVER.md` §5 (بند **1ح** للمنبثقات وبند **1ط** الجديد للجداول) و§6، ثم
-   `LOCAL_TESTING_REPORT.md` §المرحلة 4 و§المرحلة 5.
-2. **تكملة المرحلة 5 (دفعة 2) — المرشّح الواضح: `MembersPage`.** دي شاشة الأدمن، وفيها يدويًا
-   نفس ماكينة الترتيب اللي بقى في `DataTable` (`SORTABLE` + `toggleSort` + `aria-sort` + أزرار
-   `<th>`)، فتحويلها يشيل ~90 سطر مكرر ويوحّد السلوك مع `MemberList` (نفس الـwhitelist، ونفس
-   العمودين المرتَّبين). بعدها بالترتيب: `MembersReport` · `PaymentsPage` · `ExpensesPage`.
-   مفيش الحزمة هنشتري حاجة — `@tanstack/react-table@8.21.3` مثبتة.
+1. اقرئي `AGENT_HANDOVER.md` §5 (بند **1ح** للمنبثقات وبند **1ط** للجداول) و§6، ثم
+   `LOCAL_TESTING_REPORT.md` §المرحلة 4 و§المرحلة 5 (بدفعتَيها).
+2. **المرحلة 5 دفعة 2 خلصت** (MembersPage · MembersReport · PaymentsPage · ExpensesPage، و`index.css`
+   اتنضّف من `.members-table`). المرشّحين التالين بنفس العقد لو عايزة تكملي في الجدول: شاشات
+   الفواتير والديون والمشتريات — وكل واحدة لازم تتقارن مع whitelist الترتيب بتاع endpointها الأول
+   (`/api/finance/*` كلها ما بتقبلش `sort`). **مطلوب قرار/عمل بسيط معلّق:** إعادة قياس شارة العدّ
+   في الداكن على صفوف حقيقية (الجلسة سقطت في نصها)، وسطر `dark:text-foreground` في `MemberList`
+   (عيب 2.62 الموثّق في §6 بند 17) — ده محتاج موافقة المالك لأنه برة نطاق الدفعة اللي اتعملت.
 3. **أو المرحلة 6** (RHF+zod للنماذج الكبيرة · cmdk — مش قبل endpoint بحث حقيقي · POS touch
    grid · live pulse فوق الـWebSocket الموجود). `react-hook-form` و`zod` لسه **غير مثبتين**.
-4. **المتبقي من المرحلة 4 (موثّق، مؤجّل):** 36 ملف / 46 موضعًا لسه `fixed inset-0` يدوي —
-   تتحوّل مع الشاشات اللي بتلمسها الدفعات، مش دفعة واحدة.
+4. **المتبقي من المرحلة 4 (موثّق، مؤجّل):** مقاس بعد دفعة 2 — **32 ملف / 41 موضعًا** لسه
+   `fixed inset-0` يدوي في `src/pages` — تتحوّل مع الشاشات اللي بتلمسها الدفعات، مش دفعة واحدة.
 5. قرارين §5 معلّقين على صاحب المشروع (تباين `text-gray-400` في الفاتح = 2.54، والأبيض فوق
    `#10b981` = 2.54) — متستناش عليهم في شغل تاني، ومتنفّذيش واحد منهم لوحدك.
 6. قبل أي قياس في بيئة التحقق: اربطي عرضاً حرفياً للحاوية (`innerWidth = 0`) وانتظري بـ
