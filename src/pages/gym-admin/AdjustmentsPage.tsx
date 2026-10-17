@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Plus, X, Trash as Trash2, Bank as Banknote } from '@phosphor-icons/react';
+import { ArrowRight, Plus, Trash as Trash2, Bank as Banknote } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -13,6 +13,7 @@ import {
 } from '../../services/api';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import { StaffAvatar } from './HrMainPage';
+import Modal from '../../components/shared/Modal';
 import PageLoader from '../../components/shared/PageLoader';
 
 // ====================================================================
@@ -205,49 +206,86 @@ export default function AdjustmentsPage() {
 
       {/* إضافة */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">{rtl ? 'حركة جديدة' : 'New entry'}</h2>
-              <button onClick={() => setShowForm(false)} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
-            </div>
-            <div className="space-y-3">
-              <select value={fStaff} onChange={(e) => setFStaff(e.target.value)} className={inputCls}>
-                <option value="">{rtl ? 'الموظف *' : 'Staff *'}</option>
-                {staff.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-              </select>
-              <select value={fKind} onChange={(e) => setFKind(e.target.value)} className={inputCls}>
-                <option value="bonus">{rtl ? 'مكافأة (+)' : 'Bonus (+)'}</option>
-                <option value="deduction">{rtl ? 'خصم (−)' : 'Deduction (−)'}</option>
-                <option value="advance">{rtl ? 'سلفة (تُسدد بالتقسيط)' : 'Advance (installments)'}</option>
-              </select>
-              <input type="number" min={0} value={fAmount} onChange={(e) => setFAmount(e.target.value)} className={inputCls} placeholder={rtl ? 'المبلغ *' : 'Amount *'} />
-              {fKind === 'advance' && (
-                <input type="number" min={0} value={fInst} onChange={(e) => setFInst(e.target.value)} className={inputCls}
-                  placeholder={rtl ? 'القسط الشهري (فارغ = الكل)' : 'Monthly installment (empty = all)'} />
-              )}
-              <input value={fReason} onChange={(e) => setFReason(e.target.value)} className={inputCls} placeholder={rtl ? 'السبب' : 'Reason'} />
-              <button onClick={() => create.mutate()} disabled={!fStaff || !fAmount || Number(fAmount) <= 0 || create.isPending}
-                className="w-full min-h-[48px] rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold disabled:opacity-50">
-                {rtl ? 'إضافة' : 'Add'}
+        <Modal
+          open
+          onClose={() => setShowForm(false)}
+          size="md"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={create.isPending}
+          title={rtl ? 'حركة جديدة' : 'New entry'}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                disabled={create.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+              >
+                {rtl ? 'إلغاء' : 'Cancel'}
               </button>
-            </div>
+              <button
+                type="button"
+                onClick={() => create.mutate()}
+                disabled={!fStaff || !fAmount || Number(fAmount) <= 0 || create.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition disabled:opacity-50"
+              >
+                {create.isPending ? (rtl ? 'جارٍ الإضافة…' : 'Adding…') : (rtl ? 'إضافة' : 'Add')}
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <select value={fStaff} onChange={(e) => setFStaff(e.target.value)} className={inputCls}>
+              <option value="">{rtl ? 'الموظف *' : 'Staff *'}</option>
+              {staff.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+            </select>
+            <select value={fKind} onChange={(e) => setFKind(e.target.value)} className={inputCls}>
+              <option value="bonus">{rtl ? 'مكافأة (+)' : 'Bonus (+)'}</option>
+              <option value="deduction">{rtl ? 'خصم (−)' : 'Deduction (−)'}</option>
+              <option value="advance">{rtl ? 'سلفة (تُسدد بالتقسيط)' : 'Advance (installments)'}</option>
+            </select>
+            <input type="number" min={0} value={fAmount} onChange={(e) => setFAmount(e.target.value)} className={inputCls} placeholder={rtl ? 'المبلغ *' : 'Amount *'} />
+            {fKind === 'advance' && (
+              <input type="number" min={0} value={fInst} onChange={(e) => setFInst(e.target.value)} className={inputCls}
+                placeholder={rtl ? 'القسط الشهري (فارغ = الكل)' : 'Monthly installment (empty = all)'} />
+            )}
+            <input value={fReason} onChange={(e) => setFReason(e.target.value)} className={inputCls} placeholder={rtl ? 'السبب' : 'Reason'} />
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* سداد سلفة */}
       {repayId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setRepayId(null)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xs p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-gray-900 mb-4">{rtl ? 'تسجيل سداد' : 'Record repayment'}</h2>
-            <input type="number" min={0} autoFocus value={repayAmt} onChange={(e) => setRepayAmt(e.target.value)} className={inputCls} placeholder="0" />
-            <button onClick={() => repay.mutate()} disabled={!repayAmt || Number(repayAmt) <= 0 || repay.isPending}
-              className="mt-3 w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold disabled:opacity-50">
-              {rtl ? 'تأكيد' : 'Confirm'}
-            </button>
-          </div>
-        </div>
+        <Modal
+          open
+          onClose={() => setRepayId(null)}
+          size="sm"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={repay.isPending}
+          title={rtl ? 'تسجيل سداد' : 'Record repayment'}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setRepayId(null)}
+                disabled={repay.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+              >
+                {rtl ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => repay.mutate()}
+                disabled={!repayAmt || Number(repayAmt) <= 0 || repay.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition disabled:opacity-50"
+              >
+                {repay.isPending ? (rtl ? 'جارٍ التأكيد…' : 'Saving…') : (rtl ? 'تأكيد' : 'Confirm')}
+              </button>
+            </>
+          }
+        >
+          <input type="number" min={0} autoFocus value={repayAmt} onChange={(e) => setRepayAmt(e.target.value)} className={inputCls} placeholder="0" />
+        </Modal>
       )}
     </div>
   );

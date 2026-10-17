@@ -13,6 +13,7 @@ import { formatMoney } from '../../utils/currency';
 import StatsGrid from '../../components/shared/StatsGrid';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
 import PageLoader from '../../components/shared/PageLoader';
+import Modal from '../../components/shared/Modal';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -202,22 +203,49 @@ function ClassModal({ open, editing, defaultDateKey, coaches, rtl, onClose }: Cl
     });
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-3xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6"
-        onClick={(e) => e.stopPropagation()}
-        dir={rtl ? 'rtl' : 'ltr'}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-gray-900">
-            {editing ? (rtl ? 'تعديل الحصة' : 'Edit Class') : (rtl ? 'إضافة حصة' : 'Add Class')}
-          </h3>
-          <button type="button" onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-50" aria-label="close">
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        </div>
+  const busy = saveMutation.isPending || cancelMutation.isPending || deleteMutation.isPending;
 
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      dir={rtl ? 'rtl' : 'ltr'}
+      disableDismiss={busy}
+      title={editing ? (rtl ? 'تعديل الحصة' : 'Edit Class') : (rtl ? 'إضافة حصة' : 'Add Class')}
+      footer={
+        <>
+          <Button variant="outline" className="min-h-[48px]" onClick={onClose} disabled={busy}>
+            {rtl ? 'إلغاء' : 'Cancel'}
+          </Button>
+          {editing && (
+            <>
+              <Button variant="outline" className="min-h-[48px]" onClick={() => cancelMutation.mutate(!editing.is_cancelled)} disabled={cancelMutation.isPending || saveMutation.isPending}>
+                {editing.is_cancelled ? (rtl ? 'إرجاع نشطة' : 'Reactivate') : (rtl ? 'إلغاء الحصة' : 'Cancel class')}
+              </Button>
+              {editing.booked === 0 ? (
+                confirmDelete ? (
+                  <Button variant="ghost" className="min-h-[48px] text-red-600" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending || saveMutation.isPending}>
+                    {rtl ? 'تأكيد الحذف' : 'Confirm delete'}
+                  </Button>
+                ) : (
+                  <Button variant="ghost" className="min-h-[48px] text-red-600" onClick={() => setConfirmDelete(true)} disabled={busy}>
+                    {rtl ? 'حذف' : 'Delete'}
+                  </Button>
+                )
+              ) : (
+                <span className="text-xs text-gray-400">
+                  {rtl ? 'لا يُحذف — عليه حجوزات (استخدم الإلغاء)' : 'Has bookings — use cancel'}
+                </span>
+              )}
+            </>
+          )}
+          <Button className="min-h-[48px]" onClick={handleSave} disabled={busy}>
+            {saveMutation.isPending ? (rtl ? 'جارٍ الحفظ…' : 'Saving…') : (rtl ? 'حفظ' : 'Save')}
+          </Button>
+        </>
+      }
+    >
         <div className="space-y-4">
           <div>
             <label className={labelClass}>{rtl ? 'اسم الحصة' : 'Title'}</label>
@@ -261,39 +289,8 @@ function ClassModal({ open, editing, defaultDateKey, coaches, rtl, onClose }: Cl
                 : `Confirmed bookings: ${editing.booked} — ${editing.is_cancelled ? 'cancelled' : 'active'}`}
             </p>
           )}
-
-          <div className="flex flex-wrap items-center gap-2 pt-2">
-            <Button onClick={handleSave} disabled={saveMutation.isPending}>
-              {saveMutation.isPending
-                ? (rtl ? 'جارٍ الحفظ...' : 'Saving...')
-                : (rtl ? 'حفظ' : 'Save')}
-            </Button>
-            {editing && (
-              <>
-                <Button variant="outline" onClick={() => cancelMutation.mutate(!editing.is_cancelled)} disabled={cancelMutation.isPending}>
-                  {editing.is_cancelled ? (rtl ? 'إرجاع نشطة' : 'Reactivate') : (rtl ? 'إلغاء الحصة' : 'Cancel class')}
-                </Button>
-                {editing.booked === 0 ? (
-                  confirmDelete ? (
-                    <Button variant="ghost" className="text-red-600" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
-                      {rtl ? 'تأكيد الحذف' : 'Confirm delete'}
-                    </Button>
-                  ) : (
-                    <Button variant="ghost" className="text-red-600" onClick={() => setConfirmDelete(true)}>
-                      {rtl ? 'حذف' : 'Delete'}
-                    </Button>
-                  )
-                ) : (
-                  <span className="text-xs text-gray-400">
-                    {rtl ? 'لا يُحذف — عليه حجوزات (استخدم الإلغاء)' : 'Has bookings — use cancel'}
-                  </span>
-                )}
-              </>
-            )}
-          </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

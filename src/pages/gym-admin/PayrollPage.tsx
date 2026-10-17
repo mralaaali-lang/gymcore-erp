@@ -12,6 +12,7 @@ import {
 } from '../../services/api';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import { StaffAvatar } from './HrMainPage';
+import Modal from '../../components/shared/Modal';
 import PageLoader from '../../components/shared/PageLoader';
 import StatusBadge from '../../components/ui/StatusBadge';
 
@@ -206,38 +207,78 @@ export default function PayrollPage() {
 
       {/* إنشاء كشف */}
       {showGen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowGen(false)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xs p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-gray-900 mb-4">{rtl ? 'إنشاء كشف' : 'Generate run'}</h2>
-            <input type="month" value={genMonth} onChange={(e) => setGenMonth(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm outline-none" />
-            <p className="mt-2 text-xs text-gray-400">{rtl ? 'يلتقط النشطين وقت التوليد فقط.' : 'Snapshots active staff only.'}</p>
-            <button onClick={() => gen.mutate()} disabled={!genMonth || gen.isPending}
-              className="mt-4 w-full min-h-[48px] rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold disabled:opacity-50">
-              {rtl ? 'إنشاء' : 'Generate'}
-            </button>
-          </div>
-        </div>
+        <Modal
+          open
+          onClose={() => setShowGen(false)}
+          size="sm"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={gen.isPending}
+          title={rtl ? 'إنشاء كشف' : 'Generate run'}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setShowGen(false)}
+                disabled={gen.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+              >
+                {rtl ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => gen.mutate()}
+                disabled={!genMonth || gen.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold transition disabled:opacity-50"
+              >
+                {gen.isPending ? (rtl ? 'جارٍ الإنشاء…' : 'Generating…') : (rtl ? 'إنشاء' : 'Generate')}
+              </button>
+            </>
+          }
+        >
+          <input type="month" value={genMonth} onChange={(e) => setGenMonth(e.target.value)}
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-ring" />
+          <p className="mt-2 text-xs text-gray-400">{rtl ? 'يلتقط النشطين وقت التوليد فقط.' : 'Snapshots active staff only.'}</p>
+        </Modal>
       )}
 
       {/* الصرف */}
       {showPay && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowPay(null)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xs p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-gray-900 mb-1">{rtl ? 'صرف الرواتب' : 'Pay out'}</h2>
-            <p className="text-xs text-gray-400 mb-4">{rtl ? 'يولّد حركة خزنة واحدة بإجمالي الصافي.' : 'Books one cashbox expense for the net total.'}</p>
-            <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm outline-none mb-3">
-              <option value="cash">{rtl ? 'نقدي' : 'Cash'}</option>
-              <option value="card">{rtl ? 'بطاقة' : 'Card'}</option>
-              <option value="bank">{rtl ? 'تحويل' : 'Bank'}</option>
-            </select>
-            <button onClick={() => pay.mutate()} disabled={pay.isPending}
-              className="w-full min-h-[48px] rounded-xl bg-gray-900 text-white text-sm font-bold disabled:opacity-50">
-              {rtl ? 'تأكيد الصرف' : 'Confirm payout'}
-            </button>
-          </div>
-        </div>
+        <Modal
+          open
+          onClose={() => setShowPay(null)}
+          size="sm"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={pay.isPending}
+          title={rtl ? 'صرف الرواتب' : 'Pay out'}
+          description={rtl ? 'يولّد حركة خزنة واحدة بإجمالي الصافي.' : 'Books one cashbox expense for the net total.'}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setShowPay(null)}
+                disabled={pay.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+              >
+                {rtl ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => pay.mutate()}
+                disabled={pay.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-gray-900 text-white text-sm font-bold transition disabled:opacity-50"
+              >
+                {pay.isPending ? (rtl ? 'جارٍ الصرف…' : 'Paying…') : (rtl ? 'تأكيد الصرف' : 'Confirm payout')}
+              </button>
+            </>
+          }
+        >
+          <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)}
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-ring">
+            <option value="cash">{rtl ? 'نقدي' : 'Cash'}</option>
+            <option value="card">{rtl ? 'بطاقة' : 'Card'}</option>
+            <option value="bank">{rtl ? 'تحويل' : 'Bank'}</option>
+          </select>
+        </Modal>
       )}
     </div>
   );
