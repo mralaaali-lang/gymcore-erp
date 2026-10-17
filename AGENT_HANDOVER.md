@@ -169,8 +169,53 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
   `SELECT 15 / DELETE 52 / DELETE 15 / DELETE 15 / DELETE 6 / DELETE 4 / UPDATE 1` ثم تحقق
   `members 0 · subs 0 · attendance 0 · offers 4 · sports 7 · counter 0`، والـabort سيّب الأصل
   كما هو (قُيِّت تاني: 15 / 52 / 15).
-- **Railway staging (2026-10-12):** النشر بـ `railway up` من الجذر (سياق build = repo root).
-  بروكسي Railway يوصل للـ replica على **منفذ 8080** إن لم يُضبط Application Port — nginx يlisten على 80+8080 معاً. بعد كل redeploy للـ backend **أعد نشر الـ frontend** (nginx يظلّم DNS لـ `backend.railway.internal` عند الإقلاع وإلا يجمّد البروكسي) — مع الرفع التلقائي (§29) كل push يبني الخدمةين معاً فتنتهي هذه المشكلة جانبياً؛ تبقى عند إعادة نشر backend وحده يدوياً. `railway service restart` يتعطّل أحياناً — `railway up -d` أضمن.
+- **Railway staging (2026-10-12، تحدَّث 2026-10-17):** النشر بـ `railway up` من الجذر (سياق build = repo root).
+  بروكسي Railway يوصل للـ replica على **منفذ 8080** إن لم يُضبط Application Port — nginx يlisten على 80+8080 معاً. بعد كل redeploy للـ backend **أعد نشر الـ frontend** (nginx يظلّم DNS لـ `backend.railway.internal` عند الإقلاع وإلا يجمّد البروكسي) — كان الرفع التلقائي (§29) بيخلي كل push يبني الخدمةين معاً، **ده وقف من 2026-10-17** (شوف §6د) فالدفع والنشر بقوا خطوتين. `railway service restart` يتعطّل أحياناً — `railway up -d` أضمن.
+
+---
+
+## 6د) الدفع لم يعد نشرًا — قاعدة المالك (2026-10-17)
+
+المالك قرر: **`git push` يبقى للنسخة، والرفع لـ staging قرار يدوي في كل مرة**. أي agent
+قبل ما يدفع يسأل «أرفع ولا نسيبه على الريبو؟» وما يعتبرش الدفع = نشر.
+
+- **اللي اتعمل:** auto-deploy اتقفل لخدمة الـ backend والـ frontend على مشروع
+  `gymcore-staging` / environment `production`:
+  `railway api 'mutation { serviceInstanceAutoDeployUpdate(input: {projectId, environmentId, serviceId, enabled: false}) { enabled } }'`
+  serviceId: backend `64b179de-64a8-4e6a-a4c5-247013cb6913` — frontend `043d0844-680f-4a04-b4c3-0fbb4ddf3c01`
+  projectId `3afee7fa-2cf0-4b90-a81f-832ebba65f36` — environmentId `1e7438e0-61de-457a-b5dd-5c9d53a607f9`.
+- **التحقق:** read-back بـ`Query.serviceInstanceAutoDeployStatus` → `enabled: false` للاتنين،
+  و`canEnable: false` بـ`reason: "NO_INSTALLATION"`. **معناها عمليًا:** إعادة التشغيل من الـCLI
+  ما تكفيش — لو المالك عايز يرجّع الرفع التلقائي لازم من الـDashboard (إعادة ربط الـGitHub App)
+  أو يفضل يعمل النشر اليدوي `railway up -d` من الجذر.
+- **النشر اليدوي بعد كده:** `git push` (توثيق/نسخ) وبعدها لو المالك وافق:
+  `railway up` للخدمة المطلوبة من الجذر، أو `railway up -d`. الـmigrations بتشتغل لوحدها عند
+  إقلاع الباكند (`app.ts:150` → `runMigrations()`)، فمفيش خطوة SQL إضافية على staging.
+- **حذارِ من `railway variable list`:** الطباعة بتعرض **القيم** (مرّة طلعت `JWT_SECRET` في سجل
+  جلسة). أي فحص للمتغيرات لازم يكون بقراءة الأسماء بس من غير ما القيم تظهر، وما ينفعش القيم
+  تتكتب في أي ملف أو تقرير. **مطلوب من المالك:** يدير `JWT_SECRET` جديد على staging لأن القديم
+  اتعرض في نص tool output (إدارته بتطلع كل الجلسات الحالية — طبيعي بعد الدوران).
+
+## 6هـ) دخول staging: التشخيص الصح (2026-10-17)
+
+- staging عليها **ديتابيز منفصلة** (Railway Postgres، حجم ~118MB) — بيانات/كلمات سر ديتابيز
+  التطوير المحلي ما بتطابقهاش. القياس: `platform_admins` على staging = **1 صفوف نشط**
+  (`SELECT count(*) ... FROM platform_admins` من جوّه الكونتينر بـ`railway ssh -s backend`،
+  بدون قراءة أي عمود سرّي) — ففرضية «الجدول فاضي» بتاعة §34ك **مش متحققة** النهارده.
+- `/login` بيعمل attempt على `/platform/auth/login` الأول وبعدين fallback `/auth/login`
+  (`AdminLoginPage:166` و`:177`)؛ اتقاس من المتصفح على staging: `/platform/auth/login → 401`
+  و`/auth/login → 401` و«Invalid email or password.» يعني **مسار المناداة والنشر والـCORS
+  سليمة** (preflight على `/platform/auth/login` رجّع 204 بصلاحيات CORS صح) فالسبب **بيانات
+  غير مطابقة لكلمة السر على ديتابيز staging**، مش بلاء توجيه زي عطل المحلي.
+- **الطريق الآمن للمالك (من غير ما Agent يلمس كلمة سر):**
+  `https://frontend-production-abdd.up.railway.app/forgot-password?area=admin` — على staging
+  مفيش `SMTP_*` مت ضبط، فـ`services/email.ts:52` بيطبع رابط الريست في اللوجات بدل ما يبعتّه:
+  `railway logs -s backend --lines 120 | grep -A3 "SMTP not configured"` → الرابط فيه token
+  **سر** فافتحه في متصفحك انت وما تسيبوش يترجَّ في نص ولا في commit. الرابط صالح 30 دقيقة
+  وبيوصلك لـ`/reset-password?token=…&type=platform`.
+- **مزلق قياس:** لوجات الـHTTP على Railway بيوصلوا متأخرين (قياس: محاولة متصفح الساعة 04:06
+  ما كانش ليها سطر في `railway logs --http` في نفس اللحظة) — فـ«مفيش سطر في اللوج» **ما
+  معناهوش** إن الطلب ما اتعملش؛ اتأكد من المتصفح (fetch/XHR hook) قبل أي استنتاج.
 
 ---
 
