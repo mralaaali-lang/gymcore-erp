@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, UserCheck, Clock, UserMinus as UserX, Pencil, Plus, X, ChartBar as BarChart3 } from '@phosphor-icons/react';
+import { Users, UserCheck, Clock, UserMinus as UserX, Pencil, Plus, ChartBar as BarChart3 } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -13,6 +13,7 @@ import {
 } from '../../services/api';
 import { DashboardPage, StatCard, Panel, EmptyState } from '../../components/dashboard';
 import PageLoader from '../../components/shared/PageLoader';
+import Modal from '../../components/shared/Modal';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { sportName, useSportsCatalog } from './subscriptions/shared';
 
@@ -257,33 +258,45 @@ export default function TrainerAttendancePage() {
 
       {/* تعديل صف */}
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditing(null)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-gray-900">{editing.full_name}</h2>
-              <button onClick={() => setEditing(null)} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label={rtl ? 'إغلاق' : 'Close'}>
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'وقت الحضور' : 'Clock in'}</label>
-                <input type="datetime-local" value={editIn} onChange={(e) => setEditIn(e.target.value)} className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'وقت الانصراف (فارغ = متواجد)' : 'Clock out (empty = present)'}</label>
-                <input type="datetime-local" value={editOut} onChange={(e) => setEditOut(e.target.value)} className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm outline-none" />
-              </div>
+        <Modal
+          open
+          title={editing.full_name}
+          onClose={() => setEditing(null)}
+          size="md"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={editMut.isPending}
+          footer={
+            <>
               <button
+                type="button"
+                onClick={() => setEditing(null)}
+                disabled={editMut.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+              >
+                {rtl ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="button"
                 onClick={() => editMut.mutate()}
                 disabled={editMut.isPending}
-                className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold disabled:opacity-50"
+                className="min-h-[48px] px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition disabled:opacity-50"
               >
-                {rtl ? 'حفظ التعديل' : 'Save'}
+                {editMut.isPending ? (rtl ? 'جارٍ الحفظ…' : 'Saving…') : (rtl ? 'حفظ التعديل' : 'Save')}
               </button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'وقت الحضور' : 'Clock in'}</label>
+              <input type="datetime-local" value={editIn} onChange={(e) => setEditIn(e.target.value)} className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-500 mb-1.5">{rtl ? 'وقت الانصراف (فارغ = متواجد)' : 'Clock out (empty = present)'}</label>
+              <input type="datetime-local" value={editOut} onChange={(e) => setEditOut(e.target.value)} className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm outline-none" />
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
     </div>

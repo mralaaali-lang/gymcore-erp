@@ -11,6 +11,7 @@ import {
   listStaff, type CashboxSessionRow, type CashLedgerRow, type ShiftReport,
 } from '../../services/api';
 import PageLoader from '../../components/shared/PageLoader';
+import Modal from '../../components/shared/Modal';
 import Card from '../../components/ui/Card';
 import StatusBadge from '../../components/ui/StatusBadge';
 
@@ -391,16 +392,15 @@ export default function CashboxShiftsPage() {
         </>
       )}
 
-      {/* دفتر الوردية */}
+      {/* دفتر الوردية — لوحة قراءة فقط على القشرة (بلا footer: مفيش عملية كتابة تتأيد) */}
       {ledgerId && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setLedgerId(null)}>
-          <div className="bg-white rounded-3xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-xl border border-gray-100" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">{rtl ? 'دفتر الوردية' : 'Shift Ledger'}</h2>
-              <button onClick={() => setLedgerId(null)} className="w-9 h-9 rounded-xl hover:bg-gray-50 text-gray-500 flex items-center justify-center" aria-label={rtl ? 'إغلاق' : 'Close'}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
+        <Modal
+          open
+          title={rtl ? 'دفتر الوردية' : 'Shift Ledger'}
+          onClose={() => setLedgerId(null)}
+          size="xl"
+          dir={rtl ? 'rtl' : 'ltr'}
+        >
             {ledgerLoading ? (
               <div className="py-8 text-center text-gray-400 text-sm">{rtl ? 'جاري التحميل...' : 'Loading...'}</div>
             ) : !ledgerRes ? (
@@ -466,8 +466,7 @@ export default function CashboxShiftsPage() {
                 </div>
               </>
             )}
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

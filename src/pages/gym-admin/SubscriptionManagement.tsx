@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Pencil, Plus, Trash as Trash2, CalendarDots as CalendarDays, Ticket, Users, Clock, Barbell as Dumbbell, Gift } from '@phosphor-icons/react';
+import { Pencil, Plus, Trash as Trash2, CalendarDots as CalendarDays, Ticket, Users, Clock, Barbell as Dumbbell, Gift } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { formatMoney, currencySymbol } from '../../utils/currency';
@@ -12,6 +12,7 @@ import {
 } from '../../services/api';
 import { DashboardPage, PrimaryAction, SecondaryAction, StatCard, Panel, EmptyState } from '../../components/dashboard';
 import UnifiedTabs from '../../components/shared/UnifiedTabs';
+import Modal from '../../components/shared/Modal';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { sportName, SPORTS, WEEK_DAYS, useSportsCatalog } from './subscriptions/shared';
 import SportSelect from './subscriptions/SportSelect';
@@ -37,23 +38,6 @@ function apiError(e: unknown, fallback: string): string {
 
 const inputCls =
   'w-full min-h-[48px] md:min-h-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/40';
-
-function Modal({ title, rtl, onClose, children }: { title: string; rtl: boolean; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
-      <div dir={rtl ? 'rtl' : 'ltr'} className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl">
-        <div className="border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-3xl">
-          <h3 className="font-bold text-gray-900">{title}</h3>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 text-gray-500 touch-auto" aria-label="close">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
-  );
-}
 
 function OfferForm({ rtl, currency, offer, onClose }: {
   rtl: boolean; currency?: string | null; offer: MembershipOffer; onClose: () => void;
@@ -98,8 +82,36 @@ function OfferForm({ rtl, currency, offer, onClose }: {
   });
 
   return (
-    <Modal title={rtl ? 'تعديل الباقة' : 'Edit plan'} rtl={rtl} onClose={onClose}>
-      <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+    <Modal
+      open
+      title={rtl ? 'تعديل الباقة' : 'Edit plan'}
+      onClose={onClose}
+      size="md"
+      dir={rtl ? 'rtl' : 'ltr'}
+      disableDismiss={save.isPending}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={save.isPending}
+            className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+          >
+            {rtl ? 'إلغاء' : 'Cancel'}
+          </button>
+          <button
+            type="button"
+            onClick={() => save.mutate()}
+            disabled={!valid || save.isPending}
+            className="min-h-[48px] px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition disabled:opacity-50"
+          >
+            {save.isPending ? (rtl ? 'جارٍ الحفظ…' : 'Saving…') : (rtl ? 'حفظ' : 'Save')}
+          </button>
+        </>
+      }
+    >
+      {/* القشرة بتمّرر overflow-y-auto على اللوحة نفسها، فالحشو ما بيعملش سكرول خاص بيه */}
+      <div className="space-y-4">
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">{rtl ? 'اسم الباقة' : 'Plan name'}</label>
           <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={rtl ? 'مثال: شهر واحد' : 'e.g. Monthly'} />
@@ -163,13 +175,6 @@ function OfferForm({ rtl, currency, offer, onClose }: {
           <label className="block text-sm font-semibold text-gray-700 mb-1">{rtl ? 'الوصف' : 'Description'}</label>
           <textarea className={`${inputCls} resize-none`} rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
-        <button
-          disabled={!valid || save.isPending}
-          onClick={() => save.mutate()}
-          className="w-full min-h-[48px] md:min-h-0 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-base md:text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
-        >
-          {save.isPending ? (rtl ? 'جارٍ الحفظ…' : 'Saving…') : rtl ? 'حفظ' : 'Save'}
-        </button>
       </div>
     </Modal>
   );
@@ -459,7 +464,34 @@ export default function SubscriptionManagement() {
       )}
 
       {deleting && (
-        <Modal title={rtl ? 'حذف الباقة' : 'Delete plan'} rtl={rtl} onClose={() => setDeleting(null)}>
+        <Modal
+          open
+          title={rtl ? 'حذف الباقة' : 'Delete plan'}
+          onClose={() => setDeleting(null)}
+          size="md"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={remove.isPending}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setDeleting(null)}
+                disabled={remove.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
+              >
+                {rtl ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => remove.mutate(deleting)}
+                disabled={remove.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition disabled:opacity-50"
+              >
+                {remove.isPending ? (rtl ? 'جارٍ الحذف…' : 'Deleting…') : (rtl ? 'تأكيد الحذف' : 'Confirm delete')}
+              </button>
+            </>
+          }
+        >
           <p className="text-sm text-gray-700">
             {rtl ? `حذف «${deleting.title}» نهائيًا؟` : `Permanently delete “${deleting.title}”?`}
           </p>
@@ -470,21 +502,6 @@ export default function SubscriptionManagement() {
                 : `${deleting.subscription_count} subscriptions linked — deletion will be refused. Deactivate instead.`}
             </p>
           )}
-          <div className="flex items-center gap-3 mt-5">
-            <button
-              onClick={() => remove.mutate(deleting)}
-              disabled={remove.isPending}
-              className="flex-1 min-h-[44px] rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-50"
-            >
-              {rtl ? 'تأكيد الحذف' : 'Confirm delete'}
-            </button>
-            <button
-              onClick={() => setDeleting(null)}
-              className="min-h-[44px] px-6 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold"
-            >
-              {rtl ? 'إلغاء' : 'Cancel'}
-            </button>
-          </div>
         </Modal>
       )}
     </div>

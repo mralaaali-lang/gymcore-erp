@@ -13,6 +13,7 @@ import { formatMoney } from '../../utils/currency';
 import { fmtNum, formatDate } from '../../utils/date';
 import { escapeHtml, printDocument } from '../../utils/print';
 import { DashboardPage, PrimaryAction, SecondaryAction, Panel, EmptyState } from '../../components/dashboard';
+import Modal from '../../components/shared/Modal';
 import StatusBadge from '../../components/ui/StatusBadge';
 import AddSubscription from './subscriptions/AddSubscription';
 import EditSubscription from './subscriptions/EditSubscription';
@@ -371,34 +372,42 @@ export default function SubscriptionsPage() {
 
       {/* مودال إلغاء مصغّر — السيرفر يفرض سببًا */}
       {cancelling && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setCancelling(null)} aria-hidden />
-          <div dir={rtl ? 'rtl' : 'ltr'} className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-5 space-y-4">
-            <h3 className="font-bold text-gray-900">{rtl ? `إلغاء اشتراك ${cancelling.member_name}` : `Cancel ${cancelling.member_name}'s subscription`}</h3>
-            <p className="text-sm text-gray-500">{cancelling.offer_title} · {formatDate(cancelling.start_date)} ← {formatDate(cancelling.end_date)}</p>
-            <input
-              className={inputCls}
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              placeholder={rtl ? 'سبب الإلغاء (مطلوب)' : 'Reason (required)'}
-            />
-            <div className="flex gap-2">
+        <Modal
+          open
+          title={rtl ? `إلغاء اشتراك ${cancelling.member_name}` : `Cancel ${cancelling.member_name}'s subscription`}
+          description={`${cancelling.offer_title} · ${formatDate(cancelling.start_date)} ← ${formatDate(cancelling.end_date)}`}
+          onClose={() => setCancelling(null)}
+          size="md"
+          dir={rtl ? 'rtl' : 'ltr'}
+          disableDismiss={cancel.isPending}
+          footer={
+            <>
               <button
-                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-bold text-gray-600 hover:bg-gray-50"
+                type="button"
                 onClick={() => setCancelling(null)}
+                disabled={cancel.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition disabled:opacity-50"
               >
                 {rtl ? 'تراجع' : 'Back'}
               </button>
               <button
-                disabled={cancelReason.trim().length === 0 || cancel.isPending}
-                className="flex-1 rounded-xl bg-rose-600 py-2 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-50"
+                type="button"
                 onClick={() => cancel.mutate()}
+                disabled={cancelReason.trim().length === 0 || cancel.isPending}
+                className="min-h-[48px] px-5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold transition disabled:opacity-50"
               >
-                {cancel.isPending ? (rtl ? 'جارٍ…' : '…') : (rtl ? 'تأكيد الإلغاء' : 'Confirm cancel')}
+                {cancel.isPending ? (rtl ? 'جارٍ الإلغاء…' : 'Cancelling…') : (rtl ? 'تأكيد الإلغاء' : 'Confirm cancel')}
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <input
+            className={inputCls}
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder={rtl ? 'سبب الإلغاء (مطلوب)' : 'Reason (required)'}
+          />
+        </Modal>
       )}
     </div>
   );

@@ -802,3 +802,66 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
   و`grep -n "^## " AGENT_HANDOVER.md`. وقبل أي commit: `git diff --cached --name-only` — الـindex
   مشترك، ولو لقيت ملفات لجلسة تانية في الـindex استنى commitها يخلص الأول (وإلا نصك يدخل في commit
   غيرك، أو commitك يبلع شغلهم).
+
+## 19) تسليم موجة 3 / دفعة 11: الاشتراكات والصندوق وحضور المدربين على `shared/Modal` (2026-10-18 — جلسة A+C، §62)
+
+**المتحوَّل (٤ ملفّات / ٥ لوحات، `grep -c "fixed inset-0"` = 0 في كل واحد):**
+`gym-admin/SubscriptionManagement.tsx` (**كان فيه `Modal` محلي جوّه الملف** — نسخة يدوية من الصدفة؛ اتشال وبقى
+استيراد القشرة) → «تعديل الباقة» `md` 448×**757** (أطول لوحة في الموجة) + «حذف الباقة» `md` 448×**221** ·
+`gym-admin/CashboxShiftsPage.tsx` → «دفتر الوردية» `xl` 672×**293** **بلا `footer`** ·
+`gym-admin/SubscriptionsPage.tsx` → «إلغاء اشتراك …» `md` 448×**236** (**أول `description` في الموجة** ⇒
+`aria-describedby` حقيقي) + تسمية pending «جارٍ الإلغاء…» · `gym-admin/TrainerAttendancePage.tsx` → «تعديل صف» `md`
+448×**329** مع زر `إلغاء` إضافي. العُرف المطبَّق زي §§56–60: `min-h-[48px] px-5 rounded-xl text-sm font-bold
+transition disabled:opacity-50` + `disableDismiss={mut.isPending}` + لون الـCTA بتاع الصفحة.
+
+**المتبقي على الموجة (مؤشّر §62):** `src/pages` **ملفّان/موضعان** = `subscriptions/AddSubscription` (`D9`) و
+`super-admin/AddGymModal` (`D6`) — **محجوزان لقرار المالك، ما تتلمسش من غير أمر صريح**. `src/**` **7 ملفات/8 مواضع**
+يشملون القشرة (`shadcn/dialog.tsx` ×2) وسطر تعليق في `shared/Modal.tsx:67` و`Sidebar.tsx:244` (**scrim فقط** —
+استثناء مورّث). ⇒ **دفعة 12 = `components/auth/PwaInstallPrompts.tsx:51` + `components/dashboard/QuickActionCenter.tsx:74`**
+وبس. **12 دفعة متحقق عليها حيًّا.**
+
+**بيئة التحقق (لازم تتكرر كما هي):** Chromium `--headless=new` + CDP على `:9336` بملف تعريف نظيف لكل طلقة،
+وVite `http://127.0.0.1:9110` (مواسير لجلسات تانية على `:9100`/`:9110` معًا — اقرأ الـ`origin` الأول)، والباكند
+Docker `:4001`/`:9000` ← `gymcore-db` (`:5433`). الصالة الرملية «حامد جيم» بإذن المالك؛ **الـcredentials بـenv بس**
+(`GYM_USER`/`GYM_PASS`) ومفيش أي ملف بالريبو فيه سر. الهارنس في `gymcore-a11y/m3d11/` (`seed.mjs` · `panel.mjs` ·
+`m3d11.mjs` · `m3d11b.mjs` · `m3d11c.mjs` + JSONs والصور) — **throwaway، ما يتعملش لـcommit**.
+
+**خمسة دروس تشغيلية جديدة (اتدفع فيها وقت):**
+1. **المصادقة بقى cookie-only:** `POST /auth/login` بيرجّع `{expires_in, user}` وباصطي `access_token`+`refresh_token`
+   كـHttpOnly. **أي `Authorization: Bearer undefined` بيرجع 401** (الهيدر بيهيمن على الـcookie) ⇒ كل `fetch` داخل
+   الصفحة بـ`credentials: 'include'` وبس. البروفيلات القديمة اللي كانت بتقرأ `data.token` **بايظة**.
+2. **فلتر حضور المدربين مكسور بالتوقيت:** الصفحة بتبعت `localDateStr(new Date())` (مضيف UTC+3 ⇒ يوم بكرة) والسيرفر
+   بيقارن `ss.clock_in::date` (UTC) ⇒ **الجدول فاضي** بعد منتصف الليل المحلّي، وكل `waitFor` على نصّ الصف بيطابق
+   **الفلتر** مش الجدول. الحل في الهارنس: `input[type="date"]` على تاريخ الـUTC + نقر «بحث» الحقيقي. **العيب في
+   المنتج وما اتصلحش** (مش شغل الدفعة).
+3. **سلاسل الحوار:** لوحة بتتفتح من زر **جوّه حوار تاني** (`EditSubscription` → «إلغاء الاشتراك») ⇒ (أ) الفلتر
+   `!closest('[role="dialog"][data-state="open"]')` بيستبعد الفاتح، والاعتماد على `ds[ds.length-1]`؛ (ب) الفاتح
+   **بيتفصل** قبل الإغلاق فالفوكس بيقع على `<body>` — **مش باگ قشرة** (القشرة بتسأل `document.contains(opener)`)
+   و**معلَن كسلوك سير-فلو**.
+4. **`Fetch.enable` + `holdWrites` بقى بيشيل `PUT/PATCH` كمان** (من `m3d10/ext.mjs`)، و`releaseAs(c,'abort')` بيكفل
+   **صفر كتابة**: `netForHeld` فاضي + `s: null` في سجلّ الشبكة = الطلب ما وصلش السيرفر. قياس pending بلا حبس =
+   كتابة فعلية في قاعدة صالة حقيقية.
+5. **أزمنة «القفل» بتاعة الحذف مش قياسات:** `durationMs` في مسار `DELETE` (1811/1817) بيسودّه `wait(1800)` في
+   الهارنس. القراءة الحقيقية لأزمنة الكتابة = **الإغلاق التلقائي بعد النجاح** (205 · 204 · 216 · 217 ms).
+
+**نتائج باكند/منتج معلنة وما اتصلحتش:** `DELETE /api/membership-offers/:id` بيرجع **409 حتى بعد إلغاء الاشتراك**
+⇒ حرس الحذف بيعدّ كل الحالات (الباقات اللي عليها اشتراكات ملغاة **بتحب تعطيل لا حذف**) · `cancelReason` في
+`SubscriptionsPage.tsx` بيتصفّر في `onSuccess` (:164) فقط، مش عند الإغلاق (:379) ⇒ **السبب المكتوب بينتقل للوحة
+الاشتراك التالي** والزر بيتفعّل على حاجة مستخدم تاني (سطر إصلاح، محجول) · مفيش `DELETE endpoints` لـ
+`member_subscriptions`/`cashbox_sessions`/`staff_shifts` ⇒ التنظيف **SQL** · البوابات المورّثة لسه: X القشرة **26px**
++ `aria-label="إغلاق"` عربي حرفي (`shadcn/dialog.tsx:66`) · `htmlFor` ناقص في **كل** لوحات الدفعة (و«إلغاء اشتراك»
+**بلا `<label>` خالص**) · أزرار صف 36–44px و`window.confirm()` · الفوكس على `<body>` أثناء pending · قرار زر
+الإغلاق للوحات القراءة (٣ حالات الآن) · الألوان الحرفية → موجة 5 · `npm run lint` غير قابل للتشغيل.
+
+**التنظيف والجرد:** البذر بوسم `A11Y-D11-bc5f71` اترجع كله — `PUT` الباقة اترد بوصف فاضي، المدرب اتمسح بـ`DELETE
+/api/staff/:id` (**204**) وشيفته اتسحب بالـcascade، الوردية اتقفلت (**200**) والباقي اتمسح بـSQL بترتيب الـFK:
+`member_debts` 1 → `member_subscriptions` 1 → `membership_offers` 1 → `cashbox_sessions` 1 → `members` 1 (وبالمناسبة
+اتمسح **دين اختبار §58** فاضل من دفعة قبل كده). الجرد: كل فهارس `A11Y%`/«اختبار» = **0**، وبيانات الصالة الأصلية
+سليمة (اشتراكات 2486 · عروض 133 · أعضاء 2489 · موظفون 86).
+
+**البوابات والنوايا:** `npx tsc --noEmit` = **0** · `npm run build` = ✓ **6.21s** و`index-B1ysZSi3.js` = **908,967
+بايت** · `vitest`/`jest` **ما اتعادش تشغيلهم** (شجرة `server` مُحرَّرة الآن بجلسة تانية — لا تستبدل ملفات ownership
+تانية ولا تعمل stash لشجرة مشتركة) · **26** عملة غير مدفوعة قبل commit الدفعة (**D7** لسه مفتوح) · **ولا `push` ولا
+deploy ولا rebuild على `:9000`** — الانتظار لأمر المالك. قبل أي commit: `git diff --cached --numstat` — بلوكات
+`## §50`/`### ٨)` في التقرير وبلوك `TODO.md` بتاع جلسة C لسه **unstaged** في شجرة العمل، فالتوثيق بيتعمل ببروتوكول
+الـblob المُخلَّق (`git show HEAD:<doc>` + بلوكي → `git hash-object -w --path=<doc>` → `git update-index --cacheinfo`).
