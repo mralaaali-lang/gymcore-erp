@@ -171,9 +171,13 @@ export default function BillingEngine() {
   const [showArchived, setShowArchived] = useState(false);
 
   // ── Queries ──────────────────────────────────────────
+  // §46: شاشة إدارة الكتالوج تطلب الكتالوج كاملًا دائمًا (النشط + المؤرشف) — لو
+  // كانت تستدعي `include_archived` بحسب `showArchived` لوحدها، بقى الخيار الذي
+  // يكشف المؤرشفة محتاج أن المؤرشفة مكشوفة أولًا (dead end مقاس على staging).
+  // المفتاح ثابت فلا إعادة جلب عند تبديل العرض.
   const plansQuery = useApiQuery(
-    ['billing-plans', showArchived ? 'with-archived' : 'live'],
-    () => listBillingPlans({ includeArchived: showArchived }),
+    ['billing-plans', 'catalog'],
+    () => listBillingPlans({ includeArchived: true }),
     { staleTime: 30_000 },
   );
   const invoicesQuery = useApiQuery(['billing-invoices'], () => listInvoices({ limit: 50 }), { staleTime: 15_000 });
@@ -612,10 +616,10 @@ export default function BillingEngine() {
   }
 
   function couponProblem(): string | null {
-    if (couponForm.code.trim().length < 3) return t('Coupon code needs 3 characters or more', 'رمز الكوبون ٣ حروف على الأقل');
+    if (couponForm.code.trim().length < 3) return t('Coupon code needs 3 characters or more', 'رمز الكوبون 3 حروف على الأقل');
     const v = num(couponForm.value);
     if (couponForm.value.trim() === '' || v <= 0) return t('Discount value must be greater than zero', 'قيمة الخصم لازم تكون أكبر من صفر');
-    if (couponForm.type === 'percentage' && v > 100) return t('Percentage must be between 0 and 100', 'النسبة بين ٠ و١٠٠');
+    if (couponForm.type === 'percentage' && v > 100) return t('Percentage must be between 0 and 100', 'النسبة بين 0 و100');
     if (couponForm.starts_at && couponForm.expires_at && couponForm.expires_at <= couponForm.starts_at) {
       return t('The end date must be after the start date', 'تاريخ الانتهاء لازم يكون بعد البداية');
     }
@@ -745,7 +749,7 @@ export default function BillingEngine() {
               <p className={HINT_CLASS}>
                 {t(
                   `Yearly saves ${plan.annual_discount_percent}% over 12 monthly payments`,
-                  `التحويل السنوي يوفّر ${plan.annual_discount_percent}% من ١٢ دفعة شهرية`,
+                  `التحويل السنوي يوفّر ${plan.annual_discount_percent}% من 12 دفعة شهرية`,
                 )}
               </p>
             ) : null}
@@ -787,7 +791,7 @@ export default function BillingEngine() {
         <div className="border-t border-hairline bg-surface-container-low px-5 py-3">
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{t('Subtotal', 'المجموع')}: <span dir="ltr" className="font-mono">{formatCurrency(subtotal)}</span></span>
-            <span>{t('VAT 14%', 'ضريبة ١٤٪')}: <span dir="ltr" className="font-mono">{formatCurrency(vat)}</span></span>
+            <span>{t('VAT 14%', 'ضريبة 14%')}: <span dir="ltr" className="font-mono">{formatCurrency(vat)}</span></span>
           </div>
           <div className="mt-1 flex justify-between text-sm font-bold text-foreground">
             <span>{t('Total', 'الإجمالي')}</span>
@@ -883,7 +887,12 @@ export default function BillingEngine() {
             <span className={`text-sm ${billingCycle === 'monthly' ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
               {t('Monthly', 'شهري')}
             </span>
-            <Toggle checked={billingCycle === 'yearly'} onChange={(v) => setBillingCycle(v ? 'yearly' : 'monthly')} label="" />
+            <Toggle
+              checked={billingCycle === 'yearly'}
+              onChange={(v) => setBillingCycle(v ? 'yearly' : 'monthly')}
+              label=""
+              srLabel={t('Billing cycle', 'دورة المحاسبة')}
+            />
             <span className={`text-sm ${billingCycle === 'yearly' ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
               {t('Yearly', 'سنوي')}
             </span>
@@ -1307,7 +1316,7 @@ export default function BillingEngine() {
                   className={FIELD_CLASS} dir="ltr" placeholder="0" />
                 {yearlyHint ? (
                   <p className={HINT_CLASS}>
-                    {t('House rule: yearly = monthly × 10 (two months free)', 'قاعدة البيت: السنوي = الشهري × ١٠ (شهرين مجانًا)')}
+                    {t('House rule: yearly = monthly × 10 (two months free)', 'قاعدة البيت: السنوي = الشهري × 10 (شهرين مجانًا)')}
                   </p>
                 ) : null}
               </div>
@@ -1543,7 +1552,7 @@ export default function BillingEngine() {
               <label className={LABEL_CLASS}>{t('Description', 'الوصف')}</label>
               <input type="text" value={couponForm.description}
                 onChange={(e) => patchCouponForm({ description: e.target.value })}
-                className={FIELD_CLASS} placeholder={t('20% off the Advanced plan', 'خصم ٢٠٪ على الباقة المتقدمة')} />
+                className={FIELD_CLASS} placeholder={t('20% off the Advanced plan', 'خصم 20% على الباقة المتقدمة')} />
             </div>
           </div>
 
@@ -2002,10 +2011,17 @@ export default function BillingEngine() {
  * و`rtl:-translate-x` — ماديًا نفس المسافة في الاتجاهين (خطأ الكود القديم أنه
  * كان يترجم لليمين دائمًا فيصفّر عند `start` في RTL).
  */
-function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+/** مفتاح تبديل على توكنات الصدفة؛ `srLabel` الاسم الصوتي حين بلا نص ظاهر. */
+function Toggle({ checked, onChange, label, srLabel }: { checked: boolean; onChange: (v: boolean) => void; label: string; srLabel?: string }) {
   return (
     <label className="inline-flex cursor-pointer items-center gap-2">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        aria-label={!label ? (srLabel || undefined) : undefined}
+        className="peer sr-only"
+      />
       <span
         aria-hidden="true"
         className={`relative block h-6 w-11 shrink-0 rounded-full border transition-colors after:absolute after:inset-y-1 after:start-1 after:h-4 after:w-4 after:rounded-full after:bg-card after:transition-transform peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-checked:border-primary peer-checked:bg-primary peer-checked:after:ltr:translate-x-5 peer-checked:after:rtl:-translate-x-5 ${checked ? 'border-primary bg-primary' : 'border-input bg-surface-container-high'}`}
