@@ -175,6 +175,16 @@ SaaS متعدد المستأجرين لإدارة الصالات الرياضي�
 - **بصمة التحقق لازم تتقاس على build سليم الأول:** البحث عن `enabled:"gym-admin"` طلع **0** في
   القديم والجديد معًا لأن esbuild بيقلّل لـ`enabled:r==="gym-admin"`. اكتب البصمة من `dist` معروف
   إنه صح، وإلا هتتّهم الكود وهو بريء.
+- **التاب المخفي يجمّد الـtransitions فالقياس يكدب:** في `visibilityState=hidden`،
+  `getComputedStyle(el).backgroundColor` على عنصر فيه `transition-colors` بيرجع قيمة **ما قبل**
+  التغيير (الداكن قِيس على كارت POS وطلع ورق فاتح بينما `--card` نفسه كان بقيمة الداكن). الحل:
+  `el.style.transition='none'` قبل القراءة، أو قارن بعنصر جديد نفس الكلاسات في نفس الـDOM.
+- **`localhost` و`127.0.0.1` جرتين كوكي مختلفتين:** الكوكي host-based مش port-based — فتح الـdev
+  server على `http://127.0.0.1:9100` بيسمح بدخول حساب اختبار من غير ما تطير جلسة المالك المفتوحة
+  على `localhost:9000` (والعكس). ده أنضف طريق للتحقق بالمتصفح.
+- **`planGuard` بيمنع إضافة منتجات على Starter:** `POST /api/products` محتاج ميزة `products`،
+  و`gym_effective_features` للـStarter = `{attendance, dashboard}`. صالات الاختبار للـPOS/المتجر
+  لازم تتسند على خطة فيها الميزة (أو وحدة إضافية) قبل ما تتهم الواجهة بالخلل.
 - **مسح بيانات الديمو من صالة موجودة:** `server/scripts/remove_demo_seed_data.sql` — للأمر نفسه
   transaction مفتوحة على `SELECT` تحقق و`COMMIT` معلّق (المالك يكتبها). الـdry-run اتعمل:
   `SELECT 15 / DELETE 52 / DELETE 15 / DELETE 15 / DELETE 6 / DELETE 4 / UPDATE 1` ثم تحقق

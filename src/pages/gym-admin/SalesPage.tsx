@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { formatDate } from '../../utils/date';
 import { useApp } from '../../context/GymBrandContext';
 import { formatMoney } from '../../utils/currency';
@@ -27,8 +27,14 @@ interface SaleRow {
   id: string; member_name?: string; staff_name?: string;
   total_amount: number; payment_method: string; created_at: string;
 }
-interface SaleItemRow {
-  product_id: string; product_name: string; quantity: number; unit_price: number;
+/**
+ * §46 POS touch grid — the cart is a `{ product_id: quantity }` map, so a tile
+ * tap is the ONLY way a line enters the invoice. The old model kept an array of
+ * blank `<select>` rows (`items`), which meant an empty row could be submitted
+ * away but never filled by touch, and every row re-listed all products.
+ */
+interface CartLine {
+  product: ProductData; quantity: number;
 }
 
 // §34ج — 'Settings' tab removed: nothing behind it but a "قيد التطوير" card.
@@ -53,8 +59,20 @@ const paymentMethods = [
   { value: 'wallet', labelAr: 'محفظة', labelEn: 'Wallet' },
 ];
 
-const inputClass =
-  'w-full px-4 py-2.5 rounded-2xl border border-gray-200 bg-white text-sm text-gray-900 shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-gray-400';
+/**
+ * POS shell classes (Chalk & Brass, `src/components/dashboard/tokens.ts`).
+ * A POS terminal is a touch surface, so every control here keeps a ≥48px target
+ * at ALL breakpoints — that is the §46 brief. Text density still follows the
+ * §34و rule (16px on mobile, 14px on desktop). No literal colour is used: the
+ * only old-palette control left on this tab is the shared `<Button>` itself,
+ * which the deferred shell codemod retints for every screen at once.
+ */
+const posFieldClass =
+  'w-full min-h-[48px] rounded-shell border border-input bg-card px-4 py-2.5 text-base text-foreground placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-ring md:text-sm';
+const posTileClass =
+  'flex min-h-[52px] flex-col justify-between gap-1.5 rounded-shell border border-hairline bg-card px-3 py-2.5 text-start transition-colors duration-150 hover:border-brass-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-40 disabled:hover:border-hairline';
+const posStepperClass =
+  'grid min-h-[48px] min-w-[48px] place-items-center rounded-shell border border-hairline bg-card text-foreground transition-colors duration-150 hover:border-brass-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40';
 
 export default function SalesPage() {
   const { language, gymProfile } = useApp();
@@ -65,6 +83,7 @@ export default function SalesPage() {
   const rtl = language === 'ar';
   // §35أ — honour any valid ?tab= on first mount (same pattern as the hubs pages).
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const initialTab = POS_TABS.find(
     (t) => t.toLowerCase().replace(/\s+/g, '') === (searchParams.get('tab') ?? '').toLowerCase().replace(/[\s_-]/g, '')
   );
@@ -74,7 +93,7 @@ export default function SalesPage() {
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [memberSearch, setMemberSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [items, setItems] = useState<SaleItemRow[]>([{ product_id: '', product_name: '', quantity: 1, unit_price: 0 }]);
+  const [cart, setCart] = useState<Record<string, number>>({});
 
   const { data: salesRes, isLoading } = useApiQuery<{ data: SaleRow[]; pagination: any }>(['sales', String(page)], () => listSales(page));
   const { data: summaryRes } = useApiQuery<any>(['finance-summary'], () => getFinanceSummary());
@@ -92,26 +111,30 @@ export default function SalesPage() {
     onError: () => showToast(rtl ? 'فشل إنشاء الفاتورة' : 'Failed to create invoice', 'error'),
   });
 
-  const resetForm = () => { setSelectedMemberId(''); setMemberSearch(''); setPaymentMethod('cash'); setItems([{ product_id: '', product_name: '', quantity: 1, unit_price: 0 }]); };
-  const addItemRow = () => setItems([...items, { product_id: '', product_name: '', quantity: 1, unit_price: 0 }]);
-  const removeItemRow = (idx: number) => { if (items.length > 1) setItems(items.filter((_, i) => i !== idx)); };
-  const updateItem = (idx: number, field: keyof SaleItemRow, value: any) => {
-    setItems(items.map((item, i) => {
-      if (i !== idx) return item;
-      const next = { ...item, [field]: value };
-      if (field === 'product_id') {
-        const product = productsRes?.data?.find((p: ProductData) => p.id === value);
-        if (product) { next.product_name = product.name; next.unit_price = product.selling_price; }
-      }
+  const resetForm = () => { setSelectedMemberId(''); setMemberSearch(''); setPaymentMethod('cash'); setCart({}); };
+  const addProductToCart = (product: ProductData) =>
+    setCart((c) => ({ ...c, [product.id]: (c[product.id] ?? 0) + 1 }));
+  const decreaseProduct = (product: ProductData) =>
+    setCart((c) => {
+      const next = { ...c };
+      const qty = (next[product.id] ?? 0) - 1;
+      if (qty > 0) next[product.id] = qty; else delete next[product.id];
       return next;
-    }));
-  };
-  const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+    });
+  const removeProduct = (productId: string) =>
+    setCart((c) => {
+      const next = { ...c };
+      delete next[productId];
+      return next;
+    });
 
   const handleSubmit = () => {
-    const validItems = items.filter((i) => i.product_id && i.quantity > 0);
-    if (validItems.length === 0) { showToast(rtl ? 'أضف منتجاً واحداً على الأقل' : 'Add at least one product', 'warning'); return; }
-    createMutation.mutate({ member_id: selectedMemberId || null, items: validItems.map((i) => ({ product_id: i.product_id, quantity: i.quantity })), payment_method: paymentMethod });
+    if (cartLines.length === 0) { showToast(rtl ? 'أضف منتجاً واحداً على الأقل' : 'Add at least one product', 'warning'); return; }
+    createMutation.mutate({
+      member_id: selectedMemberId || null,
+      items: cartLines.map((line) => ({ product_id: line.product.id, quantity: line.quantity })),
+      payment_method: paymentMethod,
+    });
   };
 
   const sales = salesRes?.data || [];
@@ -123,6 +146,15 @@ export default function SalesPage() {
   const monthlySalesCount = summaryRes?.data?.monthly_sales_count ?? 0;
   const monthlyExpenses = Number(summaryRes?.data?.monthly_expenses ?? 0);
   const products = productsRes?.data || [];
+
+  // Cart lines are derived from the product list (the server order is kept, so a
+  // tap never re-sorts the invoice), and prices always come from `ProductData` —
+  // never from a row the cashier typed.
+  const cartLines: CartLine[] = products
+    .filter((p: ProductData) => (cart[p.id] ?? 0) > 0)
+    .map((p: ProductData) => ({ product: p, quantity: cart[p.id] }));
+  const cartCount = cartLines.reduce((sum, line) => sum + line.quantity, 0);
+  const totalAmount = cartLines.reduce((sum, line) => sum + line.quantity * line.product.selling_price, 0);
 
   // No `sortable` on any column: /api/finance/sales takes page/limit only, so a
   // header control here would re-order the twenty rows already loaded and pass
@@ -166,73 +198,137 @@ export default function SalesPage() {
   ];
 
   const renderCreateSale = () => (
-    <div className="max-w-2xl mx-auto">
-      <Card className="space-y-4">
-        <h3 className="text-base font-bold text-gray-900">{rtl ? 'فاتورة جديدة' : 'New Sale'}</h3>
-
+    <div className="mx-auto max-w-3xl space-y-4">
+      <Card className="space-y-3">
         <div>
-          <label className="block text-sm font-medium text-gray-500 mb-1.5">{rtl ? 'بحث عن عضو' : 'Search Member'}</label>
-          <input type="text" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
+          <label htmlFor="pos-member-search" className="mb-1.5 block text-sm font-medium text-muted-foreground">
+            {rtl ? 'بحث عن عضو' : 'Search Member'}
+          </label>
+          <input id="pos-member-search" type="text" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
             placeholder={rtl ? 'اسم العضو أو رقم الجوال...' : 'Member name or phone...'}
-            className={`${inputClass} mb-2`} />
-          {membersRes?.members && membersRes.members.length > 0 && (
-            <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-2xl">
-              {membersRes.members.map((m: MemberResponse) => (
-                <button key={m.id} onClick={() => { setSelectedMemberId(m.id); setMemberSearch(m.full_name); }}
-                  className={`w-full text-right px-4 py-2 text-sm text-gray-900 hover:bg-gray-50 transition-colors ${selectedMemberId === m.id ? 'bg-emerald-50' : ''}`}>
-                  {m.full_name} - {m.phone_number}
-                </button>
-              ))}
-            </div>
+            className={posFieldClass} />
+        </div>
+        {membersRes?.members && membersRes.members.length > 0 && (
+          <div className="max-h-40 overflow-y-auto rounded-shell border border-hairline">
+            {membersRes.members.map((m: MemberResponse) => (
+              <button key={m.id} type="button" onClick={() => { setSelectedMemberId(m.id); setMemberSearch(m.full_name); }}
+                aria-pressed={selectedMemberId === m.id}
+                className={`flex min-h-[48px] w-full items-center justify-between gap-2 px-4 text-start transition-colors duration-150 hover:bg-accent/40 ${selectedMemberId === m.id ? 'bg-primary/10' : ''}`}>
+                <span className="truncate text-base text-foreground md:text-sm">{m.full_name}</span>
+                <span dir="ltr" className="shrink-0 text-sm tabular-nums text-muted-foreground">{m.phone_number}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-base font-bold text-foreground">{rtl ? 'المنتجات' : 'Products'}</h3>
+          {products.length > 0 && (
+            <span className="text-sm tabular-nums text-muted-foreground">
+              {products.length} {rtl ? 'منتج' : 'products'}
+            </span>
           )}
         </div>
-
-        <div className="border-t border-gray-100 pt-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-gray-900">{rtl ? 'المنتجات' : 'Products'}</span>
-            <div className="flex gap-2">
-              <button onClick={addItemRow} className="px-3 py-1.5 border border-emerald-200 text-emerald-600 rounded-xl text-xs font-semibold hover:bg-emerald-50 transition flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">add</span>
-                {rtl ? 'إضافة منتج' : 'ADD A PRODUCT'}
-              </button>
-              <button onClick={addItemRow} className="px-3 py-1.5 border border-gray-200 rounded-xl text-xs font-medium text-gray-500 hover:bg-gray-50 transition flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">edit_note</span>
-                {rtl ? 'إضافة بند' : 'ADD LINE ITEM'}
-              </button>
-            </div>
+        {products.length === 0 ? (
+          <div className="rounded-shell border border-dashed border-hairline px-4 py-10 text-center">
+            <span className="material-symbols-outlined mb-2 block text-3xl text-ink-faint">inventory</span>
+            <p className="text-sm text-muted-foreground">
+              {rtl ? 'لا توجد منتجات في الصالة بعد' : 'No products in this gym yet'}
+            </p>
+            <button type="button" onClick={() => navigate('/admin/products')}
+              className="mt-3 min-h-[48px] rounded-shell border border-input bg-card px-4 text-sm font-semibold text-foreground transition-colors duration-150 hover:border-brass-soft">
+              {rtl ? 'إضافة منتج' : 'Add a product'}
+            </button>
           </div>
-          {items.map((item, idx) => (
-            <div key={idx} className="flex gap-2 items-center mb-2">
-              <div className="flex-1">
-                <select value={item.product_id} onChange={(e) => updateItem(idx, 'product_id', e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                  <option value="">{rtl ? 'اختر منتجاً' : 'Select product'}</option>
-                  {products.map((p: ProductData) => <option key={p.id} value={p.id}>{p.name} — {money(p.selling_price)}</option>)}
-                </select>
-              </div>
-              <input type="number" min="1" value={item.quantity}
-                onChange={(e) => updateItem(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-16 px-2 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 text-center focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-              <span className="w-20 text-left text-sm font-semibold text-gray-900">{money(item.quantity * item.unit_price)}</span>
-              {items.length > 1 && (
-                <button onClick={() => removeItemRow(idx)} className="text-red-500 p-1"><span className="material-symbols-outlined text-lg">remove_circle</span></button>
-              )}
-            </div>
-          ))}
+        ) : (
+          <div className="grid max-h-[46vh] grid-cols-2 gap-2 overflow-y-auto pl-1 sm:grid-cols-3">
+            {products.map((p: ProductData) => {
+              const qty = cart[p.id] ?? 0;
+              return (
+                <button key={p.id} type="button" onClick={() => addProductToCart(p)}
+                  aria-label={`${p.name} — ${money(p.selling_price)}`}
+                  className={`${posTileClass} ${qty > 0 ? 'border-brass-soft' : ''}`}>
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="line-clamp-2 text-base font-semibold leading-snug text-foreground md:text-sm">{p.name}</span>
+                    {qty > 0 && (
+                      <span className="grid h-6 min-w-6 shrink-0 place-items-center rounded-full bg-primary px-1.5 text-xs font-bold tabular-nums text-primary-foreground">
+                        {qty}
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="text-base font-bold tabular-nums text-foreground md:text-sm">{money(p.selling_price)}</span>
+                    <span className="text-xs tabular-nums text-muted-foreground">{rtl ? 'مخزون' : 'Stock'} {p.stock_quantity}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      <Card className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-base font-bold text-foreground">{rtl ? 'الفاتورة' : 'Invoice'}</h3>
+          <span className="text-sm tabular-nums text-muted-foreground">
+            {cartCount} {rtl ? 'قطعة' : 'items'}
+          </span>
         </div>
 
-        <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-2xl p-3">
-          <span className="text-sm font-semibold text-gray-900">{rtl ? 'الإجمالي' : 'Total'}</span>
-          <span className="text-xl font-bold text-emerald-600">{money(totalAmount)}</span>
+        {cartLines.length === 0 ? (
+          <p className="rounded-shell border border-dashed border-hairline px-4 py-6 text-center text-sm text-muted-foreground">
+            {rtl ? 'اضغط على منتج من الشبكة لإضافته' : 'Tap a product in the grid to add it'}
+          </p>
+        ) : (
+          <ul className="divide-y divide-hairline">
+            {cartLines.map((line) => (
+              <li key={line.product.id} className="flex min-h-[56px] items-center gap-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-medium text-foreground md:text-sm">{line.product.name}</p>
+                  <p className="text-xs tabular-nums text-muted-foreground">
+                    {money(line.product.selling_price)} × {line.quantity}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button type="button" onClick={() => decreaseProduct(line.product)}
+                    aria-label={rtl ? 'تقليل الكمية' : 'Decrease quantity'} className={posStepperClass}>
+                    <span className="material-symbols-outlined text-lg">remove</span>
+                  </button>
+                  <span className="w-9 text-center text-base font-bold tabular-nums text-foreground md:text-sm">{line.quantity}</span>
+                  <button type="button" onClick={() => addProductToCart(line.product)}
+                    aria-label={rtl ? 'زيادة الكمية' : 'Increase quantity'} className={posStepperClass}>
+                    <span className="material-symbols-outlined text-lg">add</span>
+                  </button>
+                </div>
+                <span className="w-24 shrink-0 text-end text-base font-bold tabular-nums text-foreground md:text-sm">
+                  {money(line.quantity * line.product.selling_price)}
+                </span>
+                <button type="button" onClick={() => removeProduct(line.product.id)}
+                  aria-label={rtl ? 'حذف من الفاتورة' : 'Remove from invoice'} className={posStepperClass}>
+                  <span className="material-symbols-outlined text-lg">delete</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="flex items-center justify-between rounded-shell border border-hairline bg-surface-container-low px-4 py-3">
+          <span className="text-sm font-semibold text-foreground">{rtl ? 'الإجمالي' : 'Total'}</span>
+          <span className="text-xl font-bold tabular-nums text-primary">{money(totalAmount)}</span>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-500 mb-1.5">{rtl ? 'طريقة الدفع' : 'Payment Method'}</label>
-          <div className="flex gap-2">
+          <span className="mb-1.5 block text-sm font-medium text-muted-foreground">{rtl ? 'طريقة الدفع' : 'Payment Method'}</span>
+          <div className="flex gap-2" role="group" aria-label={rtl ? 'طريقة الدفع' : 'Payment method'}>
             {paymentMethods.map((pm) => (
-              <button key={pm.value} onClick={() => setPaymentMethod(pm.value)}
-                className={`flex-1 px-4 py-2.5 rounded-2xl text-sm font-medium border transition ${
-                  paymentMethod === pm.value ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+              <button key={pm.value} type="button" onClick={() => setPaymentMethod(pm.value)}
+                aria-pressed={paymentMethod === pm.value}
+                className={`min-h-[48px] flex-1 rounded-shell border px-3 text-base font-semibold transition-colors duration-150 md:text-sm ${
+                  paymentMethod === pm.value
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-input bg-card text-muted-foreground hover:border-brass-soft hover:text-foreground'
                 }`}>
                 {rtl ? pm.labelAr : pm.labelEn}
               </button>
@@ -240,7 +336,7 @@ export default function SalesPage() {
           </div>
         </div>
 
-        <Button variant="primary" fullWidth onClick={handleSubmit} disabled={createMutation.isPending}>
+        <Button variant="primary" fullWidth className="min-h-[52px]" onClick={handleSubmit} disabled={createMutation.isPending}>
           {createMutation.isPending
             ? <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
             : <span className="material-symbols-outlined text-lg">receipt_long</span>}

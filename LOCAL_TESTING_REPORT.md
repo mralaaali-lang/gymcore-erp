@@ -2899,3 +2899,67 @@ backend container: `factory-fresh` = 1 و`deleted_at = CURRENT_TIMESTAMP` = 1 (�
 `is_active = t` و`archived = f`.
 الحذف الجذري الحقيقي (purge مع نقل الـlogs لجدول أرشيف) بند في المتبقي، مش منفّذ.
 
+---
+
+## المرحلة 6 (دفعة 1) — شبكة POS باللمس على توكنات الصدفة (2026-10-17)
+
+**المطلوب (من `UI_PREMIUM_HANDOFF.md` §المرحلة 6):** «POS touch grid: أزرار لمس ≥48px من توكنات
+الصدفة، بدون ألوان حرفية». الدفعات التانية (RHF+zod / cmdk / live pulse) اتأجلت بقرار المالك:
+**مفيش تثبيت حزم جديدة** النهارده، وcmdk هيشتغل فوق endpoints الموجودة، والـpulse يستنى شغل
+الجلسة الموازية على `server/src/app.ts`.
+
+**اللي كان:** تاب «إنشاء فاتورة» في `SalesPage.tsx` كان سطر `<select>` لكل بند + input رقم للكمية،
+وزرارين «إضافة منتج» و«إضافة بند» بيحطوا سطر فاضي بس (مفيش منتج = مرفوض عند الإرسال)، والألوان
+كلها حرفية (`bg-white`/`text-gray-900`/`border-emerald-200`/`focus:ring-emerald-500`).
+
+**اللي اتعمل:** السلة بقت `{ product_id: quantity }` والمنتج بيدخل بالضغط على كارت في شبكة
+(2 أعمدة على الموبايل، 3 على `sm`) — مفيش سطر فاضي يتبعت بالغلط تاني. الكارت بيعرض الاسم
+والسعر والمخزون من `ProductData`، وبيحمل عدّاد كمية (`bg-primary`) و`border-brass-soft` وهو في
+السلة. الفاتورة تحت: سطر لكل منتج بأزرار − / + / حذف، والإجمالي وطرق الدفع وزرار الإتمام.
+**العقد مع السيرفر ما اتغيّرش:** نفس `POST /api/finance/sales` بنفس الجسد.
+رسالة الفراغ الصادقة لما مفيش منتجات بتفتح `/admin/products` (مكان الإضافة الحقيقي) بدل رسالة
+«قريبًا».
+
+**قرار مقصود ومسجّل:** كل أزرار الـPOS ≥48px على **كل** المقاسات — لأن شاشة الكاشير سطح لمس، وده
+نص Brief المرحلة 6. قاعدة §34و (48px للموبايل فقط) ماشية على كثافة الخط (`text-base md:text-sm`)
+مش على ارتفاع الزر. لو المالك عايز الديسكتوب يرجّع 40px، ده سطر واحد في `posTileClass`/`posStepperClass`.
+
+**التحقق الحي (`:9100` + باكند `:4000` على صالة اختبار):** الارقام من 4 منتجات حقيقية اتعملت
+بالـ`API` (201 x4):
+
+    tile heights      : min 76px (4 tiles, 3 cols @584px)
+    stepper buttons   : min 48px (6)
+    payment buttons   : min 48px (3)
+    cart after taps   : Protein Bar ×2 = 90 ج.م · Water ×3 = 30 ج.م
+    total             : 120 ج.م  (2×45 + 3×10 ✓)
+    POST body         : {"member_id":null,"items":[{"product_id":"e3626521…","quantity":2},
+                          {"product_id":"063e3ed9…","quantity":1}],"payment_method":"cash"} → 201
+    invalidations     : GET /api/finance/sales 200 · GET /api/finance/summary 200
+    after submit      : السلة 0 أسطر · الإجمالي 0 ج.م · عدّادات الكروت اختفت
+
+**التوكنات في الوضعين (مقاسة بـ`getComputedStyle`):** tile = `rgb(255,253,249)` فوق `rgb(239,233,221)`
+ونص `rgb(18,28,42)` في الفاتح، و`rgb(23,44,36)` / `rgb(46,74,62)` / `rgb(238,240,232)` في الداكن —
+يعني `bg-card`/`border-hairline`/`text-foreground` بتتبع الثيم من غير أي لون حرفي.
+
+**مزلق قياس جديد (اتسجّل في الـhandover):** في تاب **مخفي** (`visibilityState=hidden`) الـCSS
+transitions بتتجمّد، فـ`getComputedStyle` بيرجع قيمة ما قبل التحويل — أول قراءة للداكن رجعت الورق
+الفاتح على كارت فيه `transition-colors`، مع إن `--card` نفسه كان بقيمة الداكن. المزلق ده اتحلّ بـ
+`el.style.transition='none'` قبل القراءة. والمقارنة كانت بـ`<div class="bg-card">` جديد في نفس
+الـDOM (`rgb(23,44,36)` = صح) — وده اللي أثبت إن المشكلة من القياس مش من الكود.
+
+**مزلق ثانٍ (مفيد للتحقق):** جلسة الكوكي بتاعة المالك على `localhost:9000` **مش بتتشارك** مع
+`127.0.0.1:9100` — الكوكي host-based مش port-based. فتح الـdev على `127.0.0.1` معناه إني سجلت
+دخول صالة الاختبار من غير ما أطلع جلسة المالك بره حسابها.
+
+
+**بقايا معلنة:** صالة الاختبار `zz-fresh-mvbuhpxa` ارجعت مؤقتًا للتحقق (خطتها Starter،
+و`planGuard` ما بيسمحش بـ`products` على Starter — فأسندتها Pro بالـSQL)، وبعدين اتصلحت:
+`pos_order_items` 4 + `financial_transactions` 2 + `pos_orders` 2 + `products` 4 = **صفر**،
+الخطّة رجعت Starter/basic، والصالة اتمسحت تاني (`archived` + `is_active=false` + تعطيل المدير).
+الباقي الوحيد: **4 أسطر في `activity_logs`** للـsandbox (append-only، وقاعدة المشروع ما بيسمحش
+إن أسطرها تتمسح). صالة «حامد جيم» ما اتلمّشت: `products 0 · members 0 · orders 0` وحالتها نشطة.
+
+
+**أدوات التحقق:** front `tsc --noEmit` = **0** · `vite build` ✓ **6.93s** · مفيش تعديل في أي ملف تاني
+(`SalesPage.tsx` بس)، ومفيش حزم جديدة اتثبتت.
+
