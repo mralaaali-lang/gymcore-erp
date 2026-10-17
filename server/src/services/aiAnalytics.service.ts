@@ -94,13 +94,14 @@ export async function predictChurn(
     LEFT JOIN (
       SELECT gym_id, COUNT(*) AS count
       FROM attendance_logs
-      WHERE checked_in_at >= CURRENT_DATE - INTERVAL '30 days'
+      WHERE check_in_time >= CURRENT_DATE - INTERVAL '30 days' AND deleted_at IS NULL
       GROUP BY gym_id
     ) recent_usage ON g.id = recent_usage.gym_id
     LEFT JOIN (
       SELECT gym_id, COUNT(*) AS count
       FROM attendance_logs
-      WHERE checked_in_at BETWEEN CURRENT_DATE - INTERVAL '60 days' AND CURRENT_DATE - INTERVAL '30 days'
+      WHERE check_in_time BETWEEN CURRENT_DATE - INTERVAL '60 days' AND CURRENT_DATE - INTERVAL '30 days'
+        AND deleted_at IS NULL
       GROUP BY gym_id
     ) prev_usage ON g.id = prev_usage.gym_id
   `;
@@ -188,6 +189,65 @@ export async function predictChurn(
 
 // ─── Plan Recommendations ────────────────────────────────────────────
 
+/**
+ * §61 — مصدر أسماء الباقات هو الكتالوج الجاري، مش نص ثابت في الكود.
+ *
+ * migration 079 غيّرت الكتالوج (Starter/Pro/Growth/Enterprise => Basic/
+ * Advanced/Complete)، لكن التوصيات والـprompt بقوا ينطقوا القديم — و«Professional»
+ * اسم ما كانش موجود أصلًا في `billing_plans`، فوجه المنصة كان يعرض باقة وهمية.
+ * أي توصية أو نص تسويقي بقى يتبني من `getActivePlanCatalog()` فلا يكذب لما
+ * الكتالوج يتغير تاني من شاشة المنصة.
+ */
+export interface ActivePlan {
+  id: string;
+  name: string;
+  name_ar: string;
+  max_members: number;
+  max_staff: number;
+  price_monthly: number;
+}
+
+/** الباقات النشطة المرتبة من الأرخص للأغلى (نفس صفوف شاشة «محرك الفوترة»). */
+export async function getActivePlanCatalog(): Promise<ActivePlan[]> {
+  const { rows } = await pool.query(
+    `SELECT id, name, name_ar, max_members, max_staff, price_monthly
+       FROM billing_plans
+      WHERE is_active AND deleted_at IS NULL
+      ORDER BY price_monthly ASC, name ASC`,
+  );
+  // أعمدة numeric بترجع نص من pg — بالتحويل الطبقات تتقارن كأرقام مش كسلاسل.
+  return rows.map((r: any) => ({
+    id: r.id,
+    name: r.name,
+    name_ar: r.name_ar,
+    max_members: Number(r.max_members),
+    max_staff: Number(r.max_staff),
+    price_monthly: Number(r.price_monthly),
+  }));
+}
+
+export interface PlanTiers {
+  entry: ActivePlan;
+  mid: ActivePlan;
+  top: ActivePlan;
+}
+
+/**
+ * ثلاث طبقات مقاسة من الكتالوج: الأرخص = دخول، الأوسط = وسط، الأغلى = أعلى.
+ * الترتيب بيتعمل هنا كمان (مش في الـSQL بس) فأي منادٍ يدي مصفوفة غير مرتبة
+ * ياخد نفس النتيجة، والمتساوي في السعر يرجع لاسم الباقة كمرجع ثابت.
+ */
+export function planTiers(catalog: ActivePlan[]): PlanTiers | null {
+  if (catalog.length === 0) return null;
+  const byPrice = [...catalog].sort(
+    (a, b) => a.price_monthly - b.price_monthly || a.name.localeCompare(b.name),
+  );
+  const entry = byPrice[0];
+  const top = byPrice[byPrice.length - 1];
+  const mid = byPrice.length >= 3 ? byPrice[Math.floor((byPrice.length - 1) / 2)] : top;
+  return { entry, mid, top };
+}
+
 export interface PlanRecommendation {
   gym_id: string;
   gym_name: string;
@@ -201,6 +261,11 @@ export interface PlanRecommendation {
  * Recommend plan upgrades based on usage patterns and billing history
  */
 export async function recommendPlans(): Promise<PlanRecommendation[]> {
+  // §61: الطبقات تُقرأ من الكتالوج الحي. بلا باقة نشطة ما فيش توصية صادقة —
+  // الأفضل صفحة فاضية من اسم مخترع على وجه المنصة.
+  const tiers = planTiers(await getActivePlanCatalog());
+  if (!tiers) return [];
+
   const query = `
     SELECT
       g.id AS gym_id,
@@ -219,7 +284,8 @@ export async function recommendPlans(): Promise<PlanRecommendation[]> {
     LEFT JOIN billing_invoices bi ON g.id = bi.gym_id
     LEFT JOIN billing_plans bp ON bi.plan_id = bp.id
     LEFT JOIN attendance_logs al ON g.id = al.gym_id
-      AND al.checked_in_at >= CURRENT_DATE - INTERVAL '90 days'
+      AND al.check_in_time >= CURRENT_DATE - INTERVAL '90 days'
+      AND al.deleted_at IS NULL
     GROUP BY g.id, g.name, bp.name
     HAVING COUNT(DISTINCT bi.id) > 0
   `;
@@ -231,21 +297,21 @@ export async function recommendPlans(): Promise<PlanRecommendation[]> {
     const usageIntensity = row.usage_intensity;
     const totalBills = parseInt(row.total_bills, 10) || 1;
 
-    let recommendedPlan = 'Professional';
+    let recommendedPlan = tiers.mid.name;
     let reason = '';
     let confidence = 0.5;
 
     if (usageIntensity === 'high' && paymentRate >= 0.8) {
-      recommendedPlan = 'Enterprise';
-      reason = 'High usage with strong payment history — suitable for premium tier';
+      recommendedPlan = tiers.top.name;
+      reason = `High usage with strong payment history — ${tiers.top.name} is the top of the live catalog`;
       confidence = 0.85;
     } else if (usageIntensity === 'medium' && paymentRate >= 0.6) {
-      recommendedPlan = 'Professional';
+      recommendedPlan = tiers.mid.name;
       reason = 'Moderate usage with good payment track record';
       confidence = 0.75;
     } else if (usageIntensity === 'low' || paymentRate < 0.5) {
-      recommendedPlan = 'Starter';
-      reason = 'Low usage or inconsistent payment — recommend entry plan';
+      recommendedPlan = tiers.entry.name;
+      reason = `Low usage or inconsistent payment — recommend the entry plan (${tiers.entry.name})`;
       confidence = 0.7;
     } else {
       reason = 'Current plan appears suitable based on available data';
@@ -347,6 +413,8 @@ export interface AISuggestion {
  */
 export async function generateSuggestions(): Promise<AISuggestion[]> {
   const suggestions: AISuggestion[] = [];
+  // §61: نص فرصة الترقية يذكر أسماء الكتالوج الحقيقي لا أسماء قديمة.
+  const tiers = planTiers(await getActivePlanCatalog());
 
   // 1. Overdue invoice alerts
   const overdueResult = await pool.query(`
@@ -379,7 +447,8 @@ export async function generateSuggestions(): Promise<AISuggestion[]> {
            COUNT(DISTINCT al.id) AS checkin_count_90d
     FROM gyms g
     JOIN attendance_logs al ON g.id = al.gym_id
-    WHERE al.checked_in_at >= CURRENT_DATE - INTERVAL '90 days'
+    WHERE al.check_in_time >= CURRENT_DATE - INTERVAL '90 days'
+      AND al.deleted_at IS NULL
     GROUP BY g.id, g.name
     HAVING COUNT(DISTINCT al.id) > 50
     ORDER BY checkin_count_90d DESC
@@ -392,7 +461,11 @@ export async function generateSuggestions(): Promise<AISuggestion[]> {
       gym_id: row.gym_id,
       gym_name: row.gym_name,
       title: '💡 فرصة ترقية الباقة',
-      description: `الصالة تشهد ${row.checkin_count_90d} دخول خلال 90 يوم — باقة Professional أو Enterprise قد تكون مناسبة`,
+      description: `الصالة تشهد ${row.checkin_count_90d} دخول خلال 90 يوم — ${
+        tiers
+          ? `باقة «${tiers.mid.name_ar}» أو «${tiers.top.name_ar}» قد تكون مناسبة`
+          : 'كتالوج المنصة ما فيهوش باقة نشطة دلوقتي، فالترقية متوقفة على إضافة واحدة'
+      }`,
       priority: 'medium',
     });
   }
@@ -403,7 +476,8 @@ export async function generateSuggestions(): Promise<AISuggestion[]> {
            COUNT(DISTINCT al.id) AS checkin_count_90d
     FROM gyms g
     LEFT JOIN attendance_logs al ON g.id = al.gym_id
-      AND al.checked_in_at >= CURRENT_DATE - INTERVAL '90 days'
+      AND al.check_in_time >= CURRENT_DATE - INTERVAL '90 days'
+      AND al.deleted_at IS NULL
     GROUP BY g.id, g.name
     HAVING COUNT(DISTINCT al.id) < 5 AND g.created_at < CURRENT_DATE - INTERVAL '180 days'
     ORDER BY checkin_count_90d ASC

@@ -5061,3 +5061,60 @@ probe بعد **120ms** = **447×328** (ذيل الأنيميشن)، probe بعد
 و`git ls-files` عليها = **0**. **ولا `push` ولا deploy ولا إعادة بناء `:9000`** (**D7**: 24 عملة غير مدفوعة قبل commit الدفعة — جلسة B أضافت `582cfd8` أثناء هذه الدفعة، فالعدّ بقى 24 بعد ما كان 23 وقت القياس) ·
 **تدوير كلمة مرور الصالة الرملية و`JWT_SECRET`** · والدفعة دي بتضيف قرارين للمالك: **زر إغلاق صريح للوحات العرض بلا footer**
 («تقارير البرايفت» §59 + «عرض العقد» §60) و**الفوكس أثناء pending** (`disabled` بيسقط الكيرسر على `<body>`).
+
+## §61 — أسماء الباقات في توصيات الـAI تُقاس من الكتالوج الحي، وعمود وهمي كان يرمي 500 (2026-10-18 — جلسة B)
+
+**كان:**
+- `recommendPlans()` بيرجع أسماء حرفية `Starter`/`Professional`/`Enterprise`، والنص العربي في
+  `generateSuggestions()` كان بيقول «باقة Professional أو Enterprise». القياس:
+  `count(*) FROM billing_plans WHERE is_active AND deleted_at IS NULL AND name IN ('Starter','Professional','Enterprise')` =
+  **0**، و`name='Professional'` = **0 صفوف** (الاسم ده ما كانش موجود أصلًا ولا في أي نسخة من
+  الكتالوج). وشاشة `src/pages/super-admin/AIAnalytics.tsx:182` بتطبع `recommended_plan` كما هي —
+  فوجه المنصة كان بيعرض باقة وهمية.
+- الـprompt في `geminiAdapter.generatePlanRecommendation` كان بيعدد نفس الثلاث مع حدود مخترعة
+  («up to 50 members, 2 staff»)، والكتالوج الحقيقي حدوده `300 / -1 / -1` أعضاء و`3 / 10 / -1` موظفين.
+- **العيب كان أكبر من الأسماء:** استعلامات `aiAnalytics.service.ts` كلها بتكتب
+  `attendance_logs.checked_in_at`، والعمود ده **مش في الـschema** (مقاس:
+  `information_schema.columns WHERE table_name='attendance_logs' AND column_name='checked_in_at'` =
+  **0 صفوف**؛ الاسم الصحيح `check_in_time`، ولا migration قط ذكرت `checked_in_at`). النتيجة:
+  `recommendPlans()` بيرمي استثناء → `GET /api/platform/ai/plan-recommendations` = **500**، و
+  `getAIDashboard` بينادي الدوال الأربعة جوه `Promise.all` فما يرجعش أي حاجة. ده فضل مكتوم لأن
+  مفيش اختبار بيشغّل الشجرة دي، و`tsc` ما يمسكش أسماء أعمدة جوّه سلاسل SQL.
+
+**بقى:**
+- `getActivePlanCatalog()` + `planTiers()` في نفس الملف: الباقات النشطة مرتبة بالسعر ثم الاسم،
+  والأعمدة `numeric` بتتحوّل لـ`number` (pg بيرجعها نص، فمقارنة السعر بتبقى نصية لو سِبتها).
+  الطبقات = أرخص / أوسط / أعلى، وكتالوج فاضي = `null` → `recommendPlans()` يرجع `[]` بدل اسم مخترع.
+- `recommendPlans()` و`generateSuggestions()` بيبْنوا الأسماء من الكتالوج؛ نص فرصة الترقية بذكر
+  `name_ar` («المتقدمة» / «الشاملة»).
+- `generatePlanRecommendation` بقى ياخد `plans: PlanCatalogEntry[]` من الكتالوج ويبني منه سطر
+  «Available plans» وقائمة الاختيار، و`-1` ⇒ `unlimited`، وبيرجع `null` لو الكتالوج فاضي.
+- `checked_in_at` ⇒ `check_in_time` في **5** مواضع، ومعاها `deleted_at IS NULL` زي بقية استعلامات
+  الحضور في `analytics.ts`.
+
+**القياس (بعد):**
+
+| التحقق | الطريقة | النتيجة |
+| --- | --- | --- |
+| الكتالوج والطبقات | probe (`ts-node`) على القاعدة المحلية | `Basic/390 · Advanced/550 · Complete/790` وكلها `number` — الطبقات `Basic → Advanced → Complete` |
+| جودة التوصية | `recommendPlans()` | **10 صفوف** · أسماء موصى بها `["Advanced","Complete"]` · خارج الكتالوج = **0** |
+| النص العربي | `generateSuggestions()` | 14 اقتراحًا · 5 فرص ترقية · مثال: «أطلس جيم — الصالة تشهد 2970 دخول خلال 90 يوم — باقة «المتقدمة» أو «الشاملة» قد تكون مناسبة» |
+| الدوال التانية اللي كانت 500 | `predictChurn(90)` · `forecastRevenue(3)` | **36 صفًا** · **3 أشهر** (17715.73 / 18038.11 / 18360.48) |
+| الأسماء القديمة في الكود | `grep "'Starter'\|'Professional'\|'Enterprise'" server/src` | **0** |
+| الحذف الناعم في الحضور | `count(*) FROM attendance_logs WHERE deleted_at IS NOT NULL` | **0** (الف محليًا — الفرق بيظهر في أي قاعدة فيها حذف ناعم) |
+| أنواع + اختبارات | `npx tsc --noEmit` · `npx vitest run tests/unit` | **0** أخطاء · **25/25** (5 جديدة لـ`planTiers`) |
+
+اختبارات `planTiers` بتغطي: الترتيب بالسعر (مش بترتيب المصفوفة) · كتالوج فاضي = `null` · باقة واحدة =
+الطبقات التلاتة متطابقة · باقتان ⇒ الوسط = الأعلى · التساوي في السعر ⇒ الاسم مرجع.
+
+**معلَنات:**
+1. المسار HTTP (`GET /api/platform/ai/plan-recommendations`) ما اتقيسش بمنادي حقيقي لأن دخول
+   المنصة محتاج جلسة platform-admin بحساب المالك؛ التحقق اتعمل على مستوى الخدمة بنفس `pool`
+   ونفس الـschema، وده يغطي سبب الـ500 (اسم العمود) مباشرة.
+2. `generatePlanRecommendation` لسه **مش بيتنادى من أي مكان** (dead export) — اتصلّح عشان ما
+   يكرّشش نص قديم لما يتفعّل، والتوصية نفسها لسه قاعدة-استنادية. تحويلها لـLLM شغل مستقل.
+3. `planTiers` بياخد «الأوسط» من المنتصف، فمع باقتين الوسط = الأعلى؛ السلوك ده متغطى باختبار
+   ومش هيتغير غير لما شاشة المنصة يبقى لها ترتيب طبقات صريح.
+4. النافذة الزمنية لسا `CURRENT_DATE - INTERVAL …` بتوقيت السيرفر مقابل `timestamptz` — سلوك
+   قديم متورّط مع بند التوقيتات (§34ث) وما اتلمسش عشان الأرقام تتقارن قبل/بعد.
+5. `server/src/scripts/_zz-b-ai-plan-probe.ts` اتكتب للقياس و**اتمسح** بعده؛ ولا `push` ولا deploy.

@@ -130,6 +130,18 @@ Format as JSON:
 }
 
 /**
+ * §61 — سطر الباقات في الـprompt يتبني من الكتالوج الحي، مش من نص ثابت:
+ * الأسماء القديمة (Starter/Professional/Enterprise) اتسحبت من `billing_plans`
+ * في migration 079 وحلت مكانها Basic/Advanced/Complete، و«Professional» ما
+ * كانش اسم موجود أصلًا. المنادي يمرّ `plans` من `getActivePlanCatalog()`.
+ */
+export interface PlanCatalogEntry {
+  name: string;
+  max_members: number;
+  max_staff: number;
+}
+
+/**
  * Generate a natural-language plan recommendation using Gemini
  */
 export async function generatePlanRecommendation(params: {
@@ -139,12 +151,19 @@ export async function generatePlanRecommendation(params: {
   payment_rate: number;
   member_count: number;
   staff_count: number;
+  plans: PlanCatalogEntry[];
 }): Promise<{
   recommendation: string;
   confidence: number;
   reasoning: string;
 } | null> {
   if (!isGeminiAvailable()) return null;
+  if (params.plans.length === 0) return null;
+
+  const limit = (n: number) => (n < 0 ? 'unlimited' : String(n));
+  const available = params.plans
+    .map((p) => `${p.name} (up to ${limit(p.max_members)} members, ${limit(p.max_staff)} staff)`)
+    .join(', ');
 
   const prompt = `Based on the following gym data, recommend the best billing plan:
 
@@ -155,11 +174,11 @@ Payment Rate: ${(params.payment_rate * 100).toFixed(0)}%
 Members: ${params.member_count}
 Staff: ${params.staff_count}
 
-Available plans: Starter (up to 50 members, 2 staff), Professional (up to 200 members, 10 staff), Enterprise (unlimited).
+Available plans: ${available}
 
 Respond in JSON:
 {
-  "recommendation": "Starter | Professional | Enterprise",
+  "recommendation": "${params.plans.map((p) => p.name).join(' | ')}",
   "confidence": 0.0-1.0,
   "reasoning": "Brief explanation in Arabic"
 }`;
