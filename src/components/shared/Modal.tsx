@@ -24,6 +24,18 @@ export interface ModalProps {
   disableDismiss?: boolean;
   /** Merged with `tailwind-merge`, so `max-w-*` here overrides `size`. */
   className?: string;
+  /**
+   * Text direction of the panel. Omit it only when the surrounding page already
+   * drives direction through the document.
+   *
+   * Needed because the panel is portalled to `<body>`, outside `AppLayout`, and
+   * `index.html` pins `<html dir="rtl">` permanently — `AppLayout` flips `dir`
+   * on its own inner containers, never on `<html>`. Without this prop a dialog
+   * opened from the English UI still renders RTL (keyline, close-button corner,
+   * label alignment), and the hand-rolled panels it replaces each carried an
+   * explicit `dir={rtl ? 'rtl' : 'ltr'}` to work around exactly that.
+   */
+  dir?: 'rtl' | 'ltr';
 }
 
 /** The four widths the legacy panels actually used: 24 / 28 / 32 / 42rem. */
@@ -58,7 +70,8 @@ const SIZES: Record<NonNullable<ModalProps['size']>, string> = {
  * - centred, never a side drawer;
  * - `bg-card` + `border-hairline` + `rounded-shell`, no shadow — depth from the
  *   keyline;
- * - every colour from a token, so dark mode retints it with no page change.
+ * - every colour from a token, so dark mode retints it with no page change;
+ * - `dir` is a prop, not an inference from `index.html` (see `ModalProps.dir`).
  */
 export default function Modal({
   open,
@@ -70,6 +83,7 @@ export default function Modal({
   footer,
   disableDismiss = false,
   className = '',
+  dir,
 }: ModalProps) {
   /*
    * Radix's own "return focus to what opened me" does not work for a dialog
@@ -83,17 +97,29 @@ export default function Modal({
    * and the caret lands on the body. A keyboard user therefore restarts the Tab
    * walk from the top of the document after every popup.
    *
-   * The opener is captured here, during render, at the moment `open` flips to
-   * true: the portal has not mounted yet, so `document.activeElement` is still
-   * the button or row the user just activated. Restoring happens from
-   * `onCloseAutoFocus`, which is Radix's own unmount hook — `preventDefault()`
-   * opts out of the broken restore instead of racing it with a timer.
+   * The opener is captured here, during render, the first time this dialog is
+   * seen open: the portal has not mounted yet, so `document.activeElement` is
+   * still the button or row the user just activated. Restoring happens from
+   * `onCloseAutoFocus`, which is Radix's own unmount hook (`FocusScope
+   * onUnmountAutoFocus`) — `preventDefault()` opts out of the broken restore
+   * instead of racing it with a timer.
+   *
+   * `wasOpenRef` starts at `false`, not at `open`, because the product mounts
+   * popups in two different shapes and both have to work. Measured in Chromium
+   * on 2026-10-17 (LOCAL_TESTING_REPORT §49): `MembersPage` renders
+   * `{editing && <EditMemberModal …>}`, so `Modal`'s FIRST render already has
+   * `open === true`; initialising the ref to `open` made the flip test never
+   * fire, nothing was captured, and after Escape the caret fell back to `<body>`
+   * — i.e. the fix shipped in `78718c2` was silently inert for the dominant
+   * pattern. A persistently mounted `<Modal open={flag}>` (the other shape)
+   * still relies on the flip, which `false` preserves.
    */
   const openerRef = useRef<HTMLElement | null>(null);
-  const wasOpenRef = useRef(open);
+  const wasOpenRef = useRef(false);
   if (open && !wasOpenRef.current) {
     const active = document.activeElement;
-    openerRef.current = active instanceof HTMLElement ? active : null;
+    openerRef.current =
+      active instanceof HTMLElement && active !== document.body ? active : null;
   }
   wasOpenRef.current = open;
 
@@ -105,6 +131,7 @@ export default function Modal({
       }}
     >
       <DialogContent
+        dir={dir}
         // `description` is optional and, when omitted, nothing is passed for
         // `aria-describedby`: Radix only emits the attribute once a
         // `Dialog.Description` has registered (verified in the installed

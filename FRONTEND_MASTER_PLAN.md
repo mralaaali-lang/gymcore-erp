@@ -141,13 +141,28 @@ CDP (المتصفح المدمج ما بيرفعش أحداث كيبورد وه�
 الحجم: commit واحد للموجة (`22f59dd`) + commit تاني للتحقق الحيّ والإصلاح اللي طلع منه
 (الموجة ما اتقسمتش أكتر من كده).
 
-### موجة 3 — المنبثقات المتبقية (34 ملفًا / 41 موضعًا — معاد قياسه 11:18 على `ace9306`)
+### موجة 3 — المنبثقات المتبقية (معاد قياسه على `dc317ac`: `src/pages` **31 ملفًا / 38 موضعًا** — و`src/**` 36/44)
+
+**الحالة بعد دفعة الاستكشاف (1/ ملف واحد، قرار المالك):** `EditMemberModal` اتحوّل واتقاس حيًّا
+(§49) → المتبقي `src/pages` **30 ملفًا / 37 موضعًا** (`src/**` 35/43). اللقطات القديمة اللي
+كانت بتقول 34/41 و9 قبل كده ما بقيتش متطابقة مع التعريف ده — الأرقام فوق من `git grep` على نفس
+الـglob، تتعاد قبل أي دفعة.
 
 الهدف: تصفير `fixed inset-0` اليدوي في `src/pages` على `shared/Modal`.
 الترتيب (بدايةً من اللي هتنزلها موجة 4 و5 نفس الجلسة): `EditMemberModal` · `ImportMembersModal` · `subscriptions/AddSubscription` · `subscriptions/EditSubscription` · `team/StaffDirectory` · `store/PurchasesPanel` · `store/SuppliersPanel` — بعدين `super-admin/contracts/ContractDetailModal` و`ContractFormModal` و`BillingEngine` و`TenantDirectory` و`PlatformAdmins` و`PlatformMarketing`.
 الحاجة: كل مودال بيتحوّل = **مطابقة العقد القديم** (sizes 24/28/32/42rem) + `disableDismiss={busy}` لو فيه mutation + أزرار الأكشن برا `<form>` بـ`form="id"`.
 الخطورة: **متوسطة** (فخّ الـ`animate-out` في الـviewport بلا سطح — §6 بند 13 من الـhandover).
 بوابة القبول: لكل دفعة (3–5 ملفات): `tsc` + build + فتح/إغلاق حقيقي بالمتصفح بالـ`setTimeout` مش rAF + `role=dialog` مقروب + صفر `fixed inset-0` في الملفات المتحوّلة.
+**أربع حاجات طلعت من دفعة الاستكشاف وبتسري على كل دفعة جايّة (§49):**
+(أ) `dir` بقى prop في `shared/Modal` — اللوحة بتتعمل portal على `<body>` خارج `AppLayout`
+و`index.html` مثبّت `dir="rtl"`، فأي مودال في صفحة إنجليزي لازم يمرّي `dir={rtl ? 'rtl' : 'ltr'}`؛
+(ب) مقروب الـdialog يتاخد بـ`[...querySelectorAll('[role="dialog"]')].pop()` — أول مطابقة بترجع
+عقدة الـexit animation وبتطلّع أرقام مقلوبة (45.6px، scrim «مبيقفلش»، فوكس BODY)؛
+(ج) استرجاع الفوكس يتقاس على **كل** مسارات القفل وفي نمطَي التركيب
+(`<Modal open={flag}>` و`{cond && <Modal open/>}`) — التاني هو الغالب وكان اللي خبّى العيب؛
+(د) لقياس `disableDismiss` على mutation حقيقية: شدّ **توقيت** الطلب بـCDP `Fetch.requestPaused`
++ `continueRequest` بعد ~1600ms (الـ`latency` emulation لوحدها ما بتمسكش طلب بيفشل عند النقل في
+12ms)، والقياس يتسجّل من عيّنة جوّه الصفحة كل 16ms مش من Node.
 الحجم: 6–8 دفعات = 6–8 commits.
 
 ### موجة 4 — الجداول على `DataTable` (49 صفحة)
