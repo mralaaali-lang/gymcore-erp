@@ -103,7 +103,7 @@ export default function TenantDirectory() {
   const total = data?.total ?? 0;
   const actionGym = gyms.find((gym) => gym.id === openDropdownId) ?? null;
 
-  const { data: plansRes } = useApiQuery(['platform', 'plans'], listBillingPlans, { staleTime: 60_000 });
+  const { data: plansRes } = useApiQuery(['platform', 'plans'], () => listBillingPlans(), { staleTime: 60_000 });
   const plans = plansRes?.data ?? [];
 
   // ── عدّادات الحالة من الخادم (نفس فلتر الصفحة، limit=1 لقراءة total) ──

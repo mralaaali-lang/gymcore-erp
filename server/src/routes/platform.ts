@@ -30,6 +30,7 @@ import {
 // Billing
 import {
   listBillingPlans, createBillingPlan, updateBillingPlan, deleteBillingPlan,
+  setPlanDiscount, togglePlanDiscount, deletePlanDiscount,
   listInvoices, getBillingSummary, initiateFawryPayment,
   createCustomPlan, listCustomPlans,
   setTrialPeriod, listTrials,
@@ -42,7 +43,7 @@ import {
 } from '../controllers/platformAddons';
 // Coupons
 import {
-  listCoupons, createCoupon, deleteCoupon, validateCoupon,
+  listCoupons, createCoupon, updateCoupon, toggleCoupon, deleteCoupon, validateCoupon,
 } from '../controllers/platformCoupons';
 // System & misc
 import { listAuditLogs, getSystemStatus, listTickets, updateTicketStatus, listBroadcasts, createBroadcast, getTicketAnalytics, assignTicket, addTicketRating, listKnowledgeBase, createKnowledgeBase, updateKnowledgeBase, deleteKnowledgeBase } from '../controllers/platformAdmin';
@@ -81,7 +82,8 @@ import {
   createGymSchema, setGymActiveSchema,
   createPlatformAdminSchema, updatePlatformAdminSchema,
   createBillingPlanSchema, updateBillingPlanSchema, initiateFawryPaymentSchema,
-  createCouponSchema, validateCouponInputSchema,
+  setPlanDiscountSchema, togglePlanDiscountSchema,
+  createCouponSchema, updateCouponSchema, validateCouponInputSchema,
   updateTicketStatusSchema, createBroadcastSchema,
   updateNotificationSettingsSchema, sendTestNotificationSchema,
   saveOnboardingStepSchema, completeOnboardingSchema, updatePlatformSettingsSchema,
@@ -208,6 +210,10 @@ router.get('/billing/plans', listBillingPlans);
 router.post('/billing/plans', validate(createBillingPlanSchema), createBillingPlan);
 router.put('/billing/plans/:id', validate(updateBillingPlanSchema), updateBillingPlan);
 router.delete('/billing/plans/:id', deleteBillingPlan);
+// §46 — خصم الباقة: إقامة/تعديل، تفعيل/تعطيل، وحذف (يرجع السعر الكامل)
+router.post('/billing/plans/:id/discount', validate(setPlanDiscountSchema), setPlanDiscount);
+router.patch('/billing/plans/:id/discount/toggle', validate(togglePlanDiscountSchema), togglePlanDiscount);
+router.delete('/billing/plans/:id/discount', deletePlanDiscount);
 // §36: كتالوج الإضافات + إسناد لكل صالة (سعر مخفّض بيد السوبر-أدمن)
 router.get('/billing/addons', listAddons);
 router.post('/billing/addons', createAddon);
@@ -238,9 +244,11 @@ router.get('/overview', getPlatformOverview);
 router.get('/enforcement', listEnforcementQueue);
 router.get('/security/audit', listPlatformAuditLogs);
 
-// Coupons & Promo Codes
+// Coupons & Promo Codes — §46: إنشاء/تعديل/تفعيل/حذف على الصيغة القانونية
 router.get('/billing/coupons', listCoupons);
 router.post('/billing/coupons', validate(createCouponSchema), createCoupon);
+router.put('/billing/coupons/:id', validate(updateCouponSchema), updateCoupon);
+router.patch('/billing/coupons/:id/toggle', toggleCoupon);
 router.delete('/billing/coupons/:id', deleteCoupon);
 router.post('/billing/coupons/validate', validate(validateCouponInputSchema), validateCoupon);
 

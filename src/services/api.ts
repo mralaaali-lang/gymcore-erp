@@ -1,4 +1,4 @@
-﻿import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -134,16 +134,16 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 
 let isRefreshing = false;
 let failedQueue: Array<{
-  resolve: (token: string) => void;
+  resolve: (token?: string | null) => void;
   reject: (err: unknown) => void;
 }> = [];
 
-function processQueue(error: unknown, token: string | null) {
+function processQueue(error: unknown, token: string | null = null) {
   failedQueue.forEach((p) => {
     if (error) {
       p.reject(error);
     } else {
-      p.resolve(token!);
+      p.resolve(token);
     }
   });
   failedQueue = [];
@@ -179,8 +179,10 @@ api.interceptors.response.use(
           isRefreshing = true;
           try {
             await axios.post(`${API_BASE}/auth/refresh`, {}, { withCredentials: true });
+            processQueue(null, null);
             return api(originalRequest);
-          } catch {
+          } catch (refreshErr) {
+            processQueue(refreshErr, null);
             clearTokens();
             window.location.href = '/login';
             return Promise.reject(error);
@@ -188,13 +190,17 @@ api.interceptors.response.use(
             isRefreshing = false;
           }
         }
-        // Another refresh is in flight — retry against the fresh cookie.
+        // Another refresh is in flight — queue behind it instead of racing before the cookie is set.
         originalRequest._retry = true;
-        return api(originalRequest);
+        return new Promise<string | null | undefined>((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(() => api(originalRequest))
+          .catch(() => Promise.reject(error));
       }
 
       if (isRefreshing) {
-        return new Promise<string | undefined>((resolve, reject) => {
+        return new Promise<string | null | undefined>((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then((token) => {
           if (token) originalRequest.headers.Authorization = `Bearer ${token}`;
@@ -1525,8 +1531,8 @@ export async function createDebt(data: { member_id: string; amount: number; due_
 }
 // §45 — partial payment is official: amount may be less than the remaining;
 // the server books a real payment row and returns the new remaining.
-export async function payDebt(id: string, amount: number, note?: string) {
-  const res = await api.post(`/api/finance/debts/${id}/pay`, { amount, note });
+export async function payDebt(id: string, amount: number, note?: string, payment_method?: string) {
+  const res = await api.post(`/api/finance/debts/${id}/pay`, { amount, note, payment_method });
   return res.data as { success: boolean; paid: number; remaining: number; status: string };
 }
 // §34ث — shift rows now include reconciliation figures computed server-side
@@ -2434,12 +2440,133 @@ export async function createBroadcast(data: { title: string; content: string; ta
 // ====================================================================
 // PLATFORM ADMIN — Billing
 // ====================================================================
+/**
+ * §46 — مفاتيح الوحدات التي يقرأها `planGuard` فعليًا (features.modules).
+ * القاموس مغلق: أي مفتاح آخر يُكتب ولا يُقرأ أبدًا، فيظهر في الواجهة كمسمّى
+ * يتحكم في شيئًا لا exists.
+ */
+export interface PlanModules {
+  dashboard?: boolean;
+  attendance?: boolean;
+  products?: boolean;
+  inventory?: boolean;
+  daily_reports?: boolean;
+  marketing?: boolean;
+  class_booking?: boolean;
+  training?: boolean;
+  whatsapp?: boolean;
+  white_label?: boolean;
+}
+
 export interface BillingPlan {
   id: string; name: string; name_ar: string;
+  /** السعر المحمَّل الآن: equal لـ discounted وهو الخصم مفعّل، ولـ list وهو معطّل. */
   price_monthly: number; price_yearly: number;
   max_staff: number; max_members: number; max_gyms: number;
-  features: string[]; is_active: boolean;
+  features: { modules?: PlanModules } | string[];
+  is_active: boolean;
   annual_discount_percent?: number;
+  // ── §46 طبقة الخصم ───────────────────────────────────
+  list_price_monthly?: number | null;
+  list_price_yearly?: number | null;
+  discounted_price_monthly?: number | null;
+  discounted_price_yearly?: number | null;
+  discount_active?: boolean;
+  /** نسبة الخصم المطبقة على الدورة المعروضة (0 عند عدم وجود خصم). */
+  discount_percent?: number;
+  has_discount?: boolean;
+  badge?: string | null;
+  badge_ar?: string | null;
+  /** نقاط ✔️ الظهور على الكارت (عرض فقط — الصلاحيات في features.modules). */
+  highlights?: string[];
+  highlights_en?: string[];
+}
+
+/** جسم تحرير الباقة: كل حقل غائب يبقى كما هو في قاعدة البيانات. */
+export interface BillingPlanInput {
+  name?: string; name_ar?: string;
+  price_monthly?: number; price_yearly?: number;
+  list_price_monthly?: number | null; list_price_yearly?: number | null;
+  discounted_price_monthly?: number | null; discounted_price_yearly?: number | null;
+  discount_active?: boolean;
+  max_staff?: number; max_members?: number; max_gyms?: number;
+  features?: { modules: PlanModules };
+  highlights?: string[]; highlights_en?: string[];
+  badge?: string | null; badge_ar?: string | null;
+  is_active?: boolean;
+}
+
+/** نتيجة حذف الباقة: الحذف الفعلي مستحيل وهي محل إشارة — تُعطَّل وتبقى. */
+export interface PlanDeleteResult {
+  id: string;
+  deleted: boolean;
+  deactivated: boolean;
+  live_contracts?: number;
+  invoices?: number;
+  gyms?: number;
+}
+
+export async function listBillingPlans(opts?: {
+  includeArchived?: boolean;
+}): Promise<{ data: BillingPlan[] }> {
+  const res = await api.get('/platform/billing/plans', {
+    params: opts?.includeArchived === true ? { include_archived: 'true' } : undefined,
+  });
+  return res.data;
+}
+
+export async function createBillingPlan(
+  payload: BillingPlanInput
+): Promise<{ data: BillingPlan }> {
+  const res = await api.post('/platform/billing/plans', payload);
+  return res.data;
+}
+
+export async function updateBillingPlan(
+  id: string,
+  payload: BillingPlanInput
+): Promise<{ data: BillingPlan }> {
+  const res = await api.put(`/platform/billing/plans/${id}`, payload);
+  return res.data;
+}
+
+export async function deleteBillingPlan(
+  id: string
+): Promise<{ data: PlanDeleteResult; message?: string }> {
+  const res = await api.delete(`/platform/billing/plans/${id}`);
+  return res.data;
+}
+
+/** إقامة/تعديل خصم الباقة (السعران + حالة التفعيل). */
+export async function setPlanDiscount(
+  id: string,
+  payload: {
+    list_price_monthly?: number | null;
+    list_price_yearly?: number | null;
+    discounted_price_monthly?: number | null;
+    discounted_price_yearly?: number | null;
+    active?: boolean;
+  }
+): Promise<{ data: BillingPlan }> {
+  const res = await api.post(`/platform/billing/plans/${id}/discount`, payload);
+  return res.data;
+}
+
+/** تفعيل/تعطيل الخصم — بدون payload يقلب الحالة المخزّنة. */
+export async function togglePlanDiscount(
+  id: string,
+  payload?: { active?: boolean }
+): Promise<{ data: BillingPlan }> {
+  const res = await api.patch(`/platform/billing/plans/${id}/discount/toggle`, payload ?? {});
+  return res.data;
+}
+
+/** حذف الخصم: تخرج طبقة الخصم بالكامل وترجع الباقة لسعرها الكامل. */
+export async function deletePlanDiscount(
+  id: string
+): Promise<{ data: BillingPlan }> {
+  const res = await api.delete(`/platform/billing/plans/${id}/discount`);
+  return res.data;
 }
 
 export interface BillingInvoice {
@@ -2452,11 +2579,6 @@ export interface BillingSummary {
   paid_count: number; paid_total: number;
   pending_count: number; pending_total: number;
   overdue_count: number; plans: number; active_gyms: number;
-}
-
-export async function listBillingPlans(): Promise<{ data: BillingPlan[] }> {
-  const res = await api.get('/platform/billing/plans');
-  return res.data;
 }
 
 // ====================================================================
@@ -2823,20 +2945,48 @@ export async function listPlatformAudit(params?: {
 // ====================================================================
 // PLATFORM ADMIN — Coupons & Promo Codes
 // ====================================================================
+/**
+ * §46 — الصيغة القانونية لجدول `billing_coupons` هي صيغة migration 043
+ * (`type` / `value` / `used_count` / `starts_at` / `expires_at`) لأنها التي
+ * يعمل بها خصم الطلبات الحقيقي في `coupon.service.ts`. أعمدة صيغة 022
+ * القديمة (`discount_type` / `discount_value` / `current_uses` /
+ * `valid_until`) رحّلت بياناتها 080 ولم تعد تُقرأ ولا تُكتب.
+ */
+export type CouponType = 'percentage' | 'fixed_amount';
+export type CouponTier = 'basic' | 'premium' | 'enterprise';
+
 export interface BillingCoupon {
   id: string;
   code: string;
   description: string | null;
-  discount_type: 'percentage' | 'fixed';
-  discount_value: number;
-  max_uses: number;
-  current_uses: number;
+  type: CouponType;
+  value: number;
+  max_uses: number | null;
+  used_count: number;
+  min_order_amount: number;
+  min_plan_tier: CouponTier | null;
   max_discount_amount: number | null;
-  min_plan_tier: string | null;
-  valid_from: string;
-  valid_until: string | null;
+  starts_at: string | null;
+  expires_at: string | null;
   is_active: boolean;
+  platform_wide: boolean;
+  gym_id: string | null;
   created_at: string;
+  updated_at?: string;
+}
+
+export interface CouponInput {
+  code?: string;
+  description?: string | null;
+  type?: CouponType;
+  value?: number;
+  max_uses?: number | null;
+  min_order_amount?: number | null;
+  min_plan_tier?: CouponTier | null;
+  max_discount_amount?: number | null;
+  starts_at?: string | null;
+  expires_at?: string | null;
+  is_active?: boolean;
 }
 
 export async function listCoupons(): Promise<{ data: BillingCoupon[] }> {
@@ -2844,16 +2994,30 @@ export async function listCoupons(): Promise<{ data: BillingCoupon[] }> {
   return res.data;
 }
 
-export async function createCoupon(payload: {
-  code: string; discount_type: 'percentage' | 'fixed'; discount_value: number;
-  description?: string; max_uses?: number; max_discount_amount?: number;
-  min_plan_tier?: string; valid_until?: string;
-}): Promise<{ data: BillingCoupon }> {
+export async function createCoupon(payload: CouponInput): Promise<{ data: BillingCoupon }> {
   const res = await api.post('/platform/billing/coupons', payload);
   return res.data;
 }
 
-export async function deleteCoupon(id: string): Promise<{ data: { message: string } }> {
+export async function updateCoupon(
+  id: string,
+  payload: CouponInput
+): Promise<{ data: BillingCoupon }> {
+  const res = await api.put(`/platform/billing/coupons/${id}`, payload);
+  return res.data;
+}
+
+export async function toggleCoupon(
+  id: string,
+  payload?: { active?: boolean }
+): Promise<{ data: BillingCoupon }> {
+  const res = await api.patch(`/platform/billing/coupons/${id}/toggle`, payload ?? {});
+  return res.data;
+}
+
+export async function deleteCoupon(id: string): Promise<{
+  data: { id: string; deleted: boolean; deactivated: boolean; invoices?: number; usages?: number; message?: string };
+}> {
   const res = await api.delete(`/platform/billing/coupons/${id}`);
   return res.data;
 }

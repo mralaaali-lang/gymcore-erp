@@ -10,7 +10,7 @@ import {
   type PlatformGym,
   type ContractCycle,
 } from '../../../services/api';
-import { apiError, fmtMoney, todayIso, FIELD_CLASS, LABEL_CLASS, BTN_PRIMARY, BTN_SECONDARY } from './contractsUtils';
+import { apiError, fmtMoney, cycleLabel, todayIso, FIELD_CLASS, LABEL_CLASS, BTN_PRIMARY, BTN_SECONDARY } from './contractsUtils';
 
 // §40 — مودال إبرام/تعديل عقد منصة (وسطي، كل رقم من الكتالوج الحقيقي)
 
@@ -162,11 +162,26 @@ export default function ContractFormModal({ mode, contract, gyms, plans, isRtl, 
                 onChange={(e) => { setPlanId(e.target.value); applyPlanDefaults(e.target.value, cycle); }}
                 className={`${FIELD_CLASS} disabled:opacity-60`}
               >
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {(isRtl ? p.name_ar : p.name) || p.name} — {fmtMoney(p.price_monthly, currency)}/{t('mo', 'شهر')}
+                {mode === 'edit' && contract && !plans.some((p) => p.id === contract.plan_id) ? (
+                  // الباقات القديمة صارت خارج الكتالوج النشط: العقد لا يظهر بباقة
+                  // مجهولة، بل باسمها المخزّن مع صراحة أنها مؤرشفة.
+                  <option value={contract.plan_id}>
+                    {(isRtl ? contract.plan_name_ar : contract.plan_name) || contract.plan_name} — {t('archived plan', 'باقة مؤرشفة')}
                   </option>
-                ))}
+                ) : null}
+                {plans.map((p) => {
+                  // §46: السعر المعروض هو المحمَّل في الدورة المختارة، والسعر
+                  // الكامل يُذكر صراحة وهو الخصم سارٍ (select لا يقبل شطبًا).
+                  const charged = cycle === 'yearly' ? p.price_yearly : p.price_monthly;
+                  const full = cycle === 'yearly' ? p.list_price_yearly : p.list_price_monthly;
+                  const struck = p.discount_active && full != null && Number(full) > Number(charged);
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {(isRtl ? p.name_ar : p.name) || p.name} — {fmtMoney(charged, currency)}/{cycleLabel(cycle, isRtl)}
+                      {struck ? ` (${t('instead of', 'بدلاً من')} ${fmtMoney(full, currency)})` : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div>

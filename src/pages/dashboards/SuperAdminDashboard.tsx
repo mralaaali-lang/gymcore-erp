@@ -84,7 +84,7 @@ export default function SuperAdminDashboard() {
   const { data: enforcementRes } = useApiQuery(['platform', 'enforcement'], getEnforcementQueue, { staleTime: 30_000 });
   const { data: auditRes } = useApiQuery(['platform', 'audit', 'recent'], () => listPlatformAudit({ limit: 8 }), { staleTime: 30_000 });
   const { data: gymsRes } = useApiQuery(['platform', 'gyms'], listPlatformGyms, { staleTime: 30_000 });
-  const { data: plansRes } = useApiQuery(['platform', 'plans'], listBillingPlans, { staleTime: 300_000 });
+  const { data: plansRes } = useApiQuery(['platform', 'plans'], () => listBillingPlans(), { staleTime: 300_000 });
   const { data: onboardingRes } = useApiQuery(['onboarding-progress'], getOnboardingProgress, { staleTime: 60_000 });
 
   const ov = overviewRes?.data;

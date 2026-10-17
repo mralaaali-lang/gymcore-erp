@@ -590,16 +590,6 @@ export const updatePlatformAdminSchema = z.object({
 // ====================================================================
 // PLATFORM BILLING — Plans, Fawry
 // ====================================================================
-export const createBillingPlanSchema = z.object({
-  name: sanitizedString({ min: 1, max: 255 }),
-  name_ar: sanitizedString({ min: 1, max: 255 }).optional(),
-  price_monthly: z.preprocess(parseNumeric, z.number().min(0)),
-  price_yearly: z.preprocess(parseNumeric, z.number().min(0)).optional(),
-  max_staff: z.preprocess(parseNumeric, z.number().int().min(1)).default(5),
-  max_members: z.preprocess(parseNumeric, z.number().int().min(1)).default(100),
-  max_gyms: z.preprocess(parseNumeric, z.number().int().min(1)).default(1),
-  features: z.union([z.array(z.string()), z.record(z.unknown())]).optional(),
-});
 
 /** Coerce string → number so numeric fields from PostgreSQL (returned as
  *  strings for `numeric` columns) survive validation. */
@@ -609,21 +599,76 @@ function parseNumeric(val: unknown): unknown {
   return Number.isNaN(n) ? val : n;
 }
 
+/** قبول true/false أو 'true'/'false' أو 1/0 — arrive من forms وquery strings. */
+const booleanish = z.preprocess((val) => {
+  if (val === 'true' || val === true || val === 1 || val === '1') return true;
+  if (val === 'false' || val === false || val === 0 || val === '0') return false;
+  return val;
+}, z.boolean());
+
+// -1 = بلا حد (المتعارف عليه في billing_plans/planGuard)، لذا min(-1) لا min(1).
+const planLimit = z.preprocess(parseNumeric, z.number().int().min(-1).max(100000));
+const planPrice = z.preprocess(parseNumeric, z.number().min(0).max(10000000));
+const planHighlights = z.array(z.string().trim().min(1).max(200)).max(20);
+
+/** §46 أعمدة الخصم — كلها اختيارية في الطلب، والاتساق يُتحقق في السيرفر. */
+const planPricingFields = {
+  price_monthly: planPrice.optional(),
+  price_yearly: planPrice.optional(),
+  list_price_monthly: planPrice.nullish(),
+  list_price_yearly: planPrice.nullish(),
+  discounted_price_monthly: planPrice.nullish(),
+  discounted_price_yearly: planPrice.nullish(),
+  discount_active: booleanish.nullish(),
+};
+
+export const createBillingPlanSchema = z.object({
+  name: sanitizedString({ min: 1, max: 100 }),
+  name_ar: sanitizedString({ min: 1, max: 100 }).optional(),
+  ...planPricingFields,
+  max_staff: planLimit.default(5),
+  max_members: planLimit.default(100),
+  max_gyms: planLimit.default(1),
+  features: z.union([z.array(z.string()), z.record(z.unknown())]).optional(),
+  highlights: planHighlights.optional(),
+  highlights_en: planHighlights.optional(),
+  badge: sanitizedString({ max: 80 }).nullish(),
+  badge_ar: sanitizedString({ max: 120 }).nullish(),
+  is_active: booleanish.optional(),
+});
+
 export const updateBillingPlanSchema = z.object({
-  name: sanitizedString({ min: 1, max: 255 }).nullish(),
-  name_ar: sanitizedString().nullish(),
-  price_monthly: z.preprocess(parseNumeric, z.number().min(0)).nullish(),
-  price_yearly: z.preprocess(parseNumeric, z.number().min(0)).nullish(),
-  max_staff: z.preprocess(parseNumeric, z.number().int().min(1)).nullish(),
-  max_members: z.preprocess(parseNumeric, z.number().int().min(1)).nullish(),
-  max_gyms: z.preprocess(parseNumeric, z.number().int().min(1)).nullish(),
+  name: sanitizedString({ min: 1, max: 100 }).nullish(),
+  name_ar: sanitizedString({ min: 1, max: 100 }).nullish(),
+  ...planPricingFields,
+  max_staff: planLimit.nullish(),
+  max_members: planLimit.nullish(),
+  max_gyms: planLimit.nullish(),
   features: z.union([z.array(z.string()), z.record(z.unknown())]).nullish(),
-  is_active: z.preprocess((val) => {
-    if (val === 'true' || val === true) return true;
-    if (val === 'false' || val === false) return false;
-    return val;
-  }, z.boolean()).nullish(),
+  highlights: planHighlights.nullish(),
+  highlights_en: planHighlights.nullish(),
+  badge: sanitizedString({ max: 80 }).nullish(),
+  badge_ar: sanitizedString({ max: 120 }).nullish(),
+  is_active: booleanish.nullish(),
 }).passthrough();
+
+/** §46 — تفعيل/تعطيل خصم الباقة (بدون body = قلب الحالة الحالية). */
+export const togglePlanDiscountSchema = z.object({
+  active: booleanish.optional(),
+});
+
+/** §46 — إقامة أو تعديل خصم باقة: لازم حقل سعر واحد على الأقل. */
+export const setPlanDiscountSchema = z.object({
+  list_price_monthly: planPrice.nullish(),
+  list_price_yearly: planPrice.nullish(),
+  discounted_price_monthly: planPrice.nullish(),
+  discounted_price_yearly: planPrice.nullish(),
+  active: booleanish.optional().default(true),
+}).refine(
+  (v) => [v.list_price_monthly, v.list_price_yearly, v.discounted_price_monthly, v.discounted_price_yearly]
+    .some((x) => x !== null && x !== undefined),
+  { message: 'أدخل سعرًا: قبل الخصم أو السعر الآن.', path: ['discounted_price_yearly'] },
+);
 
 export const initiateFawryPaymentSchema = z.object({
   gym_id: z.string().uuid(),
@@ -632,20 +677,46 @@ export const initiateFawryPaymentSchema = z.object({
 });
 
 // ====================================================================
-// PLATFORM COUPONS
+// PLATFORM COUPONS — §46 الصيغة القانونية (type/value/starts_at/expires_at)
 // ====================================================================
+const couponDate = z.union([
+  z.string().regex(/^\d{4}-\d{2}-\d{2}$/),                       // تاريخ بسيط
+  z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/), // ISO
+]);
+
 export const createCouponSchema = z.object({
   code: sanitizedString({ min: 3, max: 50 }),
-  description: sanitizedString({ max: 500 }).optional(),
-  discount_type: z.enum(['percentage', 'fixed']).default('percentage'),
-  discount_value: z.number().min(0),
-  max_uses: z.number().int().min(1).optional(),
-  max_discount_amount: z.number().min(0).optional(),
-  min_plan_tier: sanitizedString().optional(),
-  valid_until: z.string().optional(),
-  min_amount: z.number().min(0).optional(),
-  first_purchase_only: z.boolean().default(false),
+  description: sanitizedString({ max: 500 }).nullish(),
+  type: z.enum(['percentage', 'fixed_amount']).default('percentage'),
+  value: z.preprocess(parseNumeric, z.number().min(0).max(1000000)),
+  max_uses: z.preprocess(parseNumeric, z.number().int().min(1).max(1000000)).nullish(),
+  min_order_amount: z.preprocess(parseNumeric, z.number().min(0)).nullish(),
+  min_plan_tier: z.enum(['basic', 'premium', 'enterprise']).nullish(),
+  max_discount_amount: z.preprocess(parseNumeric, z.number().min(0)).nullish(),
+  starts_at: couponDate.nullish(),
+  expires_at: couponDate.nullish(),
+  is_active: booleanish.optional(),
 });
+
+/**
+ * كل حقل اختيارية، والغائب لا يتغير. الـnull يمسح.
+ * ملاحظة تصميم: لا يمكن اشتقاق هذا المخطط بـ `.partial()` على مخطط الإنشاء —
+ * مخطط الإنشاء فيه `.default()`، والافتراضيات كانت تُحقن في جسم الطلب فتُعيد
+ * `type` إلى percentage عند تعديل الوصف وحده (تخريب صامت للبيانات).
+ */
+export const updateCouponSchema = z.object({
+  code: sanitizedString({ min: 3, max: 50 }).nullish(),
+  description: sanitizedString({ max: 500 }).nullish(),
+  type: z.enum(['percentage', 'fixed_amount']).nullish(),
+  value: z.preprocess(parseNumeric, z.number().min(0).max(1000000)).nullish(),
+  max_uses: z.preprocess(parseNumeric, z.number().int().min(1).max(1000000)).nullish(),
+  min_order_amount: z.preprocess(parseNumeric, z.number().min(0)).nullish(),
+  min_plan_tier: z.enum(['basic', 'premium', 'enterprise']).nullish(),
+  max_discount_amount: z.preprocess(parseNumeric, z.number().min(0)).nullish(),
+  starts_at: couponDate.nullish(),
+  expires_at: couponDate.nullish(),
+  is_active: booleanish.nullish(),
+}).refine((v) => Object.keys(v).length > 0, { message: 'لا يوجد حقل لتعديله.' });
 
 export const validateCouponInputSchema = z.object({
   code: z.string().min(1),

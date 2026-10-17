@@ -54,7 +54,7 @@ export default function AddGymModal({ open, onClose, onSuccess }: AddGymModalPro
 
   const { data: plansData } = useQuery({
     queryKey: ['platform', 'billing', 'plans'],
-    queryFn: listBillingPlans,
+    queryFn: () => listBillingPlans(),
     staleTime: 60_000,
     enabled: open,
   });
@@ -406,12 +406,22 @@ export default function AddGymModal({ open, onClose, onSuccess }: AddGymModalPro
                   required
                   disabled={isSubmitting || !plans.length}
                 >
-                  <option value="">{isRtl ? 'â€” اختر الباقة â€”' : 'â€” Select Plan â€”'}</option>
-                  {plans.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {isRtl ? p.name_ar || p.name : p.name} â€” Monthly: {p.price_monthly}
-                    </option>
-                  ))}
+                  <option value="">{isRtl ? '— اختر الباقة —' : '— Select Plan —'}</option>
+                  {plans.map((p) => {
+                    // §46: نفس منطق الإبرام — السعر المعروض هو المحمَّل في الدورة
+                    // المختارة، والسعر الكامل يُذكر صراحة وهو الخصم سارٍ.
+                    const yearly = form.billing_cycle === 'yearly';
+                    const charged = Number(yearly ? p.price_yearly : p.price_monthly);
+                    const full = yearly ? p.list_price_yearly : p.list_price_monthly;
+                    const struck = Boolean(p.discount_active) && full != null && Number(full) > charged;
+                    const money = (v: number | string | null | undefined) => Number(v ?? 0).toLocaleString('en-US');
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {(isRtl ? p.name_ar || p.name : p.name)} — {yearly ? (isRtl ? 'سنوي' : 'Yearly') : (isRtl ? 'شهري' : 'Monthly')}: {money(charged)} {isRtl ? 'ج.م' : 'EGP'}
+                        {struck ? ` — ${isRtl ? `بدلاً من ${money(full)}` : `instead of ${money(full)}`}` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>

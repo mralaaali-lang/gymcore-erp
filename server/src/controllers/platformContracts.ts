@@ -23,13 +23,19 @@ function cycleInterval(cycle: Cycle): string {
   return cycle === 'yearly' ? '1 year' : '1 month';
 }
 
+/**
+ * سعر الكتالوج لحظة الإبرام. §46: الباقة المعطّلة (المؤرشفة) لا يُبرَم عليها
+ * عقد جديد — تبقى مرئية في العقود والفواتير القديمة فقط، وإلا صار الإبرام
+ * يسند صالة لكتالوج مات وسعره.
+ */
 async function planPrice(client: PoolClient, planId: string, cycle: Cycle): Promise<number | null> {
   const r = await client.query(
-    `SELECT ${cycle === 'yearly' ? 'price_yearly' : 'price_monthly'} AS price
+    `SELECT ${cycle === 'yearly' ? 'price_yearly' : 'price_monthly'} AS price, is_active
      FROM billing_plans WHERE id = $1 AND deleted_at IS NULL`,
     [planId]
   );
-  return r.rows[0] ? Number(r.rows[0].price) : null;
+  if (!r.rows.length || !r.rows[0].is_active) return null;
+  return Number(r.rows[0].price);
 }
 
 const CONTRACT_FULL_SELECT = `
@@ -162,7 +168,7 @@ export const createContract = async (req: Request, res: Response): Promise<void>
       await client.query('COMMIT'); return;
     }
     const catalogPrice = await planPrice(client, plan_id, cycle);
-    if (catalogPrice === null) { bad(res, 404, 'Billing plan not found.', 'PLAN_NOT_FOUND'); await client.query('COMMIT'); return; }
+    if (catalogPrice === null) { bad(res, 404, 'Billing plan not found or archived.', 'PLAN_NOT_FOUND'); await client.query('COMMIT'); return; }
 
     const finalPrice = price !== undefined && price !== null ? Number(price) : catalogPrice;
     if (!Number.isFinite(finalPrice) || finalPrice < 0) { bad(res, 400, 'price must be a non-negative number.', 'INVALID_PRICE'); await client.query('COMMIT'); return; }

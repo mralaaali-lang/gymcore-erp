@@ -34,7 +34,7 @@ export default function ContractsPanel({ isRtl, t }: Props) {
     { staleTime: 20_000 },
   );
   const { data: gymsRes } = useApiQuery(['platform', 'gyms'], listPlatformGyms, { staleTime: 30_000 });
-  const { data: plansRes } = useApiQuery(['platform', 'plans'], listBillingPlans, { staleTime: 300_000 });
+  const { data: plansRes } = useApiQuery(['platform', 'plans'], () => listBillingPlans(), { staleTime: 300_000 });
 
   const contracts = contractsRes?.data ?? [];
   const gyms = gymsRes?.data ?? [];

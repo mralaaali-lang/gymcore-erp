@@ -3,10 +3,53 @@ import * as Sentry from '@sentry/node';
 import { getAdminClient } from '../config/database';
 import logger from '../config/logger';
 import { logPlatformAudit } from '../utils/platformAudit';
+import {
+  resolvePlanPricing,
+  pricingProblem,
+  discountPercent,
+  type PlanPricingPatch,
+  type ResolvedPlanPricing,
+} from '../services/planPricing.service';
 
 /** Safely extract error message from unknown error type */
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+// §46 — الحقول القابلة للتحرير على الباقة (نفس الأسماء في الواجهة والـschema)
+const PLAN_EDITABLE_FIELDS = [
+  'name', 'name_ar', 'badge', 'badge_ar', 'max_staff', 'max_members', 'max_gyms',
+] as const;
+
+/** الحقول المالية فقط — تُفصل عن بقية الحقول لأن لها منطق اتساق خاص. */
+function pricingPatchOf(body: Record<string, unknown>): PlanPricingPatch {
+  const keys: Array<keyof PlanPricingPatch> = [
+    'price_monthly', 'price_yearly',
+    'list_price_monthly', 'list_price_yearly',
+    'discounted_price_monthly', 'discounted_price_yearly',
+    'discount_active',
+  ];
+  const patch: PlanPricingPatch = {};
+  for (const key of keys) {
+    if (body[key] !== undefined) (patch as Record<string, unknown>)[key] = body[key];
+  }
+  return patch;
+}
+
+/**
+ * طبقة الخصم لا تُكتب أبدًا يدويًا في SQL: تُحلَّ كل الأعمدة المالية معًا من
+ * الدالة النقية، فيستحيل أن يُكتب `price_*` قيمة تخالف `discount_active`.
+ */
+function pricingColumns(pricing: ResolvedPlanPricing): Record<string, unknown> {
+  return {
+    price_monthly: pricing.price_monthly,
+    price_yearly: pricing.price_yearly,
+    list_price_monthly: pricing.list_price_monthly,
+    list_price_yearly: pricing.list_price_yearly,
+    discounted_price_monthly: pricing.discounted_price_monthly,
+    discounted_price_yearly: pricing.discounted_price_yearly,
+    discount_active: pricing.discount_active,
+  };
 }
 
 export const initiateFawryPayment = async (req: Request, res: Response): Promise<void> => {
@@ -46,22 +89,47 @@ export const initiateFawryPayment = async (req: Request, res: Response): Promise
 // ====================================================================
 // BILLING PLANS & INVOICES
 // ====================================================================
+
+/** سطر الباقة الحالي —كل عمليات الكتابة تبدأ منه حتى تُحلَّ الأسعار بمعرفة الحالة المخزّنة. */
+async function loadPlan(client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }> }, id: string) {
+  const result = await client.query('SELECT * FROM billing_plans WHERE id = $1 AND deleted_at IS NULL', [id]);
+  return result.rows[0] ?? null;
+}
+
+/** الكروت المالية المحسوبة التي تُرد مع كل باقة (لا تُخزَّن — مشتقة دائمًا). */
+function withPlanDerived(plan: any) {
+  const pricing = resolvePlanPricing(plan);
+  // خصم السنوي مقابل الشهري×12 (قاعدة 065: شهران مجانًا)
+  let annual_discount_percent = 0;
+  if (Number(plan.price_monthly) > 0 && Number(plan.price_yearly) > 0) {
+    const annualIfMonthly = Number(plan.price_monthly) * 12;
+    annual_discount_percent = Math.max(0, Math.round((1 - Number(plan.price_yearly) / annualIfMonthly) * 100));
+  }
+  const hasDiscount = Boolean(plan.discount_active)
+    && (plan.discounted_price_monthly !== null || plan.discounted_price_yearly !== null);
+  return {
+    ...plan,
+    annual_discount_percent,
+    discount_percent: discountPercent(pricing),
+    has_discount: hasDiscount,
+  };
+}
+
 export const listBillingPlans = async (req: Request, res: Response): Promise<void> => {
   const client = await getAdminClient();
   try {
-    const result = await client.query('SELECT * FROM billing_plans ORDER BY price_monthly ASC');
-    const rows = result.rows.map((plan: any) => {
-      // Compute annual discount percentage dynamically
-      let annual_discount_percent = 0;
-      if (plan.price_monthly > 0 && plan.price_yearly > 0) {
-        const annualIfMonthly = plan.price_monthly * 12;
-        annual_discount_percent = Math.round((1 - plan.price_yearly / annualIfMonthly) * 100);
-        if (annual_discount_percent < 0) annual_discount_percent = 0;
-      }
-      return { ...plan, annual_discount_percent };
-    });
+    // §46: افتراضيًا الكتالوج النشط فقط (شاشات الإبرام وإضافة صالة لا يصح أن
+    // تعرض باقات معطّلة)، ومع ?include_archived=true تظهر القديمة التي لا تزال
+    // تحمل عقودًا سارية حتى تظل مقروءة في سجل التدقيق.
+    const includeArchived = ['true', '1'].includes(String(req.query.include_archived ?? ''));
+    const result = await client.query(
+      `SELECT * FROM billing_plans
+        WHERE deleted_at IS NULL
+          ${includeArchived ? '' : 'AND is_active'}
+        ORDER BY is_active DESC, price_yearly ASC, price_monthly ASC`
+    );
     await client.query('COMMIT');
-    res.json({ data: rows });
+    res.json({ data: result.rows.map(withPlanDerived) });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     Sentry.captureException(error);
@@ -73,23 +141,53 @@ export const listBillingPlans = async (req: Request, res: Response): Promise<voi
 export const createBillingPlan = async (req: Request, res: Response): Promise<void> => {
   const client = await getAdminClient();
   try {
-    const { name, name_ar, price_monthly, price_yearly, max_staff, max_members, max_gyms, features } = req.body;
+    const body = req.body as Record<string, any>;
+    const { name, name_ar, badge, badge_ar, max_staff, max_members, max_gyms, features } = body;
     if (!name || !name_ar) {
       res.status(400).json({ error: 'name and name_ar are required' });
+      await client.query('COMMIT');
       return;
     }
+    const pricing = resolvePlanPricing({}, pricingPatchOf(body));
+    const problem = pricingProblem(pricing);
+    if (problem) {
+      res.status(400).json({ error: problem, code: 'INVALID_PRICING' });
+      await client.query('COMMIT');
+      return;
+    }
+    const staff = max_staff ?? 5;
+    const gyms = max_gyms ?? 1;
     const result = await client.query(
-      `INSERT INTO billing_plans (name, name_ar, price_monthly, price_yearly, max_staff, max_members, max_gyms, features)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO billing_plans
+         (name, name_ar, price_monthly, price_yearly,
+          list_price_monthly, list_price_yearly,
+          discounted_price_monthly, discounted_price_yearly, discount_active,
+          max_staff, max_members, max_gyms, max_employees, max_branches,
+          features, highlights, highlights_en, badge, badge_ar, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        RETURNING *`,
-      [name, name_ar, price_monthly || 0, price_yearly || 0, max_staff || 5, max_members || 100, max_gyms || 1, JSON.stringify(features || [])]
+      [
+        name, name_ar, pricing.price_monthly, pricing.price_yearly,
+        pricing.list_price_monthly, pricing.list_price_yearly,
+        pricing.discounted_price_monthly, pricing.discounted_price_yearly, pricing.discount_active,
+        staff, max_members ?? 100, gyms, staff, gyms,
+        JSON.stringify(features ?? { modules: {} }),
+        JSON.stringify(body.highlights ?? []),
+        JSON.stringify(body.highlights_en ?? []),
+        badge ?? null, badge_ar ?? null,
+        body.is_active === undefined ? true : Boolean(body.is_active),
+      ]
     );
     await client.query('COMMIT');
     await logPlatformAudit({ action: 'CREATE', tableName: 'billing_plans', recordId: result.rows[0].id, newValues: result.rows[0], req });
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: withPlanDerived(result.rows[0]) });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     Sentry.captureException(error);
+    if (getErrorMessage(error).includes('idx_billing_plans_name')) {
+      res.status(409).json({ error: 'A plan with this name already exists.', code: 'PLAN_NAME_TAKEN' });
+      return;
+    }
     logger.error('createBillingPlan failed', { error: getErrorMessage(error) });
     res.status(500).json({ error: 'Internal server error.' });
   } finally { client.release(); }
@@ -99,28 +197,47 @@ export const updateBillingPlan = async (req: Request, res: Response): Promise<vo
   const client = await getAdminClient();
   try {
     const { id } = req.params;
-    const { name, name_ar, price_monthly, price_yearly, max_staff, max_members, max_gyms, features, is_active } = req.body;
-    const result = await client.query(
-      `UPDATE billing_plans SET
-        name = COALESCE($1, name),
-        name_ar = COALESCE($2, name_ar),
-        price_monthly = COALESCE($3, price_monthly),
-        price_yearly = COALESCE($4, price_yearly),
-        max_staff = COALESCE($5, max_staff),
-        max_members = COALESCE($6, max_members),
-        max_gyms = COALESCE($7, max_gyms),
-        features = COALESCE($8, features::text)::jsonb,
-        is_active = COALESCE($9, is_active)
-       WHERE id = $10 RETURNING *`,
-      [name, name_ar, price_monthly, price_yearly, max_staff, max_members, max_gyms, features ? JSON.stringify(features) : null, is_active, id]
-    );
-    await client.query('COMMIT');
-    if (result.rows.length === 0) {
+    const body = req.body as Record<string, any>;
+    const existing = await loadPlan(client, id);
+    if (!existing) {
       res.status(404).json({ error: 'Plan not found' });
+      await client.query('COMMIT');
       return;
     }
-    await logPlatformAudit({ action: 'UPDATE', tableName: 'billing_plans', recordId: req.params.id, newValues: result.rows[0], req });
-    res.json({ data: result.rows[0] });
+    const pricing = resolvePlanPricing(existing, pricingPatchOf(body));
+    const problem = pricingProblem(pricing);
+    if (problem) {
+      res.status(400).json({ error: problem, code: 'INVALID_PRICING' });
+      await client.query('COMMIT');
+      return;
+    }
+
+    // البناء ديناميكي لكن الأعمدة من قوائم حرفية ثابتة — لا حقل من body يدخل SQL نصًا.
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    const addCol = (col: string, value: unknown) => {
+      params.push(value);
+      sets.push(`${col} = $${params.length}`);
+    };
+
+    for (const field of PLAN_EDITABLE_FIELDS) {
+      if (body[field] !== undefined) addCol(field, body[field]);
+    }
+    if (body.features !== undefined) addCol('features', JSON.stringify(body.features));
+    if (body.highlights !== undefined) addCol('highlights', JSON.stringify(body.highlights));
+    if (body.highlights_en !== undefined) addCol('highlights_en', JSON.stringify(body.highlights_en));
+    if (body.is_active !== undefined) addCol('is_active', body.is_active === true || body.is_active === 'true');
+    for (const [col, value] of Object.entries(pricingColumns(pricing))) addCol(col, value);
+    // الأعمدة القديمة المكررة للحدود (036) تظل مرآة صحيحة: planGuard يقرأ max_branches
+    // من billing_plans، فلو تحرّك max_gyms وحده تبقى الحدود متضاربة.
+    if (body.max_staff !== undefined) addCol('max_employees', body.max_staff);
+    if (body.max_gyms !== undefined) addCol('max_branches', body.max_gyms);
+
+    params.push(id);
+    const result = await client.query(`UPDATE billing_plans SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`, params);
+    await client.query('COMMIT');
+    await logPlatformAudit({ action: 'UPDATE', tableName: 'billing_plans', recordId: id, oldValues: existing, newValues: result.rows[0], req });
+    res.json({ data: withPlanDerived(result.rows[0]) });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     Sentry.captureException(error);
@@ -129,18 +246,195 @@ export const updateBillingPlan = async (req: Request, res: Response): Promise<vo
   } finally { client.release(); }
 };
 
+// ====================================================================
+// §46 — خصم الباقة: إنشاء/تعديل، تفعيل/تعطيل، حذف
+// ====================================================================
+
+/** POST /billing/plans/:id/discount — يقيم أو يعدّل خصم الباقة (السعران + حالة التفعيل). */
+export const setPlanDiscount = async (req: Request, res: Response): Promise<void> => {
+  const client = await getAdminClient();
+  try {
+    const { id } = req.params;
+    const body = req.body as Record<string, any>;
+    const existing = await loadPlan(client, id);
+    if (!existing) {
+      res.status(404).json({ error: 'Plan not found' });
+      await client.query('COMMIT');
+      return;
+    }
+    const pricing = resolvePlanPricing(existing, {
+      list_price_monthly: body.list_price_monthly,
+      list_price_yearly: body.list_price_yearly,
+      discounted_price_monthly: body.discounted_price_monthly,
+      discounted_price_yearly: body.discounted_price_yearly,
+      discount_active: body.active === undefined ? true : Boolean(body.active),
+    });
+    const problem = pricingProblem(pricing);
+    if (problem) {
+      res.status(400).json({ error: problem, code: 'INVALID_DISCOUNT' });
+      await client.query('COMMIT');
+      return;
+    }
+    const result = await client.query(
+      `UPDATE billing_plans SET
+         list_price_monthly = $1, list_price_yearly = $2,
+         discounted_price_monthly = $3, discounted_price_yearly = $4,
+         discount_active = $5, price_monthly = $6, price_yearly = $7
+       WHERE id = $8 RETURNING *`,
+      [
+        pricing.list_price_monthly, pricing.list_price_yearly,
+        pricing.discounted_price_monthly, pricing.discounted_price_yearly,
+        pricing.discount_active, pricing.price_monthly, pricing.price_yearly, id,
+      ]
+    );
+    await client.query('COMMIT');
+    await logPlatformAudit({ action: 'UPDATE', tableName: 'billing_plans', recordId: id, oldValues: existing, newValues: result.rows[0], req });
+    res.json({ data: withPlanDerived(result.rows[0]) });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    Sentry.captureException(error);
+    logger.error('setPlanDiscount failed', { error: getErrorMessage(error) });
+    res.status(500).json({ error: 'Internal server error.' });
+  } finally { client.release(); }
+};
+
+/** PATCH /billing/plans/:id/discount/toggle — بلا body يقلب الحالة، ومع `active` يحدّدها. */
+export const togglePlanDiscount = async (req: Request, res: Response): Promise<void> => {
+  const client = await getAdminClient();
+  try {
+    const { id } = req.params;
+    const existing = await loadPlan(client, id);
+    if (!existing) {
+      res.status(404).json({ error: 'Plan not found' });
+      await client.query('COMMIT');
+      return;
+    }
+    const requested = req.body?.active;
+    const nextActive = requested === undefined ? !existing.discount_active : Boolean(requested);
+    if (nextActive && existing.discounted_price_monthly === null && existing.discounted_price_yearly === null) {
+      res.status(400).json({
+        error: 'لا يوجد سعر مخفّض لهذه الباقة — أضف «السعر الآن» أولًا.',
+        code: 'NO_DISCOUNT_PRICE',
+      });
+      await client.query('COMMIT');
+      return;
+    }
+    const pricing = resolvePlanPricing(existing, { discount_active: nextActive });
+    const problem = pricingProblem(pricing);
+    if (problem) {
+      res.status(400).json({ error: problem, code: 'INVALID_DISCOUNT' });
+      await client.query('COMMIT');
+      return;
+    }
+    const result = await client.query(
+      `UPDATE billing_plans SET
+         discount_active = $1, price_monthly = $2, price_yearly = $3
+       WHERE id = $4 RETURNING *`,
+      [pricing.discount_active, pricing.price_monthly, pricing.price_yearly, id]
+    );
+    await client.query('COMMIT');
+    await logPlatformAudit({
+      action: pricing.discount_active ? 'ACTIVATE' : 'DEACTIVATE',
+      tableName: 'billing_plans', recordId: id,
+      oldValues: { discount_active: existing.discount_active, price_monthly: existing.price_monthly, price_yearly: existing.price_yearly },
+      newValues: { discount_active: pricing.discount_active, price_monthly: pricing.price_monthly, price_yearly: pricing.price_yearly },
+      req,
+    });
+    res.json({ data: withPlanDerived(result.rows[0]) });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    Sentry.captureException(error);
+    logger.error('togglePlanDiscount failed', { error: getErrorMessage(error) });
+    res.status(500).json({ error: 'Internal server error.' });
+  } finally { client.release(); }
+};
+
+/** DELETE /billing/plans/:id/discount — يحذف الخصم ويعيد الباقة لسعرها الكامل (الباقة نفسها تبقى). */
+export const deletePlanDiscount = async (req: Request, res: Response): Promise<void> => {
+  const client = await getAdminClient();
+  try {
+    const { id } = req.params;
+    const existing = await loadPlan(client, id);
+    if (!existing) {
+      res.status(404).json({ error: 'Plan not found' });
+      await client.query('COMMIT');
+      return;
+    }
+    // السعر الكامل المرجعي هو price القادم؛ وحيث لا يوجد سعر كامل (خصم أُدخل
+    // بدون مرجع) يبقى السعر الحالي كما هو بدل أن يُصفَّر.
+    const fullMonthly = existing.list_price_monthly ?? existing.price_monthly;
+    const fullYearly = existing.list_price_yearly ?? existing.price_yearly;
+    const result = await client.query(
+      `UPDATE billing_plans SET
+         price_monthly = $1, price_yearly = $2,
+         list_price_monthly = NULL, list_price_yearly = NULL,
+         discounted_price_monthly = NULL, discounted_price_yearly = NULL,
+         discount_active = false
+       WHERE id = $3 RETURNING *`,
+      [fullMonthly, fullYearly, id]
+    );
+    await client.query('COMMIT');
+    await logPlatformAudit({
+      action: 'DELETE', tableName: 'billing_plans', recordId: id,
+      oldValues: {
+        list_price_monthly: existing.list_price_monthly, list_price_yearly: existing.list_price_yearly,
+        discounted_price_monthly: existing.discounted_price_monthly, discounted_price_yearly: existing.discounted_price_yearly,
+        discount_active: existing.discount_active,
+      },
+      newValues: { discount_active: false, price_monthly: fullMonthly, price_yearly: fullYearly },
+      req,
+    });
+    res.json({ data: withPlanDerived(result.rows[0]) });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    Sentry.captureException(error);
+    logger.error('deletePlanDiscount failed', { error: getErrorMessage(error) });
+    res.status(500).json({ error: 'Internal server error.' });
+  } finally { client.release(); }
+};
+
 export const deleteBillingPlan = async (req: Request, res: Response): Promise<void> => {
   const client = await getAdminClient();
   try {
     const { id } = req.params;
-    const result = await client.query('DELETE FROM billing_plans WHERE id = $1 RETURNING id', [id]);
-    await client.query('COMMIT');
-    if (result.rows.length === 0) {
+    const existing = await loadPlan(client, id);
+    if (!existing) {
       res.status(404).json({ error: 'Plan not found' });
+      await client.query('COMMIT');
       return;
     }
-    await logPlatformAudit({ action: 'DELETE', tableName: 'billing_plans', recordId: id, oldValues: { id }, req });
-    res.json({ data: { id: result.rows[0].id, deleted: true } });
+    // حذف فعلي مستحيل ما دام هناك عقد/فاتورة/صالة تشير للباقة — الأرقام التاريخية
+    // مقدسة. الحل: تعطيل (تخرج من الإبرام ومن إضافة صالة) وتبقى في «المؤرشفة».
+    const refs = await client.query(
+      `SELECT
+         (SELECT count(*)::int FROM platform_contracts WHERE plan_id = $1 AND status = 'active') AS live_contracts,
+         (SELECT count(*)::int FROM billing_invoices   WHERE plan_id = $1) AS invoices,
+         (SELECT count(*)::int FROM gyms               WHERE plan_id = $1) AS gyms`,
+      [id]
+    );
+    const { live_contracts, invoices, gyms } = refs.rows[0];
+    if (live_contracts > 0 || invoices > 0 || gyms > 0) {
+      const disabled = await client.query(
+        'UPDATE billing_plans SET is_active = false WHERE id = $1 RETURNING *', [id]
+      );
+      await client.query('COMMIT');
+      await logPlatformAudit({
+        action: 'DEACTIVATE', tableName: 'billing_plans', recordId: id,
+        oldValues: { is_active: existing.is_active },
+        newValues: { is_active: false, live_contracts, invoices, gyms }, req,
+      });
+      res.json({
+        data: {
+          id, deleted: false, deactivated: true, live_contracts, invoices, gyms,
+        },
+        message: `الباقة عليها ${live_contracts} عقد سارٍ و${gyms} صالة — عُطّلت بدل الحذف حتى لا تتغير أرقام تاريخية.`,
+      });
+      return;
+    }
+    const result = await client.query('DELETE FROM billing_plans WHERE id = $1 RETURNING id, name', [id]);
+    await client.query('COMMIT');
+    await logPlatformAudit({ action: 'DELETE', tableName: 'billing_plans', recordId: id, oldValues: existing, req });
+    res.json({ data: { id: result.rows[0].id, deleted: true, deactivated: false } });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     Sentry.captureException(error);
