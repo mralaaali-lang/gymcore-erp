@@ -3190,20 +3190,81 @@ transparent }` بتغطي الخمس صيغ (`focus:ring`، `focus-visible:ring`
 الـSidebar، وEnter على صف يفتح مودال التعديل، وحبس الفوكس في `Modal`) **ما اتقِش في التطبيق
 الشغّان** — قاعدة `staff_users` فيها **63 حساب، 62 منهم `is_active = false`** (السيد بيخلقهم
 موقوفين)، والحساب النشط الوحيد هو بريد المالك الشخصي. دخول المدير المؤسس بيتكد بمسار
-`!staff.is_active` بيرجع **401** عام، فما سجّلتش بدخول المالك ولا عملت حساب بديل. اللي عايز
-يكمّل النقص ده: يفعّل حساب واحد (`update staff_users set is_active = true where email = '…'`)
-أو يدّي بيانات دخول شغّالة، وبعدين على `http://127.0.0.1:9100` يتأكد إن أول Tab بيوقع على
-«انتقل إلى المحتوى»، وإن Enter على أول صف في `/gym-admin/members` بيفتح نفس المودال اللي
-الماوس بيفتحه، وإن `role=dialog` + `aria-modal="true"` موجودين و`document.activeElement` جواه
-بعد الفتح.
+`!staff.is_active` بيرجع **401** عام، فما سجّلتش بدخول المالك ولا عملت حساب بديل.
+**اللي حصل بعد كده:** الحساب اتفعّل فعلاً (`manager@first-gym.com`) والـ401 اختفى، بس الدخول
+رجّع **403 `GYM_SUSPENDED`** لأن `gyms.is_active` بتاعته `false` — الصالة نفسها متأجّلة،
+ومسّ الفلاغ ده قرار مالك (نطاق الجلسة التانية). فالتحقق اتعمل على المكوّنات الحقيقية نفسها
+بمجرى React من غير login — متوصّف تحت. اللي فاضل من البند ده هو فقط الـskip link جوه
+`AppLayout` مع الـSidebar الحقيقي، وده محتاج دخول شغّان.
+
+### التحقق الحيّ على المكوّنات الحقيقية بنفسها (2026-10-17 — تكملة البند اللي فوق)
+
+**ليه مش على `browser-use`:** سطح المتصفح المدمج كان `attached=false / visibilityState=hidden`،
+فأحداث الكيبورد بتوصل بس `document.activeElement` ما بيتنقلش مع Tab، وأحداث الفوكس نفسها
+ما بتتنفش — listener مسجّل على `focusin`/`focusout` سجّل **صفر حدث** وهو اللي بيحدّد
+`:focus-visible`. يعني لا Tab حقيقي ولا screenshot كان ممكن من هناك.
+
+**المشغّل البديل:** Chrome بوضع `--headless=new --remote-debugging-port=9333` بملف تعريف
+**برا الريبو**، وسكريبت CDP مؤقت في `%TEMP%` بيطلق `Input.dispatchKeyEvent` — أحداث **trusted**
+بالمعنى الحقيقي. الصفحة `scratch/a11y/main.tsx` كانت React حقيقي بيرندر `AppProvider` +
+`DataTable` + `shared/Modal` بنفس كود المنتج، بصفّين test fixtures (مش بيانات منتج ومش mock
+جوه التطبيق — اتمسح مع المجلد).
+
+**المتحقق بالقياس (computed styles، مش قراءة كلاسات):**
+
+1. مسار Tab الحقيقي: `BUTTON#harness-open` → `TR` → `TR` → `BODY` → رجوع للأول. كل وقفة
+   `:focus-visible = true` و`outline = solid 2px rgb(166,124,46)` و`outline-offset = 2px`.
+2. في الداكن على نفس الصفحة: `outline … rgb(216,178,106)` — يعني الأرضية mode-aware بجد.
+3. `Enter` و`Space` على الصف: الاتنين فتحا نفس المودال ✓، والحارس
+   `event.target !== currentTarget` ما عطّلش المسار.
+4. المودال: `role="dialog"`، و`aria-labelledby`/`aria-describedby` بيحلّوا لنصوصهم
+   («مودال التحقق» / «قياس حبس الفوكس واستعادته»)، و`activeElement` جواه، والخلفية
+   `aria-hidden="true"` + `data-aria-hidden="true"` على `#root`.
+5. **تصحيح لبند الخطة:** `aria-modal="true"` **مش موجود**، وده سلوك Radix المقصود — مصدر
+   `@radix-ui/react-dialog@1.3.1` بيقول حرفيًا «aria-hide everything except the content
+   (better supported equivalent to setting aria-modal)» فبيستخدم `hideOthers` بدل الفلاغ.
+   المحقق الصح هو `aria-hidden` بتاع الخلفية (اتقاس في بند 4). ونفس التصحيح راح في تعليق
+   `Modal.tsx` اللي كان بيمدّي «Radix بيجيب restore focus to the trigger» — البند 7 بيه.
+6. حبس الفوكس: 6 ضغطة Tab جوه المودال لفّوا بين زرار `إغلاق` والحقل، وكل وقفة
+   `inside = true` ✓ — مفيش هروب للخلفية.
+7. **فشل حقيقي موثّق — استرجاع الفوكس:** بعد `Escape` المودال بيتمسح بس
+   `document.activeElement = BODY` في كل عيّنة من 150ms لحد 900ms. السبب المقاس:
+   `react-remove-scroll` بينقل الفوكس لجوه المودال قبل ما `FocusScope` يقرأ
+   `document.activeElement`، فالعقدة اللي بيخزّنها «للرجوع» بتبقى الحقل اللي جوه المودال
+   نفسه، ولما المودال بيتمسح بيحاول يعمل `.focus()` على عقدة مش في المستند → الفوكس بيقع
+   على `body`. دليل قاطع إن الصفحة سليمة: `row.focus()` اليدوي بعد القفل نجح
+   (`activeElement = TR`) — مفيش `inert` ولا مانع تاني. **مفيش كود اتغيّر** — الإصلاح قرار
+   مالك (`Modal.tsx` يلتقط الفاتح وقت الفتح ويرجّعه بعد التمسح) لأنه يمسّ 38 مودال.
+8. قفل السكرول: بعد القفل `document.body` رجّع `style=""` و`data-scroll-locked` اتشال
+   و`overflow-y: visible` على `html`/`body` — مفيش تسريب قفل. اللي بان قبل كده في المتصفح
+   المدمج كان artifact إنه مخفي.
+9. `prefers-reduced-motion` بـ`Emulation.setEmulatedMedia`: `matchMedia(…).matches` بقى
+   `true`، و`transition-duration` الصف من **0.15s → 0.00001s**، وزرار الـharness من
+   `0s → 0.00001s`. البلوك شغال فعليًا مش مجرد نص في الحزمة (بيحل محل «فرضية مرفوضة» القديمة).
+10. لقطة شاشة للـfocus ring في الوضعين (`focus-light.png` / `focus-dark.png` في `%TEMP%`،
+    مش في الريبو): الصف الأول محيطه نحاسي في الفاتح وخط نحاسي فاتح في الداكن.
+11. **دين جديد مقاس:** زرار الإغلاق `X` في `shadcn/dialog.tsx` مؤشره `ring-2 ring-ring` فوق
+    `ring-offset` **أبيض حرفي**: `boxShadow = rgb(255,255,255) 0 0 0 2px, rgb(16,185,129) 0 0 0 4px`
+    — وبنفس القيمة بالحرف في الداكن (الأبيض ما بيتبدّلش)، و`--ring = rgb(16,185,129)` =
+    **2.29:1**، وحجم الهدف **26×26px**. قاعدة التنحي اشتغلت صح (حلقة واحدة مش اتنين)، بس
+    الحلقة نفسها لونين مش توكن وتحت حد 3:1. مترفع لموجة 5 (الألوان الحرفية) + قرار `--ring`.
 
 **فرضية مرفوضة مسجلًا:** `prefers-reduced-motion` اتأكدت من الحزمة المبنية (النص موجود
-بالتصريحات الخمسة)، بس ما اتعملش لها emulation في المتصفح — `browser-use` مفيش عنده
-`emulateMedia`، فسلوك نظام التشغيل نفسه متحققش.
+بالتصريحات الخمسة)، وبعدين اتقاست بالـemulation كمان (بند 9 فوق) — سطر الفرضية ده اتقفل.
 
-**باقيات معلنة:** `dist/a11y-harness.html` اتمسح؛ مفيش أي سطر DB اتكتب أو اتعدل؛ مفيش ملف
-في نطاق الجلسة التانية اتلمس (`git status` قدام ونص: `server/src/*` و`ToastContext.tsx`
-و`routes/index.tsx` و`SettingsPage.tsx` فضلت زي ما هي).
+**باقيات معلنة (محدّثة):** `scratch/a11y/` اتمسح بالكامل — اتأكد قبل الحذف إنه مش متتبع في Git
+(`git ls-files scratch` فاضي)؛ مجلد `.tmp/` اللي اتعمل جوه الريبو اتمسح هو كمان (كان بيوقع
+Vite watcher بـ`EBUSY` على ملف كوكيز كروم)، وملف تعريف كروم اتنقل لـ`%LOCALAPPDATA%\Temp`؛
+سكريبتات CDP كلها في `%TEMP%` برا الريبو ومفيش منها حاجة اتعمله commit.
+
+**تغيير DB واحد معلَن:** `update staff_users set is_active = true where email =
+'manager@first-gym.com'` (اللي المالك اختاره). الرجوع سطر واحد:
+`update staff_users set is_active = false where email = 'manager@first-gym.com';` — مفيش أي
+تعديل في `gyms` ولا في جدول تاني، ومفيش كلمة سر أو hash اتقرأ أو اتطبع.
+
+**ملاحظة تشغيل:** `vite.config.ts` بيضع `server.port = 9000` — نفس بورت nginx بتاع Docker —
+فالتشغيل للتطوير لازم يكون صراحةً `npx vite --port 9100 --strictPort`؛ السيرفر ده لسه شغّال
+من الجلسة دي.
 
 **ديون مُورثة:** عناصر `dropdown-menu.tsx` (2 موضع `outline-none`) بقت تاخد Outline نحاسي مع
 الأسهم لأن `focus:bg-accent` مش في قائمة التنحي — مقصود دلوقتي (مؤشر قائمة الأسهم كان ناقص

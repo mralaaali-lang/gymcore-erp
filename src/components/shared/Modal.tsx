@@ -46,9 +46,19 @@ const SIZES: Record<NonNullable<ModalProps['size']>, string> = {
  *
  * That markup centres the panel (good) and nothing else: Tab walks out of the
  * dialog into the page behind it, Escape does nothing, the scrim is a click
- * target rather than a dismissal affordance, `aria-modal` is absent, and the
- * page keeps scrolling underneath. Radix supplies all of it — focus trap,
- * Escape, restore focus to the trigger, scroll lock, inert background.
+ * target rather than a dismissal affordance, the background stays readable to a
+ * screen reader, and the page keeps scrolling underneath. Radix supplies all of
+ * that except one thing, measured in Chromium on 2026-10-17 (see
+ * LOCAL_TESTING_REPORT §موجة 2): background isolation comes as
+ * `aria-hidden="true"` on `#root` from `hideOthers`, NOT as `aria-modal` —
+ * `@radix-ui/react-dialog@1.3.1` calls that its "better supported equivalent",
+ * so do not grep for `aria-modal` when auditing a dialog. What Radix does NOT
+ * do here is return focus to the opener: because `react-remove-scroll` moves
+ * focus inside the dialog before `FocusScope` reads `document.activeElement`,
+ * the element it stores to restore is the dialog's own field, and after unmount
+ * `.focus()` on a detached node drops the caret to `<body>`. Verified with
+ * trusted `Enter`/`Escape` on a real `DataTable` row. Fixing it means capturing
+ * the opener in this component, which is an owner decision — 38 modals share it.
  *
  * Shell rules this component enforces (see AGENT_HANDOVER §5 بند 1هـ):
  * - centred, never a side drawer;
