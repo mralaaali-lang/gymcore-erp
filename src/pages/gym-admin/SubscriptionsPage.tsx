@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Warning as AlertTriangle, ArrowDown, ArrowUp, ArrowsDownUp, Clock, CurrencyDollar as DollarSign, FileText, Plus, UserCheck, X } from '@phosphor-icons/react';
+import { Warning as AlertTriangle, Clock, CurrencyDollar as DollarSign, FileText, Plus, UserCheck, X } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -13,8 +13,10 @@ import { formatMoney } from '../../utils/currency';
 import { fmtNum, formatDate } from '../../utils/date';
 import { escapeHtml, printDocument } from '../../utils/print';
 import { DashboardPage, PrimaryAction, SecondaryAction, Panel, EmptyState } from '../../components/dashboard';
+import { SkeletonStats, SkeletonTable } from '../../components/shared/Skeleton';
 import Modal from '../../components/shared/Modal';
 import StatusBadge from '../../components/ui/StatusBadge';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
 import AddSubscription from './subscriptions/AddSubscription';
 import EditSubscription from './subscriptions/EditSubscription';
 import { SPORTS, sportName, useSportsCatalog } from './subscriptions/shared';
@@ -47,14 +49,18 @@ const DURATION_OPTIONS = [
   { value: '180', ar: '6 شهور' },
 ];
 
-// الأعمدة القابلة للترتيب + الاتجاه الافتراضي الذكي لكل عمود
-// (إلى/المتبقي: الأقرب أولاً — الأهم للتجديد؛ المبلغ: الأعلى أولاً).
-const SORTABLE: Record<string, { labelAr: string; labelEn: string; def: 'asc' | 'desc' }> = {
-  member_name: { labelAr: 'العضو', labelEn: 'Member', def: 'asc' },
-  start_date: { labelAr: 'من', labelEn: 'From', def: 'desc' },
-  end_date: { labelAr: 'إلى', labelEn: 'To', def: 'asc' },
-  remaining: { labelAr: 'المتبقي', labelEn: 'Remaining', def: 'asc' },
-  amount: { labelAr: 'المبلغ', labelEn: 'Amount', def: 'desc' },
+// الأعمدة القابلة للترتيب = مرآة حرفية للـwhitelist في السيرفر
+// (`server/src/controllers/subscriptions.ts:74-80`: member_name · start_date ·
+// end_date · remaining · amount، والافتراضي start_date DESC). أي رأس ضاغط هنا
+// لازم يكون مفتاحًا مقبولًا هناك — «الترتيب مش ادعاء».
+// الاتجاه الافتراضي ذكي لكل عمود (إلى/المتبقي: الأقرب أولاً — الأهم للتجديد؛
+// المبلغ: الأعلى أولاً) وبيمرّر لـ`DataTable` عبر `sortDescFirst`.
+const SORTABLE: Record<string, { def: 'asc' | 'desc' }> = {
+  member_name: { def: 'asc' },
+  start_date: { def: 'desc' },
+  end_date: { def: 'asc' },
+  remaining: { def: 'asc' },
+  amount: { def: 'desc' },
 };
 
 /**
@@ -123,38 +129,89 @@ export default function SubscriptionsPage() {
   };
   const filtersDirty = status !== 'all' || sport !== '' || duration !== '' || search !== '';
 
-  // الضغط على عمود مرتّب يعكس الاتجاه، والضغط على عمود جديد يبدأ باتجاهه الذكي.
-  const toggleSort = (key: string) => {
-    if (sort === key) {
-      setOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSort(key);
-      setOrder(SORTABLE[key].def);
-    }
-    setPage(1);
-  };
-
-  const sortTh = (key: string) => {
-    const cfg = SORTABLE[key];
-    const active = sort === key;
-    return (
-      <th key={key} className="py-3 px-2 font-semibold text-start" aria-sort={active ? (order === 'asc' ? 'ascending' : 'descending') : undefined}>
-        <button
-          type="button"
-          onClick={() => toggleSort(key)}
-          title={rtl ? 'اضغط للترتيب' : 'Click to sort'}
-          className={`inline-flex items-center gap-1 hover:text-gray-900 ${active ? 'text-emerald-700' : ''}`}
-        >
-          {rtl ? cfg.labelAr : cfg.labelEn}
-          {active ? (
-            order === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
-          ) : (
-            <ArrowsDownUp size={14} className="text-gray-300" />
+  // الأعمدة: المفاتيح اللي لها مكان في الـwhitelist بس هي `sortable`، و`value`
+  // موجودة لكل عمود مرتّب عشان الفانطازة والترقيم الحي يستخدم نفس المفتاح.
+  const columns: TableColumn<SubscriptionRow>[] = [
+    {
+      id: '__n',
+      label: rtl ? 'م' : '#',
+      width: '2.5rem',
+      cell: (_r, i) => (
+        <span className="text-xs text-ink-faint tabular-nums">{(page - 1) * limit + i + 1}</span>
+      ),
+    },
+    {
+      id: 'member_name',
+      label: rtl ? 'العضو' : 'Member',
+      sortable: true,
+      sortDescFirst: SORTABLE.member_name.def === 'desc',
+      cell: (r) => (
+        <div className="min-w-0">
+          <p className="font-bold text-foreground">{r.member_name}</p>
+          <p className="text-xs text-muted-foreground">
+            {rtl ? 'كود' : 'Code'} {r.member_code ?? '—'}
+            {r.member_phone ? ` · ${r.member_phone}` : ''}
+          </p>
+        </div>
+      ),
+    },
+    { id: 'offer_title', label: rtl ? 'الباقة' : 'Plan', value: (r) => r.offer_title },
+    { id: 'sport', label: rtl ? 'الرياضة' : 'Sport', value: (r) => sName(r.sport) },
+    {
+      id: 'coach',
+      label: rtl ? 'المدرب' : 'Coach',
+      value: (r) => r.coach_name || (rtl ? 'بدون مدرب' : 'No coach'),
+    },
+    {
+      id: 'start_date',
+      label: rtl ? 'من' : 'From',
+      sortable: true,
+      sortDescFirst: SORTABLE.start_date.def === 'desc',
+      value: (r) => formatDate(r.start_date),
+    },
+    {
+      id: 'end_date',
+      label: rtl ? 'إلى' : 'To',
+      sortable: true,
+      sortDescFirst: SORTABLE.end_date.def === 'desc',
+      value: (r) => formatDate(r.end_date),
+    },
+    {
+      id: 'remaining',
+      label: rtl ? 'المتبقي' : 'Remaining',
+      sortable: true,
+      sortDescFirst: SORTABLE.remaining.def === 'desc',
+      cell: (r) => {
+        const rem = remainingCell(r);
+        return <StatusBadge status={rem.text} variant={rem.variant} />;
+      },
+    },
+    {
+      id: 'amount',
+      label: rtl ? 'المبلغ' : 'Amount',
+      sortable: true,
+      sortDescFirst: SORTABLE.amount.def === 'desc',
+      numeric: true,
+      value: (r) => formatMoney(Number(r.offer_price), currency),
+    },
+    {
+      id: 'payment',
+      label: rtl ? 'الدفع' : 'Payment',
+      cell: (r) => (
+        <div className="min-w-0">
+          <StatusBadge
+            status={r.payment_state === 'paid' ? (rtl ? 'مدفوع' : 'Paid') : (rtl ? 'غير مدفوع' : 'Unpaid')}
+            variant={r.payment_state === 'paid' ? 'success' : 'error'}
+          />
+          {r.payment_state === 'unpaid' && (
+            <p className="mt-1 text-[11px] text-rose-500">
+              {rtl ? 'عليه' : 'owed'} {formatMoney(Number(r.outstanding_amount), currency)}
+            </p>
           )}
-        </button>
-      </th>
-    );
-  };
+        </div>
+      ),
+    },
+  ];
 
   const cancel = useMutation({
     mutationFn: () => cancelSubscription(cancelling!.id, cancelReason.trim() || 'إلغاء من صفحة الاشتراكات'),
@@ -196,7 +253,12 @@ export default function SubscriptionsPage() {
           </PrimaryAction>
         </div>
 
-        {/* 3) كروت الإحصائيات — من aggregate على السيرفر لنفس الجدول */}
+        {/* 3) كروت الإحصائيات — من aggregate على السيرفر لنفس الجدول. أثناء التحميل
+            الكروت بتافانطازة (مش أصفار): «0 نشط» رقم مقروء ومغرض، والفانطازة بتقول
+            «لسه ما اتقاسش». */}
+        {isLoading ? (
+          <SkeletonStats columns={4} gridClassName="grid-cols-2 md:grid-cols-4 gap-4" />
+        ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <button type="button" onClick={() => { setStatus('active'); setPage(1); }} className="text-start">
             <Statish icon={<UserCheck size={22} />} color="text-emerald-600" bg="bg-emerald-50" value={fmtNum(stats?.active ?? 0)} label={rtl ? 'نشط' : 'Active'} />
@@ -211,6 +273,7 @@ export default function SubscriptionsPage() {
             <Statish icon={<DollarSign size={22} />} color="text-cyan-600" bg="bg-cyan-50" value={formatMoney(Number(stats?.dues ?? 0), currency)} label={rtl ? 'مستحقات (ديون مفتوحة)' : 'Dues (open debts)'} />
           </button>
         </div>
+        )}
 
         {/* 4) شريط الفلاتر */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -237,10 +300,19 @@ export default function SubscriptionsPage() {
           )}
         </div>
 
-        {/* 5) الجدول — 10 أعمدة، 10/50/100/300 صفوف (الافتراضي 10)، والضغط على الصف يفتح مودال التعديل */}
+        {/* 5) الجدول — 10 أعمدة، 10/50/100/300 صفوف (الافتراضي 10)، والضغط على الصف يفتح مودال التعديل.
+            موجة 4 / دفعة ب: `ui/DataTable` بـ`bare` جوّه `Panel` — القشرة والحشو والـ`aria-sort`
+            بقوا ملك المكوّن، و`minWidth` بترمة الـ850px القديمة. */}
         <Panel>
           {isLoading ? (
-            <p className="text-center py-12 text-gray-400">{rtl ? 'جاري التحميل...' : 'Loading…'}</p>
+            /* موجة 4 / دفعة ب — صف الاشتراك سطران (اسم العضو فوق الكود/التليفون).
+               `rowHeight` قياس حي على 1440: 77px للصفوف اللي عمود الدفع فيها شارة فقط،
+               و89px لما يزيد سطر «غير مدفوع عليه …» — بنثبّت الأغلب (77) والفارق سطر واحد
+               لا أكثر. على 390 الصفوف 97/89 لأن عمود العضو (124px) يلف السطر الثالث،
+               والرأس الحقيقي 73 بدل 41 لأن أرضية اللمس (‎min-height:48px تحت 768px في
+               styles/index.css) بتفرض نفسها على زر الفرز — قرار وصول مقصود مش اختلاف
+               فانطازة: الفانطازة مفيهاش أزرار فبتفضل 41. */
+            <SkeletonTable bare rows={6} cols={columns.length} rowHeight={77} />
           ) : isError ? (
             <EmptyState title={rtl ? 'تعذّر تحميل الاشتراكات' : 'Failed to load subscriptions'} />
           ) : rows.length === 0 ? (
@@ -250,105 +322,66 @@ export default function SubscriptionsPage() {
               actions={filtersDirty ? <SecondaryAction onClick={resetFilters}>{rtl ? 'إعادة تعيين' : 'Reset'}</SecondaryAction> : undefined}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[850px] text-sm">
-                <thead>
-                  <tr className="text-start text-gray-500 border-b border-gray-100">
-                    <th className="py-3 px-2 font-semibold text-start w-10">#</th>
-                    {sortTh('member_name')}
-                    <th className="py-3 px-2 font-semibold text-start">{rtl ? 'الباقة' : 'Plan'}</th>
-                    <th className="py-3 px-2 font-semibold text-start">{rtl ? 'الرياضة' : 'Sport'}</th>
-                    <th className="py-3 px-2 font-semibold text-start">{rtl ? 'المدرب' : 'Coach'}</th>
-                    {sortTh('start_date')}
-                    {sortTh('end_date')}
-                    {sortTh('remaining')}
-                    {sortTh('amount')}
-                    <th className="py-3 px-2 font-semibold text-start">{rtl ? 'الدفع' : 'Payment'}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {rows.map((r, idx) => {
-                    const rem = remainingCell(r);
-                    return (
-                      <tr
-                        key={r.id}
-                        onClick={() => setEditing(r)}
-                        title={rtl ? 'اضغط للتعديل' : 'Click to edit'}
-                        className="hover:bg-gray-50/60 cursor-pointer"
+            <DataTable
+              columns={columns}
+              data={rows}
+              bare
+              minWidth="850px"
+              caption={rtl ? 'قائمة الاشتراكات' : 'Subscriptions'}
+              manualSorting
+              sorting={[{ id: sort, desc: order === 'desc' }]}
+              onSortingChange={(next) => {
+                const picked = next[0];
+                if (!picked) return;
+                setSort(picked.id);
+                setOrder(picked.desc ? 'desc' : 'asc');
+                setPage(1);
+              }}
+              onRowClick={(r) => setEditing(r)}
+              rowTitle={() => (rtl ? 'اضغط للتعديل' : 'Click to edit')}
+              footer={
+                pagination ? (
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <label className="flex items-center gap-2 text-sm text-gray-500">
+                      {rtl ? 'عرض' : 'Show'}
+                      <select
+                        className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm min-h-[40px]"
+                        value={limit}
+                        onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
                       >
-                        <td className="py-3 px-2 text-start text-gray-400 tabular-nums text-xs">
-                          {(page - 1) * limit + idx + 1}
-                        </td>
-                        <td className="py-3 px-2 text-start">
-                          <p className="font-bold text-gray-900">{r.member_name}</p>
-                          <p className="text-xs text-gray-500">
-                            {rtl ? 'كود' : 'Code'} {r.member_code ?? '—'}
-                            {r.member_phone ? ` · ${r.member_phone}` : ''}
-                          </p>
-                        </td>
-                        <td className="py-3 px-2 text-start">
-                          <p className="text-gray-800">{r.offer_title}</p>
-                        </td>
-                        <td className="py-3 px-2 text-start text-gray-700">{sName(r.sport)}</td>
-                        <td className="py-3 px-2 text-start text-gray-700">{r.coach_name || (rtl ? 'بدون مدرب' : 'No coach')}</td>
-                        <td className="py-3 px-2 text-start text-gray-700 whitespace-nowrap">{formatDate(r.start_date)}</td>
-                        <td className="py-3 px-2 text-start text-gray-700 whitespace-nowrap">{formatDate(r.end_date)}</td>
-                        <td className="py-3 px-2 text-start"><StatusBadge status={rem.text} variant={rem.variant} /></td>
-                        <td className="py-3 px-2 text-start text-gray-900 font-semibold whitespace-nowrap">{formatMoney(Number(r.offer_price), currency)}</td>
-                        <td className="py-3 px-2 text-start">
-                          <StatusBadge status={r.payment_state === 'paid' ? (rtl ? 'مدفوع' : 'Paid') : (rtl ? 'غير مدفوع' : 'Unpaid')} variant={r.payment_state === 'paid' ? 'success' : 'error'} />
-                          {r.payment_state === 'unpaid' && (
-                            <p className="text-[11px] text-rose-500 mt-1">{rtl ? 'عليه' : 'owed'} {formatMoney(Number(r.outstanding_amount), currency)}</p>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* عرض الصفوف + ترقيم */}
-          {rows.length > 0 && pagination && (
-            <div className="flex items-center justify-between gap-3 mt-4 flex-wrap">
-              <label className="flex items-center gap-2 text-sm text-gray-500">
-                {rtl ? 'عرض' : 'Show'}
-                <select
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm min-h-[40px]"
-                  value={limit}
-                  onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-                >
-                  <option value={10}>10</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value={300}>300</option>
-                </select>
-              </label>
-              {/* §35ج — numbered pages replace the deleted «السابق/التالي»: a click
-                  jumps straight to the page, and 300-per-view shrinks the window. */}
-              {pagination.total_pages > 1 && (
-                <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
-                  {Array.from({ length: Math.min(pagination.total_pages, 5) }, (_, i) => {
-                    const start = pagination.total_pages <= 5 ? 1
-                      : Math.max(1, Math.min(pagination.page - 2, pagination.total_pages - 4));
-                    const p = start + i;
-                    if (p > pagination.total_pages) return null;
-                    return (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setPage(p)}
-                        aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
-                        className={`w-9 h-9 rounded-xl text-sm font-medium transition min-w-[44px] ${page === p ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                      >
-                        {p}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                        <option value={10}>10</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value={300}>300</option>
+                      </select>
+                    </label>
+                    {/* §35ج — numbered pages replace the deleted «السابق/التالي»: a click
+                        jumps straight to the page, and 300-per-view shrinks the window. */}
+                    {pagination.total_pages > 1 && (
+                      <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
+                        {Array.from({ length: Math.min(pagination.total_pages, 5) }, (_, i) => {
+                          const start = pagination.total_pages <= 5 ? 1
+                            : Math.max(1, Math.min(pagination.page - 2, pagination.total_pages - 4));
+                          const p = start + i;
+                          if (p > pagination.total_pages) return null;
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => setPage(p)}
+                              aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
+                              className={`w-9 h-9 rounded-xl text-sm font-medium transition min-w-[44px] ${page === p ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                            >
+                              {p}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : undefined
+              }
+            />
           )}
         </Panel>
       </DashboardPage>

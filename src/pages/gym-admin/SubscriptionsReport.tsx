@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { getSubscriptionsReport, listOffers, type MembershipOffer } from '../../services/api';
+import { getSubscriptionsReport, listOffers, type MembershipOffer, type SubscriptionsReportRow } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
 import { formatDate, daysUntil, fmtNum } from '../../utils/date';
 import { escapeHtml, printDocument } from '../../utils/print';
 import { buildExportMatrix, downloadMatrixXlsx } from '../../utils/csv';
 import { StatCard, EmptyState } from '../../components/dashboard';
-import Spinner from '../../components/ui/Spinner';
 import StatusBadge from '../../components/ui/StatusBadge';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
+import { SkeletonPanel, SkeletonStats, SkeletonTable } from '../../components/shared/Skeleton';
 import { FileText, FileCsv as FileSpreadsheet, Users, CheckCircle as CheckCircle2, Clock, Wallet } from '@phosphor-icons/react';
 
 // ====================================================================
@@ -30,10 +31,14 @@ const DATE_FIELD_OPTIONS = [
   { value: 'registered', ar: 'تاريخ التسجيل', en: 'Registration date' },
   { value: 'end', ar: 'تاريخ الانتهاء', en: 'End date' },
 ];
-const SORTABLE: Record<string, { labelAr: string; labelEn: string; def: 'asc' | 'desc' }> = {
-  member_name: { labelAr: 'العضو', labelEn: 'Member', def: 'asc' },
-  end_date: { labelAr: 'إلى', labelEn: 'To', def: 'asc' },
-  amount: { labelAr: 'المبلغ', labelEn: 'Amount', def: 'desc' },
+// مرآة حرفية للـwhitelist في `server/src/controllers/analytics.ts:907-910`
+// (member_name · end_date · amount) — «من» مش مرتّب لأن السيرفر ما بيعرفش مفتاحه،
+// وده الفرق عن صفحة الاشتراكات. ملاحظة عقد: هذا الـendpoint افتراضي asc
+// (`order=desc` بس هو اللي بيرجع DESC)، بينما `/api/subscriptions` افتراضي DESC.
+const SORTABLE: Record<string, { def: 'asc' | 'desc' }> = {
+  member_name: { def: 'asc' },
+  end_date: { def: 'asc' },
+  amount: { def: 'desc' },
 };
 
 const inputCls =
@@ -83,31 +88,6 @@ export default function SubscriptionsReport() {
   const pagination = data?.pagination;
   const pages = pagination ? pagination.total_pages : 0;
 
-  const toggleSort = (key: string) => {
-    if (sort === key) setOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
-    else { setSort(key); setOrder(SORTABLE[key].def); }
-    setPage(1);
-  };
-  const sortTh = (key: string) => {
-    const cfg = SORTABLE[key];
-    const active = sort === key;
-    return (
-      <th key={key} className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">
-        <button
-          type="button"
-          onClick={() => toggleSort(key)}
-          title={rtl ? 'اضغط للترتيب' : 'Click to sort'}
-          className={`inline-flex items-center gap-1 hover:text-gray-900 ${active ? 'text-emerald-700' : ''}`}
-        >
-          {rtl ? cfg.labelAr : cfg.labelEn}
-          <span className="material-symbols-outlined text-base">
-            {active ? (order === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more'}
-          </span>
-        </button>
-      </th>
-    );
-  };
-
   const money = (v: unknown) => formatMoney(Number(v || 0), currency);
 
   const stateCell = (paid: number, price: number) => {
@@ -131,6 +111,73 @@ export default function SubscriptionsReport() {
       </span>
     );
   };
+
+  // موجة 4 / دفعة ب — الأعمدة على صدفة `ui/DataTable`: `sortable` بس للمفاتيح اللي
+  //عرفها السيرفر، و`align` منطقي + `tabular-nums` للمبالغ، والفوتر (عرض الصفوف
+  // والترقيم) بقى جوّه نفس القشرة بدل كارت `bg-white` تاني.
+  const columns: TableColumn<SubscriptionsReportRow>[] = [
+    {
+      id: '__n',
+      label: rtl ? 'م' : '#',
+      width: '2.5rem',
+      cell: (_r, i) => (
+        <span className="text-xs text-ink-faint tabular-nums">
+          {((pagination?.page ?? 1) - 1) * ((pagination?.limit) ?? limit) + i + 1}
+        </span>
+      ),
+    },
+    {
+      id: 'member_name',
+      label: rtl ? 'العضو' : 'Member',
+      sortable: true,
+      sortDescFirst: SORTABLE.member_name.def === 'desc',
+      cell: (r) => (
+        <div className="min-w-0">
+          <p className="font-semibold text-foreground leading-tight whitespace-nowrap">{r.member_name}</p>
+          <p dir="ltr" className={`text-xs text-muted-foreground whitespace-nowrap ${rtl ? 'text-right' : 'text-left'}`}>
+            {r.card_code ?? '—'}
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: 'phone_number',
+      label: rtl ? 'الهاتف' : 'Phone',
+      value: (r) => r.phone_number || '—',
+      cell: (r) => (
+        <span dir="ltr" className={rtl ? 'text-right' : 'text-left'}>{r.phone_number || '—'}</span>
+      ),
+    },
+    { id: 'offer_title', label: rtl ? 'الباقة' : 'Plan', value: (r) => r.offer_title },
+    { id: 'start_date', label: rtl ? 'من' : 'From', value: (r) => formatDate(r.start_date) },
+    {
+      id: 'end_date',
+      label: rtl ? 'إلى' : 'To',
+      sortable: true,
+      sortDescFirst: SORTABLE.end_date.def === 'desc',
+      value: (r) => formatDate(r.end_date),
+      cell: (r) => endCell(r.end_date),
+    },
+    {
+      id: 'amount',
+      label: rtl ? 'المبلغ' : 'Amount',
+      sortable: true,
+      sortDescFirst: SORTABLE.amount.def === 'desc',
+      numeric: true,
+      value: (r) => money(r.price),
+    },
+    {
+      id: 'price_paid',
+      label: rtl ? 'المدفوع' : 'Paid',
+      numeric: true,
+      value: (r) => money(r.price_paid),
+    },
+    {
+      id: 'state',
+      label: rtl ? 'الحالة' : 'Status',
+      cell: (r) => stateCell(Number(r.price_paid), Number(r.price)),
+    },
+  ];
 
   const exportColumns = [
     { key: '__n', label: rtl ? 'م' : '#' },
@@ -290,7 +337,16 @@ export default function SubscriptionsReport() {
       </div>
 
       {isLoading ? (
-        <div className="py-16 flex justify-center"><Spinner /></div>
+        /* موجة 4 / دفعة ب — الفانطازة بنفس هندسة الشاشة النهائية: 4 كروت + جدول في
+           قشرة واحدة. `rowHeight={58}` قياس حي لصف التقرير (اسم فوق كود) وطابق الحقيقي
+           على 1440 و390 معًا (58/59)؛ الرأس الحقيقي 73 على 390 سببه أرضية اللمس 48px على
+           زر الفرز (`styles/index.css`) لا اختلاف القشرة. */
+        <div className="flex flex-col gap-5">
+          <SkeletonStats columns={4} gridClassName="grid-cols-2 lg:grid-cols-4 gap-4" />
+          <SkeletonPanel>
+            <SkeletonTable bare rows={6} cols={columns.length} rowHeight={58} />
+          </SkeletonPanel>
+        </div>
       ) : isError ? (
         <EmptyState title={rtl ? 'تعذّر تحميل التقرير' : 'Failed to load report'} />
       ) : (
@@ -303,89 +359,69 @@ export default function SubscriptionsReport() {
             <StatCard icon={Wallet} label={rtl ? 'المتبقي' : 'Remaining'} value={money(stats?.remaining ?? 0)} accent="rose" />
           </div>
 
-          {/* 4) جدول الاشتراكات بإعدادات جدول المشتركين */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100 text-start">
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 w-10">#</th>
-                    {sortTh('member_name')}
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'الهاتف' : 'Phone'}</th>
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'الباقة' : 'Plan'}</th>
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'من' : 'From'}</th>
-                    {sortTh('end_date')}
-                    {sortTh('amount')}
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'المدفوع' : 'Paid'}</th>
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'الحالة' : 'Status'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.length === 0 && (
-                    <tr><td colSpan={10} className="p-10 text-center text-gray-400 text-sm">
-                      {rtl ? 'لا اشتراكات مطابقة للفلاتر' : 'No subscriptions match the filters'}
-                    </td></tr>
+          {/* 4) جدول الاشتراكات على صدفة `ui/DataTable` — القشرة نفسها (مش كارت
+             `bg-white rounded-3xl` يدوي)، والترقيم جوّه نفس القشرة في `footer`. */}
+          <DataTable
+            columns={columns}
+            data={rows}
+            minWidth="900px"
+            caption={rtl ? 'تقرير الاشتراكات' : 'Subscriptions report'}
+            manualSorting
+            sorting={[{ id: sort, desc: order === 'desc' }]}
+            onSortingChange={(next) => {
+              const picked = next[0];
+              if (!picked) return;
+              setSort(picked.id);
+              setOrder(picked.desc ? 'desc' : 'asc');
+              setPage(1);
+            }}
+            empty={
+              <EmptyState
+                icon={Users}
+                accent="gray"
+                title={rtl ? 'لا اشتراكات مطابقة للفلاتر' : 'No subscriptions match the filters'}
+              />
+            }
+            footer={
+              pagination ? (
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <label className="flex items-center gap-1.5 text-sm text-gray-500">
+                    {rtl ? 'عرض' : 'Show'}
+                    <select
+                      className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm min-h-[40px]"
+                      value={limit}
+                      onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={300}>300</option>
+                    </select>
+                  </label>
+                  {pages > 1 && (
+                    <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
+                      {Array.from({ length: Math.min(pages, 5) }, (_, i) => {
+                        const start = pages <= 5 ? 1 : Math.max(1, Math.min(page - 2, pages - 4));
+                        const p = start + i;
+                        if (p > pages) return null;
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setPage(p)}
+                            aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
+                            className={`w-9 h-9 rounded-xl text-sm font-medium transition min-w-[44px] ${page === p ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                          >
+                            {p}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
-                  {rows.map((r, idx) => {
-                    return (
-                      <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-                        <td className="py-3 px-3 text-start text-gray-400 tabular-nums text-xs">
-                          {((pagination?.page ?? 1) - 1) * ((pagination?.limit) ?? limit) + idx + 1}
-                        </td>
-                        <td className="py-3 px-3 text-start">
-                          <p className="font-semibold text-gray-900 leading-tight whitespace-nowrap">{r.member_name}</p>
-                          <p dir="ltr" className={`text-xs text-gray-500 whitespace-nowrap ${rtl ? 'text-right' : 'text-left'}`}>{r.card_code ?? '—'}</p>
-                        </td>
-                        <td className={`py-3 px-3 text-gray-500 whitespace-nowrap ${rtl ? 'text-right' : 'text-left'}`} dir="ltr">{r.phone_number || '—'}</td>
-                        <td className="py-3 px-3 text-gray-800 text-start whitespace-nowrap">{r.offer_title}</td>
-                        <td className="py-3 px-3 text-gray-600 text-start tabular-nums whitespace-nowrap">{formatDate(r.start_date)}</td>
-                        <td className="py-3 px-3 text-start whitespace-nowrap">{endCell(r.end_date)}</td>
-                        <td className="py-3 px-3 text-gray-900 font-semibold text-start tabular-nums whitespace-nowrap">{money(r.price)}</td>
-                        <td className="py-3 px-3 text-emerald-600 font-semibold text-start tabular-nums whitespace-nowrap">{money(r.price_paid)}</td>
-                        <td className="py-3 px-3 text-start">{stateCell(Number(r.price_paid), Number(r.price))}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {rows.length > 0 && pagination && (
-              <div className="flex items-center justify-between gap-3 p-4 border-t border-gray-100 flex-wrap">
-                <label className="flex items-center gap-1.5 text-sm text-gray-500">
-                  {rtl ? 'عرض' : 'Show'}
-                  <select
-                    className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm min-h-[40px]"
-                    value={limit}
-                    onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-                  >
-                    <option value={10}>10</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                    <option value={300}>300</option>
-                  </select>
-                </label>
-                {pages > 1 && (
-                  <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
-                    {Array.from({ length: Math.min(pages, 5) }, (_, i) => {
-                      const start = pages <= 5 ? 1 : Math.max(1, Math.min(page - 2, pages - 4));
-                      const p = start + i;
-                      if (p > pages) return null;
-                      return (
-                        <button
-                          key={p}
-                          onClick={() => setPage(p)}
-                          aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
-                          className={`w-9 h-9 rounded-xl text-sm font-medium transition min-w-[44px] ${page === p ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                        >
-                          {p}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              ) : undefined
+            }
+          />
         </>
       )}
     </div>
