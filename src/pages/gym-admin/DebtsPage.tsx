@@ -7,7 +7,8 @@ import { createDebt, listDebts, listMembers, payDebt, getSettings } from '../../
 import { formatMoney } from '../../utils/currency';
 import { formatDate, fmtNum } from '../../utils/date';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
-import Spinner from '../../components/ui/Spinner';
+import { SkeletonTable } from '../../components/shared/Skeleton';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
 import Modal from '../../components/shared/Modal';
 import {
   Plus,
@@ -184,6 +185,103 @@ export default function DebtsPage() {
     setPage(1);
   };
 
+  // موجة 4 / دفعة أ — بلا `sortable`: `/api/debts` ما بيقبلش sort/order (بحث +
+  // نوع + حالة + ترقيم بس)، فرأس مضغوط كان هيرتّب الـ100 صف المحمّولة ويسيب
+  // باقي السجل في محله — نفس قاعدة جدول المدفوعات (§45).
+  const columns: TableColumn<DebtRow>[] = [
+    {
+      id: 'member_name',
+      label: rtl ? 'العضو' : 'Member',
+      value: (r) => r.member_name,
+      cell: (r) => <span className="font-medium whitespace-nowrap text-foreground">{r.member_name || '—'}</span>,
+    },
+    {
+      id: 'debt_kind',
+      label: rtl ? 'النوع' : 'Kind',
+      value: (r) => r.debt_kind,
+      cell: (r) => (
+        <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${KIND_BADGE[r.debt_kind] ?? 'bg-gray-100 text-gray-600'}`}>
+          {KIND_LABELS[r.debt_kind]?.[rtl ? 'ar' : 'en'] ?? r.debt_kind}
+        </span>
+      ),
+    },
+    {
+      id: 'reason',
+      label: rtl ? 'الوصف' : 'Description',
+      value: (r) => r.reason,
+      cell: (r) => (
+        <span className="block max-w-[240px] truncate text-table-head" title={r.reason || undefined}>
+          {r.reason || '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'original_amount',
+      label: rtl ? 'المبلغ' : 'Total',
+      numeric: true,
+      value: (r) => Number(r.original_amount),
+      cell: (r) => <span className="whitespace-nowrap">{money(r.original_amount)}</span>,
+    },
+    {
+      id: 'paid_amount',
+      label: rtl ? 'المدفوع' : 'Paid',
+      numeric: true,
+      value: (r) => Number(r.paid_amount),
+      cell: (r) => <span className="font-semibold whitespace-nowrap text-emerald-600">{money(r.paid_amount)}</span>,
+    },
+    {
+      id: 'remaining_amount',
+      label: rtl ? 'المتبقي' : 'Remaining',
+      numeric: true,
+      value: (r) => Number(r.remaining_amount),
+      cell: (r) => <span className="font-bold whitespace-nowrap text-red-600">{money(r.remaining_amount)}</span>,
+    },
+    {
+      id: 'payment_status',
+      label: rtl ? 'الحالة' : 'Status',
+      value: (r) => r.payment_status,
+      cell: (r) => (
+        <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[r.payment_status]}`}>
+          {r.payment_status === 'partial' ? (rtl ? 'سداد جزئي' : 'Partially paid') : (rtl ? 'قيد الانتظار' : 'Pending')}
+        </span>
+      ),
+    },
+    {
+      id: 'created_at',
+      label: rtl ? 'التاريخ' : 'Date',
+      value: (r) => r.created_at,
+      cell: (r) => <span className="whitespace-nowrap text-table-head">{formatDate(r.created_at)}</span>,
+    },
+    {
+      id: 'actions',
+      header: rtl ? 'إجراءات' : 'Actions',
+      cell: (r) => (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPaying(r)}
+            title={rtl ? 'سداد الدين' : 'Settle debt'}
+            aria-label={rtl ? 'سداد الدين' : 'Settle debt'}
+            className="min-h-[44px] w-11 inline-flex items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition"
+          >
+            <Banknote size={17} />
+          </button>
+          {waEnabled && (
+            <button
+              type="button"
+              onClick={() => sendReminder(r)}
+              title={rtl ? 'تذكير واتساب' : 'WhatsApp reminder'}
+              aria-label={rtl ? 'تذكير واتساب' : 'WhatsApp reminder'}
+              className="min-h-[44px] w-11 inline-flex items-center justify-center rounded-xl bg-green-500 hover:bg-green-600 text-white shadow-sm transition"
+            >
+              <MessageSquare size={17} />
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="space-y-6 bg-gray-50 min-h-screen -m-6 p-6">
       {/* §35ث — title/subtitle live in the top bar; actions stay here (§45). */}
@@ -278,7 +376,10 @@ export default function DebtsPage() {
           left (RTL): settle (green) + WhatsApp reminder. */}
       <Panel icon={Receipt} accent="emerald" title={`${rtl ? 'قائمة الديون' : 'Debts List'} (${fmtNum(Number(pagination.total ?? 0))})`}>
         {isLoading ? (
-          <div className="py-8 flex justify-center"><Spinner /></div>
+          /* موجة 4 / دفعة أ — صف الديون سطران (اسم فوق عضوية/تليفون)، وقياسه
+             الحي 68px على 1440 و72px على 390، فالـ45px بتاعة الجدول أحادي السطر
+             بتخلي الصفحة تقفز 23px لكل صف. الرقم ده قياس مش تخمين. */
+          <SkeletonTable bare rows={6} cols={columns.length} rowHeight={68} />
         ) : rows.length === 0 ? (
           <EmptyState
             icon={Users}
@@ -289,92 +390,38 @@ export default function DebtsPage() {
               : 'No open debts with these filters — a fully settled debt leaves the list automatically.'}
           />
         ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-gray-900">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'العضو' : 'Member'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'النوع' : 'Kind'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الوصف' : 'Description'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'المبلغ' : 'Total'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'المدفوع' : 'Paid'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'المتبقي' : 'Remaining'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الحالة' : 'Status'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'التاريخ' : 'Date'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'إجراءات' : 'Actions'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 font-medium whitespace-nowrap">{r.member_name || '—'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${KIND_BADGE[r.debt_kind] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {KIND_LABELS[r.debt_kind]?.[rtl ? 'ar' : 'en'] ?? r.debt_kind}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 max-w-[240px] truncate" title={r.reason || undefined}>{r.reason || '—'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">{money(r.original_amount)}</td>
-                      <td className="px-4 py-3 font-semibold text-emerald-600 whitespace-nowrap">{money(r.paid_amount)}</td>
-                      <td className="px-4 py-3 font-bold text-red-600 whitespace-nowrap">{money(r.remaining_amount)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[r.payment_status]}`}>
-                          {r.payment_status === 'partial'
-                            ? (rtl ? 'سداد جزئي' : 'Partially paid')
-                            : (rtl ? 'قيد الانتظار' : 'Pending')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(r.created_at)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setPaying(r)}
-                            title={rtl ? 'سداد الدين' : 'Settle debt'}
-                            aria-label={rtl ? 'سداد الدين' : 'Settle debt'}
-                            className="w-11 min-h-[44px] inline-flex items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition"
-                          >
-                            <Banknote size={17} />
-                          </button>
-                          {waEnabled && (
-                          <button
-                            onClick={() => sendReminder(r)}
-                            title={rtl ? 'تذكير واتساب' : 'WhatsApp reminder'}
-                            aria-label={rtl ? 'تذكير واتساب' : 'WhatsApp reminder'}
-                            className="w-11 min-h-[44px] inline-flex items-center justify-center rounded-xl bg-green-500 hover:bg-green-600 text-white shadow-sm transition"
-                          >
-                            <MessageSquare size={17} />
-                          </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-3 mt-4">
-                <button
-                  onClick={() => setPage((v) => Math.max(1, v - 1))}
-                  disabled={page <= 1}
-                  className="min-h-[44px] px-4 py-1.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-200"
-                >
-                  {rtl ? 'السابق' : 'Prev'}
-                </button>
-                <span className="text-xs text-gray-500">
-                  {rtl ? `صفحة ${page} من ${totalPages}` : `Page ${page} of ${totalPages}`}
-                </span>
-                <button
-                  onClick={() => setPage((v) => Math.min(totalPages, v + 1))}
-                  disabled={page >= totalPages}
-                  className="min-h-[44px] px-4 py-1.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-200"
-                >
-                  {rtl ? 'التالي' : 'Next'}
-                </button>
-              </div>
-            )}
-          </>
+          <DataTable
+            columns={columns}
+            data={rows}
+            bare
+            minWidth="1040px"
+            caption={rtl ? 'قائمة الديون المفتوحة' : 'Open member debts'}
+            footer={
+              totalPages > 1 ? (
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPage((v) => Math.max(1, v - 1))}
+                    disabled={page <= 1}
+                    className="min-h-[44px] rounded-shell border border-hairline bg-card px-4 py-1.5 text-sm font-medium text-table-fg hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {rtl ? 'السابق' : 'Prev'}
+                  </button>
+                  <span className="text-xs text-table-head">
+                    {rtl ? `صفحة ${page} من ${totalPages}` : `Page ${page} of ${totalPages}`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage((v) => Math.min(totalPages, v + 1))}
+                    disabled={page >= totalPages}
+                    className="min-h-[44px] rounded-shell border border-hairline bg-card px-4 py-1.5 text-sm font-medium text-table-fg hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {rtl ? 'التالي' : 'Next'}
+                  </button>
+                </div>
+              ) : undefined
+            }
+          />
         )}
       </Panel>
 

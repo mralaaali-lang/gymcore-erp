@@ -3,13 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { getReportsOverview } from '../../services/api';
+import { getReportsOverview, type ReportsOverview } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
 import { fmtNum } from '../../utils/date';
 import { escapeHtml, printDocument } from '../../utils/print';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Chart from '../../components/charts/Chart';
-import Spinner from '../../components/ui/Spinner';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
+import { SkeletonChart, SkeletonList, SkeletonPanel, SkeletonStats, SkeletonTable } from '../../components/shared/Skeleton';
 import {
   FileText,
   Users,
@@ -83,6 +84,42 @@ export default function FinancialReports() {
       ...PACKAGE_LABELS[key],
     }))
     .filter((p) => p.count > 0);
+
+  // موجة 4 / دفعة أ — بلا `sortable`: `/api/reports/overview` بيرجّع top_attendance
+  // مرتبًا من السيرفر (visits DESC) وبلا sort/order خالص، فرأس مضغوط كان هيغيّر
+  // ترتيب الصفحة المعروضة من غير ما يعيد الطلب — نفس قاعدة جدول المدفوعات.
+  type TopRow = ReportsOverview['top_attendance'][number];
+  const topColumns: TableColumn<TopRow>[] = [
+    {
+      id: 'rank',
+      header: '#',
+      width: '48px',
+      numeric: true,
+      cell: (_r, i) => <span className="tabular-nums text-table-head">{i + 1}</span>,
+    },
+    {
+      id: 'full_name',
+      label: rtl ? 'العضو' : 'Member',
+      value: (r) => r.full_name,
+      cell: (r) => (
+        <span className="block min-w-0">
+          <span className="block font-semibold text-foreground">{r.full_name}</span>
+          <span className="block text-xs tabular-nums text-table-head" dir="ltr">{r.card_code || '—'}</span>
+        </span>
+      ),
+    },
+    {
+      id: 'visits',
+      label: rtl ? 'الحضور' : 'Visits',
+      numeric: true,
+      value: (r) => r.visits,
+      cell: (r) => (
+        <span className="inline-flex items-center justify-center min-w-8 h-7 rounded-full bg-emerald-50 px-2 text-xs font-bold tabular-nums text-emerald-700">
+          {fmtNum(r.visits)}
+        </span>
+      ),
+    },
+  ];
 
   const detailLinks = [
     {
@@ -209,7 +246,28 @@ export default function FinancialReports() {
       </div>
 
       {isLoading || !k ? (
-        <div className="py-16 flex justify-center"><Spinner /></div>
+        // موجة 4 / دفعة أ — هيكل الصفحة مش فانطازة: نفس الأربعة كروت، تلاتة
+        // تحتهم، لوحتا الرسم، ثم جدول «أكثر الأعضاء حضوراً» وقائمة التقارير.
+        <div className="flex flex-col gap-5">
+          <SkeletonStats columns={4} gridClassName="grid-cols-2 lg:grid-cols-4 gap-5" />
+          <SkeletonStats columns={3} gridClassName="grid-cols-1 sm:grid-cols-3 gap-5" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <SkeletonPanel>
+              <SkeletonChart height={280} />
+            </SkeletonPanel>
+            <SkeletonPanel>
+              <SkeletonChart height={280} />
+            </SkeletonPanel>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <SkeletonPanel>
+              <SkeletonTable bare rows={5} cols={topColumns.length} />
+            </SkeletonPanel>
+            <SkeletonPanel>
+              <SkeletonList rows={detailLinks.length} />
+            </SkeletonPanel>
+          </div>
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
@@ -318,33 +376,13 @@ export default function FinancialReports() {
                   title={rtl ? 'لا حضور في هذا النطاق' : 'No attendance in this range'}
                 />
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="text-start px-3 py-2 text-xs font-semibold text-gray-500">#</th>
-                        <th className="text-start px-3 py-2 text-xs font-semibold text-gray-500">{rtl ? 'العضو' : 'Member'}</th>
-                        <th className="text-start px-3 py-2 text-xs font-semibold text-gray-500">{rtl ? 'الحضور' : 'Visits'}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data!.top_attendance.map((row, i) => (
-                        <tr key={row.member_id} className="border-t border-gray-100">
-                          <td className="px-3 py-3 text-gray-500 tabular-nums">{i + 1}</td>
-                          <td className="px-3 py-3">
-                            <p className="font-semibold text-gray-900">{row.full_name}</p>
-                            <p className="text-xs text-gray-400 tabular-nums" dir="ltr">{row.card_code || '—'}</p>
-                          </td>
-                          <td className="px-3 py-3">
-                            <span className="inline-flex items-center justify-center min-w-8 h-7 px-2 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold tabular-nums">
-                              {fmtNum(row.visits)}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable
+                  columns={topColumns}
+                  data={data!.top_attendance}
+                  bare
+                  rowKey={(r) => r.member_id}
+                  caption={rtl ? 'أكثر الأعضاء حضوراً في نطاق الفلتر' : 'Top attendance in the filtered range'}
+                />
               )}
             </Panel>
 

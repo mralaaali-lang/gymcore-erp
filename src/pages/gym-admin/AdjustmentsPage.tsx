@@ -9,12 +9,13 @@ import { formatMoney } from '../../utils/currency';
 import { fmtNum } from '../../utils/date';
 import {
   listAdjustments, createAdjustment, deleteAdjustment, repayAdvance,
-  listStaff, type StaffData,
+  listStaff, type AdjustmentRow, type StaffData,
 } from '../../services/api';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import { StaffAvatar } from './HrMainPage';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
 import Modal from '../../components/shared/Modal';
-import PageLoader from '../../components/shared/PageLoader';
+import { SkeletonTable } from '../../components/shared/Skeleton';
 
 // ====================================================================
 // المكافآت والخصومات (/admin/hr/adjustments) — 3 أنواع على الراتب:
@@ -97,6 +98,93 @@ export default function AdjustmentsPage() {
     onError: () => showToast(rtl ? 'فشل' : 'Failed', 'error'),
   });
 
+  // موجة 4 / دفعة أ — بلا `sortable`: `/api/hr/adjustments` ما بيقبلش sort/order
+  // (شهر + نوع + بحث بس)، فرأس مضغوط كان هيرتّب الصفوف المحمّولة ويسيب باقي
+  // السجل في محله — نفس قاعدة جدول المدفوعات.
+  const columns: TableColumn<AdjustmentRow>[] = [
+    {
+      id: 'staff_name',
+      label: rtl ? 'الموظف' : 'Staff',
+      value: (r) => r.staff_name,
+      cell: (r) => (
+        <div className="flex items-center gap-2">
+          <StaffAvatar name={r.staff_name || '?'} size="w-8 h-8 text-xs" />
+          <span className="font-medium whitespace-nowrap">{r.staff_name || '—'}</span>
+        </div>
+      ),
+    },
+    {
+      id: 'kind',
+      label: rtl ? 'النوع' : 'Kind',
+      value: (r) => r.kind,
+      cell: (r) => (
+        <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${
+          r.kind === 'bonus' ? 'bg-emerald-50 text-emerald-700' : r.kind === 'deduction' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700'
+        }`}>
+          {KIND_AR[r.kind]}
+        </span>
+      ),
+    },
+    {
+      id: 'amount',
+      label: rtl ? 'المبلغ' : 'Amount',
+      numeric: true,
+      value: (r) => (r.kind === 'deduction' ? -Number(r.amount) : Number(r.amount)),
+      cell: (r) => (
+        <span className={`tabular-nums font-bold whitespace-nowrap ${r.kind === 'deduction' ? 'text-red-600' : 'text-emerald-600'}`}>
+          {r.kind === 'deduction' ? '-' : '+'}{money(r.amount)}
+        </span>
+      ),
+    },
+    {
+      id: 'repaid',
+      label: rtl ? 'مسدد/متبقي' : 'Paid/Rest',
+      numeric: true,
+      value: (r) => (r.kind === 'advance' ? Number(r.outstanding) : null),
+      cell: (r) =>
+        r.kind === 'advance' ? (
+          <span className="flex items-center justify-end gap-2 text-xs tabular-nums text-gray-500">
+            {money(r.repaid)} / {money(r.outstanding)}
+            {r.outstanding > 0 && (
+              <button
+                type="button"
+                onClick={() => { setRepayId(r.id); setRepayAmt(''); }}
+                className="inline-flex items-center min-h-[44px] px-2 rounded-shell text-emerald-600 font-bold hover:underline"
+              >
+                {rtl ? 'سداد' : 'Repay'}
+              </button>
+            )}
+          </span>
+        ) : (
+          <span>—</span>
+        ),
+    },
+    {
+      id: 'reason',
+      label: rtl ? 'السبب' : 'Reason',
+      value: (r) => r.reason,
+      cell: (r) => (
+        <span className="block max-w-[220px] truncate text-table-head" title={r.reason || undefined}>
+          {r.reason || '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: rtl ? 'حذف' : 'Delete',
+      cell: (r) => (
+        <button
+          type="button"
+          onClick={() => { if (confirm(rtl ? 'حذف الحركة؟' : 'Delete?')) remove.mutate(r.id); }}
+          aria-label={rtl ? 'حذف الحركة' : 'Delete entry'}
+          className="min-h-[44px] w-11 inline-flex items-center justify-center rounded-xl text-red-500 hover:bg-red-50"
+        >
+          <Trash2 size={15} />
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="bg-gray-50 min-h-screen -m-6 p-6">
       <div className="space-y-5">
@@ -142,64 +230,20 @@ export default function AdjustmentsPage() {
 
         <Panel title={`${rtl ? 'السجلات' : 'Records'} (${fmtNum(rows.length)})`}>
           {isLoading ? (
-            <PageLoader variant="skeleton" rows={4} />
+            /* موجة 4 / دفعة أ — خلايا السجل سطران (سبب فوق الملاحظة، ومبلغ فوق
+               القسط)، وقياسها الحي 69px على 1440 و73px على 390 — نفس سبب الديون:
+               الفانطازة بتتثبّت من القياس مش من الـ45px أحادية السطر. */
+            <SkeletonTable bare rows={6} cols={columns.length} rowHeight={69} />
           ) : rows.length === 0 ? (
             <EmptyState icon={Banknote} accent="gray" title={rtl ? 'لا توجد سجلات' : 'No records'} />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-gray-900">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الموظف' : 'Staff'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'النوع' : 'Kind'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'المبلغ' : 'Amount'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'مسدد/متبقي' : 'Paid/Rest'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'السبب' : 'Reason'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">⋯</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <StaffAvatar name={r.staff_name || '?'} size="w-8 h-8 text-xs" />
-                          <span className="font-medium whitespace-nowrap">{r.staff_name || '—'}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          r.kind === 'bonus' ? 'bg-emerald-50 text-emerald-700' : r.kind === 'deduction' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700'
-                        }`}>
-                          {KIND_AR[r.kind]}
-                        </span>
-                      </td>
-                      <td className={`px-4 py-3 tabular-nums font-bold ${r.kind === 'deduction' ? 'text-red-600' : 'text-emerald-600'}`}>
-                        {r.kind === 'deduction' ? '-' : '+'}{money(r.amount)}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums text-xs text-gray-500">
-                        {r.kind === 'advance' ? (
-                          <span className="flex items-center gap-2">
-                            {money(r.repaid)} / {money(r.outstanding)}
-                            {r.outstanding > 0 && (
-                              <button type="button" onClick={() => { setRepayId(r.id); setRepayAmt(''); }}
-                                className="text-emerald-600 font-bold hover:underline">{rtl ? 'سداد' : 'Repay'}</button>
-                            )}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 max-w-[220px] truncate">{r.reason || '—'}</td>
-                      <td className="px-4 py-3">
-                        <button type="button" onClick={() => { if (confirm(rtl ? 'حذف الحركة؟' : 'Delete?')) remove.mutate(r.id); }}
-                          className="w-9 h-9 inline-flex items-center justify-center rounded-xl text-red-500 hover:bg-red-50">
-                          <Trash2 size={15} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              columns={columns}
+              data={rows}
+              bare
+              minWidth="880px"
+              caption={rtl ? 'سجل المكافآت والخصومات والسلف' : 'Bonus, deduction and advance ledger'}
+            />
           )}
         </Panel>
       </div>

@@ -69,8 +69,10 @@ export {
   SkeletonText,
   SkeletonStats,
   SkeletonCard,
+  SkeletonPanel,
   SkeletonChart,
   SkeletonTable,
+  SkeletonList,
   SkeletonRows,
 } from './Skeleton';
 export { default as CountUp } from './CountUp';

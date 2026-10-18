@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { getFinancialReport } from '../../services/api';
+import { getFinancialReport, type FinancialReport as FinancialReportData } from '../../services/api';
 import { formatMoney } from '../../utils/currency';
 import { fmtNum } from '../../utils/date';
 import { escapeHtml, printDocument } from '../../utils/print';
 import { downloadMatrixXlsx } from '../../utils/csv';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Chart from '../../components/charts/Chart';
-import Spinner from '../../components/ui/Spinner';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
+import { SkeletonChart, SkeletonPanel, SkeletonStats, SkeletonTable } from '../../components/shared/Skeleton';
 import { FileText, FileCsv as FileSpreadsheet, TrendUp as TrendingUp, TrendDown as TrendingDown, Wallet } from '@phosphor-icons/react';
 import { paymentMethodLabel } from './subscriptions/shared';
 
@@ -65,6 +66,92 @@ export default function FinancialReport() {
   const money = (v: unknown) => formatMoney(Number(v || 0), currency);
   const inputCls =
     'h-11 min-w-[160px] px-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 outline-none';
+
+  // موجة 4 / دفعة أ — الثلاثة صفوف المرسومة كـ<ul> بقت DataTable واحدة بنفس
+  // الصدفة. بلا `sortable`: `/api/reports/financial` بيرجّع التجميعات مرتبة من
+  // السيرفر (total DESC للحركات، created_at DESC للأحدث) وبلا sort/order — زر
+  // ترتيب كان هيدّعي ترتيبًا السيرفر ما عملوش.
+  type MethodRow = FinancialReportData['methods'][number];
+  type IncomeRow = FinancialReportData['recent_income'][number];
+  type ExpenseRow = FinancialReportData['recent_expenses'][number];
+
+  const methodColumns: TableColumn<MethodRow>[] = [
+    {
+      id: 'method',
+      label: rtl ? 'الطريقة' : 'Method',
+      value: (r) => r.method,
+      cell: (r) => <span className="font-bold text-foreground">{paymentMethodLabel(r.method)}</span>,
+    },
+    {
+      id: 'count',
+      label: rtl ? 'العمليات' : 'Count',
+      numeric: true,
+      value: (r) => r.count,
+      cell: (r) => (
+        <span className="text-xs tabular-nums text-table-head">
+          {fmtNum(r.count)} {rtl ? 'عملية' : 'ops'}
+        </span>
+      ),
+    },
+    {
+      id: 'total',
+      label: rtl ? 'الإجمالي' : 'Total',
+      numeric: true,
+      value: (r) => Number(r.total),
+      cell: (r) => <span className="text-sm font-extrabold tabular-nums whitespace-nowrap text-emerald-700">{money(r.total)}</span>,
+    },
+  ];
+
+  const incomeColumns: TableColumn<IncomeRow>[] = [
+    {
+      id: 'created_at',
+      label: rtl ? 'التاريخ' : 'Date',
+      value: (r) => r.created_at,
+      width: '92px',
+      cell: (r) => <span className="text-xs tabular-nums text-table-head" dir="ltr">{shortDT(r.created_at)}</span>,
+    },
+    {
+      id: 'member_name',
+      label: rtl ? 'العضو' : 'Member',
+      value: (r) => r.member_name,
+      cell: (r) => (
+        <span className="block min-w-0">
+          <span className="block truncate text-sm text-foreground">{r.member_name || '—'}</span>
+          <span className="block text-xs text-table-head">{paymentMethodLabel(r.payment_method)}</span>
+        </span>
+      ),
+    },
+    {
+      id: 'amount',
+      label: rtl ? 'المبلغ' : 'Amount',
+      numeric: true,
+      value: (r) => Number(r.amount),
+      cell: (r) => <span className="text-sm font-bold tabular-nums whitespace-nowrap text-emerald-600">+{money(r.amount)}</span>,
+    },
+  ];
+
+  const expenseColumns: TableColumn<ExpenseRow>[] = [
+    {
+      id: 'created_at',
+      label: rtl ? 'التاريخ' : 'Date',
+      value: (r) => r.created_at,
+      width: '92px',
+      cell: (r) => <span className="text-xs tabular-nums text-table-head" dir="ltr">{shortDT(r.created_at)}</span>,
+    },
+    {
+      id: 'description',
+      label: rtl ? 'البيان' : 'Description',
+      value: (r) => r.description,
+      cell: (r) => <span className="block truncate text-sm text-foreground">{r.description || '—'}</span>,
+    },
+    {
+      id: 'amount',
+      label: rtl ? 'المبلغ' : 'Amount',
+      numeric: true,
+      value: (r) => Number(r.amount),
+      cell: (r) => <span className="text-sm font-bold tabular-nums whitespace-nowrap text-red-500">−{money(r.amount)}</span>,
+    },
+  ];
 
   const exportPdf = () => {
     if (!data || !t) return;
@@ -161,7 +248,30 @@ export default function FinancialReport() {
       </div>
 
       {isLoading || !t ? (
-        <div className="py-16 flex justify-center"><Spinner /></div>
+        // موجة 4 / دفعة أ — الفانطازة بقت هيكل الصفحة نفسه: كروت الـ3 + لوحة
+        // الرسم + لوحة طريقة الدفع + الجدولين السفليين (dense مثلهم).
+        <div className="flex flex-col gap-5">
+          <SkeletonStats columns={3} gridClassName="grid-cols-1 sm:grid-cols-3 gap-4" />
+          <SkeletonPanel>
+            <SkeletonChart height={280} />
+          </SkeletonPanel>
+          <SkeletonPanel>
+            <SkeletonTable bare rows={4} cols={methodColumns.length} />
+          </SkeletonPanel>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* موجة 4 / دفعة أ — جدولي «آخر الإيرادات/المصروفات» dense لكن
+                خلاياهم سطران (تاريخ فوق الوصف)، وقياس الصف الحي 56px على العرضين
+                مقابل 36px للفانطازة الافتراضية — نفس سبب تثبيت القياس.
+                جدول طريقة الدفع بيطلع 44px فعلي مقابل 45px افتراضي (فرق إطار
+                الـhairline تحت الـ<tr> في الـtable المُجمّد الحدود)، فسكبنش. */}
+            <SkeletonPanel>
+              <SkeletonTable bare dense rows={5} cols={incomeColumns.length} rowHeight={56} />
+            </SkeletonPanel>
+            <SkeletonPanel>
+              <SkeletonTable bare dense rows={5} cols={expenseColumns.length} rowHeight={56} />
+            </SkeletonPanel>
+          </div>
+        </div>
       ) : isError ? (
         <EmptyState title={rtl ? 'تعذّر تحميل التقرير' : 'Failed to load report'} />
       ) : (
@@ -216,19 +326,13 @@ export default function FinancialReport() {
             {data.methods.length === 0 ? (
               <EmptyState icon={Wallet} accent="gray" title={rtl ? 'لا مدفوعات في هذا النطاق' : 'No payments in this range'} />
             ) : (
-              <ul className="divide-y divide-gray-100">
-                {data.methods.map((m) => (
-                  <li key={m.method} className="flex items-center gap-3 py-2.5">
-                    <span className="text-sm font-bold text-gray-900 flex-1">{paymentMethodLabel(m.method)}</span>
-                    <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">
-                      {fmtNum(m.count)} {rtl ? 'عملية' : 'ops'}
-                    </span>
-                    <span className="text-sm font-extrabold text-emerald-700 tabular-nums whitespace-nowrap min-w-[110px] text-end">
-                      {money(m.total)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <DataTable
+                columns={methodColumns}
+                data={data.methods}
+                bare
+                rowKey={(r) => r.method}
+                caption={rtl ? 'الإيرادات حسب طريقة الدفع' : 'Revenue by payment method'}
+              />
             )}
           </Panel>
 
@@ -246,18 +350,15 @@ export default function FinancialReport() {
                   <p className="text-sm text-gray-400 mt-2">{rtl ? 'لا إيرادات في هذا النطاق' : 'No income in this range'}</p>
                 </div>
               ) : (
-                <ul className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
-                  {data.recent_income.map((r, i) => (
-                    <li key={i} className="flex items-center gap-3 px-5 py-2.5">
-                      <span className="text-xs text-gray-400 tabular-nums shrink-0" dir="ltr">{shortDT(r.created_at)}</span>
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-sm text-gray-900 truncate">{r.member_name || '—'}</span>
-                        <span className="block text-xs text-gray-400">{paymentMethodLabel(r.payment_method)}</span>
-                      </span>
-                      <span className="text-sm font-bold tabular-nums whitespace-nowrap text-emerald-600">+{money(r.amount)}</span>
-                    </li>
-                  ))}
-                </ul>
+                <DataTable
+                  columns={incomeColumns}
+                  data={data.recent_income}
+                  bare
+                  dense
+                  maxHeight="max-h-80"
+                  rowKey={(_r, i) => String(i)}
+                  caption={rtl ? 'آخر الإيرادات المسجلة' : 'Latest recorded income'}
+                />
               )}
             </div>
             <div className="bg-white rounded-3xl border border-gray-100 border-t-4 !border-t-red-500 shadow-sm overflow-hidden">
@@ -272,15 +373,15 @@ export default function FinancialReport() {
                   <p className="text-sm text-gray-400 mt-2">{rtl ? 'لا مصروفات في هذا النطاق' : 'No expenses in this range'}</p>
                 </div>
               ) : (
-                <ul className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
-                  {data.recent_expenses.map((r, i) => (
-                    <li key={i} className="flex items-center gap-3 px-5 py-2.5">
-                      <span className="text-xs text-gray-400 tabular-nums shrink-0" dir="ltr">{shortDT(r.created_at)}</span>
-                      <span className="flex-1 min-w-0 text-sm text-gray-900 truncate">{r.description || '—'}</span>
-                      <span className="text-sm font-bold tabular-nums whitespace-nowrap text-red-500">−{money(r.amount)}</span>
-                    </li>
-                  ))}
-                </ul>
+                <DataTable
+                  columns={expenseColumns}
+                  data={data.recent_expenses}
+                  bare
+                  dense
+                  maxHeight="max-h-80"
+                  rowKey={(_r, i) => String(i)}
+                  caption={rtl ? 'آخر المصروفات المسجلة' : 'Latest recorded expenses'}
+                />
               )}
             </div>
           </div>
