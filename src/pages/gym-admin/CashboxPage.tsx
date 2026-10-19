@@ -365,7 +365,7 @@ function MonthLine({ icon, iconClass, label, value, valueClass, bold }: {
 }
 
 // Amount colour per panel, from tokens rather than tailwind literals: the
-// cash-box ledger has to stay readable on the Court Green dark shell, where
+// cash-box ledger has to stay readable on the console-navy dark shell, where
 // `text-red-500` on `bg-card` measured under AA.
 const TONE_CLASS: Record<'emerald' | 'rose' | 'amber', string> = {
   emerald: 'text-primary',

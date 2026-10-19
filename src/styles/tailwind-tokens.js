@@ -23,10 +23,12 @@ export const theme = {
     'outline-variant': '#e5e7eb',
     card: '#ffffff',
     'surface-tint': '#10b981',
-    petrol: '#059669',
-    'petrol-dark': '#065f46',
-    'petrol-light': '#10b981',
-    'petrol-muted': '#a7f3d0',
+    // Petrol is themed: the ramp lives in tokens.css so dark mode can move the
+    // top bar and the header ink onto the console navy. Same hexes in light.
+    petrol: 'hsl(var(--petrol) / <alpha-value>)',
+    'petrol-dark': 'hsl(var(--petrol-dark) / <alpha-value>)',
+    'petrol-light': 'hsl(var(--petrol-light) / <alpha-value>)',
+    'petrol-muted': 'hsl(var(--petrol-muted) / <alpha-value>)',
     accent: '#10b981',
     'on-accent': '#ffffff',
     'accent-glow': 'rgba(16, 185, 129, 0.35)',

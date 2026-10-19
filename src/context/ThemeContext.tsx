@@ -60,7 +60,7 @@ export function applyTheme(pref: ThemePreference): ResolvedTheme {
   root.classList.toggle('dark', resolved === 'dark');
   root.style.colorScheme = resolved;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#12241d' : '#f5f3ee');
+  if (meta) meta.setAttribute('content', resolved === 'dark' ? '#0a1628' : '#f5f3ee');
   return resolved;
 }
 

@@ -7,27 +7,33 @@
  * copy-pasted against exactly these variables, so adopting them never
  * introduces a second token system.
  *
- * Light values are the Chalk & Brass shell (bone paper + warm graphite ink);
- * dark values are the Court Green scale. Existing hex tokens in
- * tailwind-tokens.js keep working and now point at these same numbers.
+ * Light values are the Chalk & Brass shell (bone page fill + white cards +
+ * warm graphite ink). Dark values are the Console Navy scale — the very same
+ * navy + cyan identity the unauthenticated screens have always painted from
+ * `--auth-*`, applied to the whole shell, so a signed-in page and the login
+ * screen read as one product. Existing hex tokens in tailwind-tokens.js keep
+ * working and now point at these same numbers.
  */
 
 :root {
   /*
-   * Chalk & Brass shell (2026-10-16): bone paper, warm graphite ink, hairline
-   * rules. Deliberately NOT black text — `--foreground` is #2B2620 and table
-   * cells drop further to #4A4239, because near-black body type reads as a
-   * form, not a premium product. `--primary` stays the tenant/action colour
-   * (123 call sites) and brass is only ever a meta accent: rules, active marks
-   * and chart series 1 — never a button.
+   * Chalk & Brass shell (2026-10-16): bone page fill, white cards, warm
+   * graphite ink, hairline rules. Deliberately NOT black text — `--foreground`
+   * is #2B2620 and table cells drop further to #4A4239, because near-black body
+   * type reads as a form, not a premium product. `--primary` stays the
+   * tenant/action colour (123 call sites) and brass is only ever a meta accent:
+   * rules, active marks and chart series 1 — never a button.
    */
   --background: 42.9 25.9% 94.7%; /* #f5f3ee bone */
   --foreground: 32.7 14.7% 14.7%; /* #2b2620 warm graphite, not black */
   /* Native chrome follows the shell: scrollbars, form widgets, date pickers. */
   color-scheme: light;
-  --card: 40 100% 98.8%;          /* #fffdf9 paper */
+  /* 2026-10-18 (owner): the bone-paper #fffdf9 is retired — cards, popovers and
+     panels are pure white everywhere the shell used to paint paper. Bone stays
+     the PAGE fill (`--background`), so cards still separate from the shell. */
+  --card: 0 0% 100%;              /* #ffffff */
   --card-foreground: 32.7 14.7% 14.7%; /* #2b2620 */
-  --popover: 40 100% 98.8%;       /* #fffdf9 */
+  --popover: 0 0% 100%;           /* #ffffff */
   --popover-foreground: 32.7 14.7% 14.7%; /* #2b2620 */
   --primary: 160.1 84.1% 39.4%; /* #10b981 */
   --primary-foreground: 0 0% 100%; /* #ffffff */
@@ -43,7 +49,7 @@
   --border: 41.3 21.6% 85.5%;    /* #e2ddd2 */
   --input: 41.3 21.6% 85.5%;     /* #e2ddd2 */
   --ring: 160.1 84.1% 39.4%;   /* #10b981 */
-  --surface: 40 100% 98.8%;      /* #fffdf9 paper */
+  --surface: 0 0% 100%;           /* #ffffff */
   --surface-dim: 41.3 21.6% 85.5%; /* #e2ddd2 */
 
   /* Surfaces & meta accents for the Chalk & Brass shell. Brass is the only
@@ -63,7 +69,7 @@
      hex literals (#f9fafb/#e5e7eb/#111827…) at ~75 call sites, so re-pointing
      them here is what stops cool gray fills from sitting on warm bone — a
      token-layer fix instead of a 75-site codemod. */
-  --surface-container-lowest: 40.0 100.0% 98.8%;  /* #fffdf9 paper */
+  --surface-container-lowest: 0.0 0.0% 100.0%;    /* #ffffff (was #fffdf9 paper) */
   --surface-container-low: 42.9 41.2% 96.7%;      /* #faf8f3 */
   --surface-container: 41.5 31.7% 92.0%;          /* #f1ede4 = muted */
   --surface-container-high: 41.3 21.6% 85.5%;     /* #e2ddd2 = border */
@@ -91,6 +97,13 @@
   --series-7: 31.8 13.0% 25.7%;   /* #4a4239 graphite 9.71 */
   --series-8: 208.8 12.7% 38.6%;  /* #56636f slate   6.06 */
 
+  /* Donut / arc *tracks* (the ring a progress arc sits on). Light keeps the
+     literal #e5e7eb the platform screens have always painted; dark takes the
+     shell keyline, because a pale ring is the one thing a navy page cannot
+     host. Read from inline `style` — an SVG *attribute* cannot parse
+     `hsl(var())`. */
+  --chart-track: 220 13% 91%;     /* #e5e7eb */
+
   /* Geometry — 10px is the Chalk & Brass radius (2px = Score Sheet, 18px = Clay).
      Only the new shadcn primitives read this; the legacy `rounded-3xl` classes on
      60+ pages keep their own scale until each page is migrated. */
@@ -114,6 +127,30 @@
     hsl(var(--auth-accent)) 0%, hsl(var(--auth-accent-strong)) 50%,
     hsl(var(--auth-accent-deep)) 100%);
 
+  /* Petrol ramp — the emerald family `tailwind-tokens.js` shipped as cold hex
+     (`petrol`, `petrol-dark`, `petrol-light`, `petrol-muted`) at ~20 call
+     sites. They are now variables for the same reason every other shell name
+     is: dark mode has to be able to move them. Light values are the exact
+     hexes those sites already rendered, so light mode is byte-identical. */
+  --petrol-dark: 163.1 88.1% 19.8%;  /* #065f46 */
+  --petrol: 161.4 93.5% 30.4%;       /* #059669 */
+  --petrol-light: 160.1 84.1% 39.4%; /* #10b981 */
+  --petrol-muted: 152.4 76.0% 80.4%; /* #a7f3d0 */
+
+  /* Top-bar gradient. Kept apart from `--petrol-*` because dark has to move the
+     bar onto the console navy while `petrol` stays an *ink* on page headers and
+     spinners — one ramp cannot be a surface and an ink at the same time. */
+  --chrome-1: 163.1 88.1% 19.8%;     /* #065f46 gradient start */
+  --chrome-2: 161.4 93.5% 30.4%;     /* #059669 */
+  --chrome-3: 160.1 84.1% 39.4%;     /* #10b981 gradient end */
+
+  /* Sidebar active item — a chrome *state*, not a status chip: light keeps the
+     emerald-700-on-emerald-50 pill it has always shown, dark moves to the
+     console cyan. Stored as finished colours rather than bare triplets because
+     the two themes do not share an alpha (dark needs a wash). */
+  --nav-active-bg: hsl(151.8 81.0% 95.9%);  /* #ecfdf5 = emerald-50 */
+  --nav-active-ink: hsl(162.9 93.5% 24.3%); /* #047857 = emerald-700 */
+
   /* Obsidian scale (raw hex for gradients/shadows that need literal stops) */
   --obsidian-950: #070a0f;
   --obsidian-900: #0b0f17;
@@ -123,70 +160,99 @@
 }
 
 /*
- * Dark sibling of the shell = Court Green (warm bottle green, chalk text), not
- * blue-black + neon. Still unused at runtime: nothing toggles `.dark` until
- * Phase 3, so this block is a committed decision, not a shipped screen.
+ * Dark sibling of the shell = Console Navy — the identity the unauthenticated
+ * screens paint (`--auth-bg-*` + `--auth-accent`), worn by every signed-in page:
+ * the page is `--auth-bg-1`, cards are `--auth-bg-3`, and the action colour is
+ * `--auth-accent` itself, so a filled button, a focus ring and a link in dark
+ * mode are the same cyan as the login CTA.
+ *
+ * Every value below is measured against the dark card #13203a: body ink 14.8,
+ * muted ink 7.6, primary 6.7, ink-faint 5.9, keylines 1.55 (the lift the
+ * projector note in the old block asked for).
  */
 .dark {
-  --background: 156.7 33.3% 10.6%; /* #12241d court */
-  --foreground: 75 21.1% 92.5%;    /* #eef0e8 chalk */
+  --background: 216 60% 9.8%;      /* #0a1628 = --auth-bg-1 */
+  --foreground: 210 40% 96%;       /* #f1f5f9 cool chalk, never pure white */
   color-scheme: dark;
-  --card: 157.1 31.3% 13.1%;       /* #172c24 */
-  --card-foreground: 75 21.1% 92.5%; /* #eef0e8 */
-  --popover: 157.1 31.3% 13.1%;    /* #172c24 */
-  --popover-foreground: 75 21.1% 92.5%; /* #eef0e8 */
-  --primary: 160.1 84.1% 39.4%; /* #10b981 */
-  --primary-foreground: 0 0% 100%; /* #ffffff */
-  --secondary: 152.7 24.4% 17.6%; /* #22382e */
-  --secondary-foreground: 75 21.1% 92.5%; /* #eef0e8 */
-  --muted: 152.7 25.6% 16.9%;     /* #20362c */
-  --muted-foreground: 148.6 10.8% 61.8%; /* #93a89d */
-  --accent: 158.1 64.4% 51.6%; /* #34d399 */
-  --accent-foreground: 162.4 80.4% 10%; /* #052e22 */
-  --destructive: 0 90.6% 70.8%; /* #f87171 */
+  --card: 220 50.6% 15.1%;         /* #13203a = --auth-bg-3 */
+  --card-foreground: 210 40% 96%;  /* #f1f5f9 */
+  --popover: 220 50.6% 15.1%;      /* #13203a */
+  --popover-foreground: 210 40% 96%; /* #f1f5f9 */
+  --primary: 188.7 94.5% 42.7%;    /* #06b6d4 = --auth-accent, the CTA cyan */
+  --primary-foreground: 0 0% 100%; /* #ffffff — white on the CTA cyan, exactly
+     as the login screen does it */
+  --secondary: 192.9 82.3% 31%;    /* #0e7490 = --auth-accent-deep */
+  --secondary-foreground: 0 0% 100%; /* #ffffff */
+  --muted: 218.7 50.8% 12%;        /* #0f1a2e = --auth-bg-2 */
+  --muted-foreground: 210 24% 68%; /* #9aadc1 */
+  --accent: 187 92% 53%;           /* #19dcf5 — one cyan step up for hover/active */
+  --accent-foreground: 200 80% 8%; /* #041a25 */
+  --destructive: 0 90.6% 70.8%;    /* #f87171 — error stays red, it is a signal */
   --destructive-foreground: 0 69.7% 6.5%; /* #1c0505 */
-  --border: 154.3 23.3% 23.5%;    /* #2e4a3e — lifted: at #22382e a card keyline
-     measured 1.18 against the surface, i.e. invisible on a projector */
-  --input: 154.3 23.3% 23.5%;     /* #2e4a3e */
-  --ring: 160.1 84.1% 39.4%;   /* #10b981 */
-  --surface: 157.1 31.3% 13.1%;  /* #172c24 */
-  --surface-dim: 156.7 33.3% 10.6%; /* #12241d */
+  --border: 217 32% 27%;           /* #2f405b — lifted on purpose: at a
+     card-coloured keyline the edge is invisible on a projector */
+  --input: 217 32% 27%;            /* #2f405b */
+  --ring: 188.7 94.5% 42.7%;       /* #06b6d4 — focus is the CTA cyan, which is
+     the ring the login fields already use */
+  --surface: 220 50.6% 15.1%;      /* #13203a */
+  --surface-dim: 216 60% 9.8%;     /* #0a1628 */
 
-  /* Court Green reading of the shell extras. Brass lifts a step (#d8b26a) so it
-     keeps contrast on the dark surface; cells stay chalk, never pure white. */
-  --hairline: 154.3 23.3% 23.5%; /* #2e4a3e — 1.52 against the card */
-  --brass: 39.3 58.5% 63.1%;     /* #d8b26a */
-  --brass-soft: 41.8 35.4% 31.0%; /* #6b5a33 — warm hover keyline, 2.20 vs card */
-  --pine: 148.6 10.8% 61.8%;     /* #93a89d — marks invert to chalk-green on dark */
-  --table-fg: 75 21.1% 92.5%;    /* #eef0e8 */
-  --table-head: 148.6 10.8% 61.8%; /* #93a89d */
-  --ink-faint: 140.8 12.0% 57.6%; /* #86a08f — 5.23 on the card; dark themes
+  /* Console reading of the shell extras. Brass lifts to the auth console's
+     amber (its second colour, after the cyan) so focus marks stay in the
+     identity; marks and cell ink invert to ice. */
+  --hairline: 217 32% 24%;         /* #2a3951 — 1.39 against the card */
+  --brass: 37.7 92.1% 50.2%;       /* #f59e0b = --auth-amber */
+  --brass-soft: 35 45% 24%;        /* #594222 — hover keyline, 1.72 vs card */
+  --pine: 200 35% 65%;             /* #87b0c5 — marks invert to ice on dark */
+  --table-fg: 210 40% 96%;         /* #f1f5f9 */
+  --table-head: 210 24% 68%;       /* #9aadc1 */
+  --ink-faint: 210 18% 62%;        /* #8d9eb0 — 5.91 on the card; dark themes
      compress the ink ladder, so faint stays AA rather than matching the
      light-mode step-down */
 
-  /* Court Green reading of the MD3-era ladder (mirrors the :root block above). */
-  --surface-container-lowest: 157.1 31.3% 13.1%;  /* #172c24 */
-  --surface-container-low: 159.1 30.7% 14.7%;     /* #1a3129 */
-  --surface-container: 152.7 25.6% 16.9%;         /* #20362c */
-  --surface-container-high: 152.7 24.4% 17.6%;    /* #22382e */
-  --surface-container-highest: 154.3 23.3% 23.5%; /* #2e4a3e */
-  --surface-variant: 152.7 24.4% 17.6%;           /* #22382e */
-  --on-surface: 75 21.1% 92.5%;                   /* #eef0e8 */
-  --on-surface-variant: 148.6 10.8% 61.8%;        /* #93a89d */
-  --inverse-surface: 75 21.1% 92.5%;              /* #eef0e8 */
-  --inverse-on-surface: 156.7 33.3% 10.6%;        /* #12241d */
-  --outline: 150.0 19.4% 28.2%;                   /* #3a5648 */
-  --outline-variant: 152.5 22.2% 21.2%;           /* #2a4237 */
+  /* Console reading of the MD3-era ladder (mirrors the :root block above) */
+  --surface-container-lowest: 220 50.6% 15.1%;  /* #13203a */
+  --surface-container-low: 219 50% 13.4%;       /* #111d33 */
+  --surface-container: 218.7 50.8% 12%;         /* #0f1a2e */
+  --surface-container-high: 220 48% 18%;        /* #182744 */
+  --surface-container-highest: 217 32% 27%;     /* #2f405b */
+  --surface-variant: 220 48% 18%;               /* #182744 */
+  --on-surface: 210 40% 96%;                    /* #f1f5f9 */
+  --on-surface-variant: 210 24% 68%;            /* #9aadc1 */
+  --inverse-surface: 210 40% 96%;               /* #f1f5f9 */
+  --inverse-on-surface: 216 60% 9.8%;           /* #0a1628 */
+  --outline: 217 30% 34%;                       /* #3d5171 */
+  --outline-variant: 217 32% 22%;               /* #26344a */
 
-  /* Series ladder lifted for the dark surface (measured 5.60–8.87 on #172c24).
-     Same eight hues in the same order, so a chart keeps its identity across
-     themes — only the lightness moves. */
-  --series-1: 39.3 58.5% 63.1%;   /* #d8b26a */
-  --series-2: 147.7 21.1% 63.7%;  /* #8fb6a1 */
-  --series-3: 154.8 42.6% 50.8%;  /* #4cb78a */
-  --series-4: 20.0 67.5% 62.5%;   /* #e08a5f */
-  --series-5: 100.0 14.5% 67.5%;  /* #a8b8a0 */
-  --series-6: 352.3 58.1% 71.0%;  /* #e08a95 */
-  --series-7: 40.9 18.6% 76.9%;   /* #cfc8b9 */
-  --series-8: 210.0 24.1% 65.9%;  /* #93a8bd */
+  /* Series ladder — carried over from the previous dark palette untouched.
+     These are data semantics (growth / loss / neutral), not chrome, so a chart
+     keeps its identity across themes and only the *shell* changes. Re-measured
+     against the new card #13203a: 6.15–9.74, comfortably over the 3:1 SVG marks
+     need under WCAG 1.4.11. */
+  --series-1: 39.3 58.5% 63.1%;   /* #d8b26a  8.10 */
+  --series-2: 147.7 21.1% 63.7%;  /* #8fb6a1  7.24 */
+  --series-3: 154.8 42.6% 50.8%;  /* #4cb78a  6.52 */
+  --series-4: 20.0 67.5% 62.5%;   /* #e08a5f  6.15 */
+  --series-5: 100.0 14.5% 67.5%;  /* #a8b8a0  7.74 */
+  --series-6: 352.3 58.1% 71.0%;  /* #e08a95  6.36 */
+  --series-7: 40.9 18.6% 76.9%;   /* #cfc8b9  9.74 */
+  --series-8: 210.0 24.1% 65.9%;  /* #93a8bd  6.62 */
+  --chart-track: 217 32% 27%;     /* #2f405b = --border; see the :root note */
+
+  /* Chrome ramps, console reading: the top bar becomes navy that ends in the
+     CTA's deep teal instead of the emerald bar light mode paints. `petrol` is
+     an *ink* here (page headers, the search spinner), so it must stay light on
+     navy — it becomes the accent cyan, never a navy fill. */
+  --petrol-dark: 216 60% 9.8%;     /* #0a1628 */
+  --petrol: 188.7 94.5% 42.7%;     /* #06b6d4 */
+  --petrol-light: 187 92% 53%;     /* #19dcf5 — hover on a filled button */
+  --petrol-muted: 187 60% 82%;     /* #b6e6ed */
+  --chrome-1: 220 50.6% 15.1%;     /* #13203a gradient start */
+  --chrome-2: 213 44% 24%;         /* #223b58 */
+  --chrome-3: 192.9 82.3% 31%;     /* #0e7490 gradient end */
+
+  /* Sidebar active pill — the login chip language: a cyan wash with cyan ink
+     (6.7 on the wash) instead of light mode's emerald-on-mint. */
+  --nav-active-bg: hsl(188.7 94.5% 42.7% / 0.13);
+  --nav-active-ink: hsl(188.7 94.5% 42.7%); /* #06b6d4 */
 }

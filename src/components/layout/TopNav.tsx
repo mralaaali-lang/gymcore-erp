@@ -125,7 +125,7 @@ export default function TopNav({ navItems }: { navItems: NavItem[] }) {
   const heading = resolvePageHeading(location.pathname, language === 'ar');
 
   return (
-    <header className="bg-gradient-to-br from-petrol-dark via-petrol to-petrol-light w-full sticky top-0 z-30 shrink-0">
+    <header className="bg-gradient-to-br from-chrome-1 via-chrome-2 to-chrome-3 w-full sticky top-0 z-30 shrink-0">
       <div className="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-5 md:py-6 gap-3">
         {/* §42ب — Start side (geometric RIGHT in Arabic, left in English):
             the mobile menu button sits here so it matches the side the

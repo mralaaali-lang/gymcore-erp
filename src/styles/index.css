@@ -131,7 +131,7 @@ table:not(.no-shell-ink) {
 }
 
 /* Glassmorphism & Modern Card Primitives — fills and keylines come from the
-   shell so the panel is warm in light mode and Court Green in dark. */
+   shell so the panel is warm in light mode and console navy in dark. */
 .glass-panel {
   background: hsl(var(--card) / 0.85);
   backdrop-filter: blur(12px);
@@ -144,6 +144,64 @@ table:not(.no-shell-ink) {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid hsl(var(--border));
+}
+
+/*
+ * Dark shell = the auth console's material.
+ *
+ * The login screen paints a navy gradient with a soft cyan glow behind its glass
+ * card; a signed-in page got a flat slab instead. `shell-canvas` (AppLayout's
+ * root) carries the same mesh at a fraction of the strength, `main` goes
+ * transparent so the mesh is not painted over, and the cards become slightly
+ * translucent — so a card sits *on* something and reads as glass rather than as
+ * a solid rectangle. Deliberately no `backdrop-filter` on `.bg-card`: a data
+ * screen stacks dozens of cards, and one blur layer each is a real cost for an
+ * effect the mesh already delivers. Opted-in panels still blur via
+ * `.glass-panel`. Light mode is untouched by all three rules.
+ */
+.shell-canvas {
+  background-color: hsl(var(--background));
+}
+
+.dark .shell-canvas {
+  background-image:
+    radial-gradient(58% 42% at 12% 0%, hsl(var(--auth-accent) / 0.10) 0%, transparent 62%),
+    radial-gradient(52% 40% at 88% 100%, hsl(var(--auth-accent-strong) / 0.08) 0%, transparent 60%);
+  background-attachment: fixed;
+}
+
+.dark main.bg-surface-container-low {
+  background-color: transparent;
+}
+
+.dark .bg-card {
+  background-color: hsl(var(--card) / 0.82);
+}
+
+/* `glass-card` — the auth surfaces (login / password flow) paint on the
+   permanently dark `--auth-root-bg`, so this primitive is authored against
+   white alpha instead of the themed shell tokens. The dark base layer matters:
+   without it the accent glow behind the card bleeds through and reads as a
+   coloured panel instead of glass. Values live here once; screens only compose
+   the class with Tailwind (padding, radius, motion). */
+.glass-card {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%),
+    hsl(var(--auth-bg-1) / 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(22px) saturate(130%);
+  -webkit-backdrop-filter: blur(22px) saturate(130%);
+  box-shadow:
+    0 25px 60px -12px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: hsl(var(--auth-bg-1) / 0.92);
+  }
 }
 
 .emerald-glow {
@@ -257,8 +315,8 @@ html {
  * Why brass and not `--ring`: `--ring` is emerald #10b981, which measures 2.29
  * against the bone page and 2.50 against the card — below the 3:1 WCAG 1.4.11
  * floor for a non-text indicator, so light mode would ship a keyboard cursor
- * nobody can see. `--brass` is 3.43 on bone (3.73 on card) and 8.09 against
- * Court Green in dark, it is already mode-aware, and the shell reserves brass
+ * nobody can see. `--brass` is 3.43 on bone (3.73 on card) and 8.44 against the
+ * console navy page in dark, it is already mode-aware, and the shell reserves brass
  * for exactly this kind of meta mark — never for an action. Re-pointing `--ring`
  * itself is not in this wave: it feeds `ring-ring` at 69 call sites plus every
  * shadcn control, so it is an owner decision with numbers before and after.

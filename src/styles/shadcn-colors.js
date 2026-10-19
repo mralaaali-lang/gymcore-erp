@@ -81,4 +81,13 @@ export const shadcnColors = {
   'auth-accent-strong': v('auth-accent-strong'),
   'auth-accent-deep': v('auth-accent-deep'),
   'auth-amber': v('auth-amber'),
+
+  // Top-bar gradient and the sidebar's active pill. The pill pair is stored as
+  // finished colours — dark needs its own alpha wash, so there is nothing for
+  // `<alpha-value>` to substitute.
+  'chrome-1': v('chrome-1'),
+  'chrome-2': v('chrome-2'),
+  'chrome-3': v('chrome-3'),
+  'nav-active': 'var(--nav-active-bg)',
+  'nav-active-ink': 'var(--nav-active-ink)',
 };

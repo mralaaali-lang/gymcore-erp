@@ -200,7 +200,7 @@ export default function Sidebar({ items }: SidebarProps) {
         className={({ isActive }) =>
           `group flex items-center gap-3 py-2.5 px-3 mx-2 rounded-xl transition-all duration-200 relative ${
             isActive
-              ? 'text-emerald-700 bg-emerald-50 font-bold'
+              ? 'text-nav-active-ink bg-nav-active font-bold'
               : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 font-medium'
           }`
         }
@@ -211,7 +211,7 @@ export default function Sidebar({ items }: SidebarProps) {
               <IconComp
                 size={18}
                 strokeWidth={1.75}
-                className={`shrink-0 transition-all duration-200 ${isActive ? 'text-emerald-600' : 'text-gray-400 group-hover:text-gray-600'}`}
+                className={`shrink-0 transition-all duration-200 ${isActive ? 'text-nav-active-ink' : 'text-gray-400 group-hover:text-gray-600'}`}
               />
             )}
             <span className="text-[13px] leading-tight truncate">{item.label}</span>

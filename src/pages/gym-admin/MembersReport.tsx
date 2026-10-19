@@ -105,8 +105,8 @@ export default function MembersReport() {
     );
   };
 
-  // brass-soft في الداكن (#6b5a33) مفتاح hover مش خلفية نص: pine فوقه = 2.66
-  // (مقيس computed). chalk (#eef0e8) على نفس الخلفية = 5.83، وهو نفس مستوى
+  // brass-soft في الداكن (#594222) مفتاح hover مش خلفية نص: pine فوقه = 4.06
+  // (مقيس computed). chalk (#f1f5f9) على نفس الخلفية = 8.61، وهو فوق مستوى
   // الاقتران في الفاتح (9.96).
   const countChip = (value: number | null | undefined) => (
     <span className="inline-flex min-w-8 items-center justify-center rounded-full bg-brass-soft px-2 py-1 text-xs font-bold text-pine tabular-nums dark:text-foreground">

@@ -13,7 +13,7 @@
  *    the signed-off bone-paper rendering cannot regress from this file.
  *  - DARK MODE REMAPS THE CLASS NAMES THEMSELVES. `.dark .bg-white` (0,2,0)
  *    beats Tailwind's `.bg-white` (0,1,0) without `!important`, so a page that
- *    still says `bg-white` gets the Court Green card, retints live, and needs
+ *    still says `bg-white` gets the Console Navy card, retints live, and needs
  *    no edit. The day a screen is converted to `bg-card`, this rule simply stops
  *    applying to it — the bridge is self-clearing, not a tax.
  *
@@ -86,8 +86,9 @@
    Pastel chips (`bg-emerald-50` + `text-emerald-600`) are the one pattern that
    genuinely breaks in dark mode: pale fill with dark-green ink. They map to the
    same series hue the charts and KPI chips already use, so a status pill and
-   its chart agree. Filled actions (`bg-emerald-600`) are left alone — those
-   are the tenant's primary colour, and `--primary` is emerald in both themes. */
+   its chart agree. Filled actions (`bg-emerald-600`) are the tenant's primary
+   colour and are handled in the block below — `--primary` is emerald in light
+   and the console cyan in dark, and those literals follow it. */
 .dark .bg-emerald-50,
 .dark .bg-emerald-100,
 .dark .bg-green-50,
@@ -142,8 +143,11 @@
 .dark .text-sky-600,
 .dark .text-blue-600,
 .dark .text-blue-700,
+.dark .text-blue-800,
+.dark .text-blue-900,
 .dark .text-cyan-600,
 .dark .text-indigo-700       { color: hsl(var(--series-8)); }
+.dark .border-blue-200       { border-color: hsl(var(--series-8) / 0.4); }
 
 .dark .bg-violet-50,
 .dark .bg-violet-100,
@@ -159,10 +163,60 @@
 .dark .border-violet-200,
 .dark .border-purple-200     { border-color: hsl(var(--series-2) / 0.4); }
 
+/* ── Filled emerald = the action colour ───────────────────────────────────
+   In light mode `bg-emerald-500` IS `--primary` (#10b981) and the two are used
+   interchangeably, so on the console navy the literals follow the token: cyan
+   fills, with hover stepping *up* a cyan (a navy shell reads a lighter hover
+   better than a darker one). `bg-green-500` is deliberately untouched — those
+   are semantic ok/warning dots sitting next to bg-red-500 / bg-amber-500 in the
+   same row. */
+.dark .bg-emerald-500,
+.dark .bg-emerald-600,
+.dark .bg-emerald-700       { background-color: hsl(var(--primary)); }
+.dark .hover\:bg-emerald-600:hover,
+.dark .hover\:bg-emerald-700:hover { background-color: hsl(var(--petrol-light)); }
+
+/* ── MD3 `*-container` pairs ──────────────────────────────────────────────
+   These are literal pastels in tailwind-tokens.js (dark green on pale mint). A
+   pale mint slab is the one thing a navy shell cannot absorb, so the pair
+   retints to the same series wash + ink the emerald chips above use — which
+   also keeps a status pill agreeing with its chart. */
+.dark .bg-primary-container,
+.dark .bg-secondary-container,
+.dark .bg-secondary-fixed   { background-color: hsl(var(--series-3) / 0.18); }
+.dark .text-on-primary-container,
+.dark .text-on-secondary-container,
+.dark .text-on-secondary-fixed { color: hsl(var(--series-3)); }
+.dark .bg-error-container   { background-color: hsl(var(--series-6) / 0.18); }
+.dark .text-on-error-container { color: hsl(var(--series-6)); }
+
+/* `text-error` / `text-tertiary` are #ba1a1a — 2.5 on the navy card, the one
+   ink in the palette that fails AA in dark. They move to the loss hue the rest
+   of the shell already uses for the same message (6.4). */
+.dark .text-error,
+.dark .text-tertiary        { color: hsl(var(--series-6)); }
+.dark .bg-error             { background-color: hsl(var(--series-6)); }
+
 /* Arbitrary hex the Aceternity copies and the old MD3 palette left behind. */
 .dark .text-\[\#584237\],
 .dark .text-\[\#121c2a\]     { color: hsl(var(--foreground)); }
+/* …and the `/40` variant of the same ink, which the rule above cannot match:
+   without it the AI-analytics empty-state icons vanish into the navy. */
+.dark .text-\[\#584237\]\/40 { color: hsl(var(--foreground) / 0.4); }
 .dark .border-\[\#d9e3f6\]   { border-color: hsl(var(--border)); }
+/* Skeletons and the wizard's notice box are literal *light surfaces*; a pale
+   slab is exactly what a navy shell cannot host, so they take a raised surface
+   and a series wash instead. */
+.dark .bg-\[\#d9e3f6\]       { background-color: hsl(var(--surface-container-high)); }
+.dark .bg-\[\#f0f4ff\]       { background-color: hsl(var(--series-8) / 0.14); }
+/* The last two inks that would otherwise stay dark-on-dark. */
+.dark .text-\[\#006c49\]     { color: hsl(var(--primary)); }
+.dark .hover\:bg-\[\#005a3e\]:hover { background-color: hsl(var(--petrol-light)); }
+/* The trial strip is literal emerald ink on near-black and it is the first
+   thing on every page, so it moves with the shell like everything else. */
+.dark .text-\[\#4ade80\]     { color: hsl(var(--primary)); }
+.dark .bg-\[\#4ade80\]       { background-color: hsl(var(--primary)); }
+.dark .hover\:text-\[\#86efac\]:hover { color: hsl(var(--petrol-light)); }
 
 /* ── Glass / glow live in index.css and are retinted there ───────────────── */
 

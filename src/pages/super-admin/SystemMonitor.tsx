@@ -401,7 +401,7 @@ export default function SystemMonitor() {
               <div className="flex flex-col items-center">
                 <div className="relative w-32 h-32 mb-4">
                   <svg className="w-full h-full transform -rotate-90" viewBox="0 0 80 80">
-                    <circle cx="40" cy="40" r="34" fill="none" stroke="#e5e7eb" strokeWidth="6" />
+                    <circle cx="40" cy="40" r="34" fill="none" style={{ stroke: 'hsl(var(--chart-track))' }} strokeWidth="6" />
                     <circle
                       cx="40" cy="40" r="34" fill="none"
                       stroke={sysData.server.mem_usage_percent > 80 ? '#ef4444' : sysData.server.mem_usage_percent > 60 ? '#f97316' : '#22c55e'}

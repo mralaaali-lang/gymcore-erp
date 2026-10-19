@@ -337,7 +337,7 @@ export default function GymHandover() {
                   cy="40"
                   r="34"
                   fill="none"
-                  stroke="#e5e7eb"
+                  style={{ stroke: 'hsl(var(--chart-track))' }}
                   strokeWidth="6"
                 />
                 <circle

@@ -41,7 +41,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     // dir changes based on language:
     // - Arabic (RTL) → sidebar appears on the RIGHT side
     // - English (LTR) → sidebar appears on the LEFT side
-    <div className="flex min-h-screen bg-background text-on-background font-body-md antialiased" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="flex min-h-screen bg-background text-on-background font-body-md antialiased shell-canvas" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       {/* موجة 2 — skip link. Every screen sits behind the whole sidebar and top
           nav, so a keyboard user tabbed through all of those nav items before
           reaching the page. It is `sr-only` until focused, then a normal card at

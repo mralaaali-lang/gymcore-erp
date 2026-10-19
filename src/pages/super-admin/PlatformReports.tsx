@@ -323,7 +323,7 @@ export default function PlatformReports() {
             <div className="flex items-center justify-center h-48">
               <div className="relative w-40 h-40">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-                  <circle cx="60" cy="60" r="54" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                  <circle cx="60" cy="60" r="54" fill="none" style={{ stroke: 'hsl(var(--chart-track))' }} strokeWidth="8" />
                   <circle cx="60" cy="60" r="54" fill="none" stroke="#22c55e" strokeWidth="8"
                     strokeDasharray={`${m.total_members ? (m.active_members / m.total_members) * 339.292 : 0} 339.292`}
                     strokeLinecap="round" />

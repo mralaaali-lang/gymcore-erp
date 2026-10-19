@@ -5,36 +5,58 @@ Utility names: `src/styles/shadcn-colors.js`. Legacy hex/typography/geometry:
 `src/styles/tailwind-tokens.js` (spread **before** `shadcnColors` in
 `tailwind.config.js`, so the shell names win).
 
-## Light (Chalk & Brass) / Dark (Court Green)
+## Light (Chalk & Brass) / Dark (Console Navy)
+
+Dark is the **same identity the unauthenticated screens paint** (`--auth-bg-*` +
+`--auth-accent`), applied to the whole shell: page `#0a1628` = `--auth-bg-1`,
+cards `#13203a` = `--auth-bg-3`, action colour = `--auth-accent` itself. So a
+filled button, a focus ring and a link in dark are the same cyan as the login
+CTA. Light mode is unchanged and byte-identical to before.
 
 | Variable | Utility | Light | Dark | Use for |
 | --- | --- | --- | --- | --- |
-| `--background` | `bg-background` | `#f5f3ee` bone | `#12241d` | app canvas (AppLayout only) |
-| `--card` | `bg-card` | `#fffdf9` paper | `#172c24` | every panel, tile, field |
-| `--foreground` | `text-foreground` | `#2b2620` | `#eef0e8` | titles, primary text |
-| `--muted-foreground` | `text-muted-foreground` | `#665f54` (6.21:1) | `#93a89d` | subtitles, secondary text |
-| `--ink-faint` | `text-ink-faint` | `#8b8478` (3.42:1) | `#86a08f` | placeholders, hint icons — never body copy |
-| `--hairline` | `border-hairline` | `#efe9dd` | `#2e4a3e` | card edge, row separators |
-| `--input` / `--border` | `border-input` | `#e2ddd2` | `#2e4a3e` | form fields |
-| `--brass` | `text-brass` | `#a67c2e` | `#d8b26a` | meta accent (marks, premium) |
-| `--brass-soft` | `border-brass-soft` | `#f0e6d2` | `#6b5a33` | hover keyline, active mark |
-| `--pine` | `text-pine` | `#1f3a2e` | `#93a89d` | brand mark only |
-| `--primary` | `bg-primary` / `text-primary` | `#10b981` | `#10b981` | the one action colour |
-| `--secondary` | `bg-secondary` | `#006c49` | `#22382e` | deep action fill |
+| `--background` | `bg-background` | `#f5f3ee` bone | `#0a1628` | app canvas (AppLayout only) |
+| `--card` | `bg-card` | `#ffffff` | `#13203a` | every panel, tile, field |
+| `--foreground` | `text-foreground` | `#2b2620` | `#f1f5f9` (14.8 on card) | titles, primary text |
+| `--muted-foreground` | `text-muted-foreground` | `#665f54` (6.21:1) | `#9aadc1` (7.6) | subtitles, secondary text |
+| `--ink-faint` | `text-ink-faint` | `#8b8478` (3.42:1) | `#8d9eb0` (5.9) | placeholders, hint icons — never body copy |
+| `--hairline` | `border-hairline` | `#efe9dd` | `#2a3951` | card edge, row separators |
+| `--input` / `--border` | `border-input` | `#e2ddd2` | `#2f405b` | form fields |
+| `--brass` | `text-brass` | `#a67c2e` | `#f59e0b` = `--auth-amber` | meta accent (marks, focus ring) |
+| `--brass-soft` | `border-brass-soft` | `#f0e6d2` | `#594222` | hover keyline, active mark |
+| `--pine` | `text-pine` | `#1f3a2e` | `#87b0c5` | brand mark only |
+| `--primary` | `bg-primary` / `text-primary` | `#10b981` | `#06b6d4` = `--auth-accent` | the one action colour |
+| `--secondary` | `bg-secondary` | `#006c49` | `#0e7490` = `--auth-accent-deep` | deep action fill |
 | `--destructive` | `bg-destructive` | `#ba1a1a` | `#f87171` | delete / loss |
-| `--ring` | `ring-ring` | `#10b981` | `#10b981` | focus ring |
-| `--table-fg` | `text-table-fg` | `#4a4239` | `#eef0e8` | `<td>` (also applied by the global `table` rule) |
-| `--table-head` | `text-table-head` | `#665f54` | `#93a89d` | `<th>` micro-labels |
+| `--ring` | `ring-ring` | `#10b981` | `#06b6d4` | focus ring |
+| `--table-fg` | `text-table-fg` | `#4a4239` | `#f1f5f9` | `<td>` (also applied by the global `table` rule) |
+| `--table-head` | `text-table-head` | `#665f54` | `#9aadc1` | `<th>` micro-labels |
 | `--radius` | `rounded-shell` | `0.625rem` | same | all radii on migrated surfaces |
 
 Surface ladder (warm fills, no shadow): `bg-surface-container-lowest`
-`#fffdf9` → `-low` `#faf8f3` → (default) `#f1ede4` → `-high` `#e2ddd2` →
-`-highest` `#cfc8b9`. Dark mirrors at `#172c24 / #1a3129 / #20362c / #22382e /
-#2e4a3e`. `bg-muted` = `surface-container`. `--outline` `#d5cec0`,
+`#ffffff` → `-low` `#faf8f3` → (default) `#f1ede4` → `-high` `#e2ddd2` →
+`-highest` `#cfc8b9`. Dark mirrors at `#13203a / #111d33 / #0f1a2e / #182744 /
+#2f405b`. `bg-muted` = `surface-container`. `--outline` `#d5cec0`,
 `--outline-variant` = hairline.
 
-Data series (every value clears ≥3:1 against `--card`, measured 3.39–12.14, so
-they are legal as SVG marks under WCAG 1.4.11):
+Shell material in dark: `.shell-canvas` (AppLayout root) carries a faint cyan
+mesh, `main` goes transparent so it is not painted over, and `.dark .bg-card` is
+82% opaque — a card sits *on* something and reads as glass. `.glass-panel`
+blurs; `.bg-card` deliberately does not (dozens of cards × one blur layer each
+is real cost for an effect the mesh already gives).
+
+Chrome ramps: `--petrol-*` (header ink, page banners) and `--chrome-1..3` (the
+top-bar gradient) are variables now. Light = the old emerald hexes verbatim;
+dark = navy → `--auth-accent-deep` teal, and `--petrol` becomes an *ink* (cyan)
+because those call sites are text, never a navy fill. `--nav-active-bg` /
+`--nav-active-ink` (utilities `bg-nav-active` / `text-nav-active-ink`) are the
+sidebar's active pill: emerald-50 + emerald-700 in light, a cyan wash + cyan in
+dark.
+
+Data series (light: every value clears ≥3:1 against `--card`, measured
+3.39–12.14, so they are legal as SVG marks under WCAG 1.4.11; dark: same eight
+hues, measured 6.15–9.74 on the `#13203a` card — the ladder is *data semantics*
+and deliberately does not move with the shell):
 
 | Token | Light | Meaning | `ACCENTS` name |
 | --- | --- | --- | --- |
@@ -89,6 +111,13 @@ touch, one file at a time:
 `src/components/ui/Button.tsx` and `Card.tsx` still carry pre-token literals —
 known debt, scheduled as its own tranche. Do not "fix" them as a side effect of
 a feature commit.
+
+On the dark shell the bridge retints the shortcuts that have no token twin, so
+none of them is urgent: `bg-emerald-500/600/700` → `--primary` (they *are* the
+action colour in light), `bg-*-container` pairs → the matching `--series-*`
+wash, `text-error` / `text-tertiary` → `--series-6` (2.5 → 6.4), and the trial
+strip's `#4ade80` → `--primary`. `bg-green-500` is deliberately left alone —
+those are ok/warning dots that sit next to `bg-red-500` / `bg-amber-500`.
 
 ## Shared primitives to reuse
 
