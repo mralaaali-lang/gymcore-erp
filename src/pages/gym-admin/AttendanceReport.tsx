@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { getAttendanceReport } from '../../services/api';
+import { getAttendanceReport, type AttendanceLogRow } from '../../services/api';
 import { formatDate, formatTime, fmtNum } from '../../utils/date';
 import { escapeHtml, printDocument } from '../../utils/print';
 import { buildExportMatrix, downloadMatrixXlsx } from '../../utils/csv';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import Chart from '../../components/charts/Chart';
-import Spinner from '../../components/ui/Spinner';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
+import { SkeletonStats, SkeletonPanel, SkeletonChart, SkeletonTable } from '../../components/shared/Skeleton';
 import { FileText, FileCsv as FileSpreadsheet, DoorOpen, Users, CalendarDots as CalendarDays, ActivityIcon as Activity } from '@phosphor-icons/react';
 
 // ====================================================================
@@ -67,29 +68,65 @@ export default function AttendanceReport() {
   const k = data?.kpis;
   const log = data?.log;
 
-  const toggleSort = (key: string) => {
-    if (sort === key) setOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
-    else { setSort(key); setOrder(SORTABLE[key].def); }
-    setPage(1);
-  };
-  const sortTh = (key: string, label: string) => {
-    const active = sort === key;
-    return (
-      <th key={key} className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">
-        <button
-          type="button"
-          onClick={() => toggleSort(key)}
-          title={rtl ? 'اضغط للترتيب' : 'Click to sort'}
-          className={`inline-flex items-center gap-1 hover:text-gray-900 ${active ? 'text-emerald-700' : ''}`}
-        >
-          {label}
-          <span className="material-symbols-outlined text-base">
-            {active ? (order === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more'}
-          </span>
-        </button>
-      </th>
-    );
-  };
+  // موجة 4 / دفعة ج — عمودان قابلان للفرز فقط، وهما حرفيًا whitelist السيرفر
+  // (`analytics.ts:753-758` = ['time','member']، الافتراضي time DESC). الفرز
+  // server-side: الجدول `manualSorting` والرأس يرفع sort/order للاستعلام.
+  const columns: TableColumn<AttendanceLogRow>[] = [
+    {
+      id: '__n',
+      label: rtl ? 'م' : '#',
+      width: '2.5rem',
+      cell: (_r, i) => (
+        <span className="text-xs text-gray-400 tabular-nums">
+          {((log?.pagination.page ?? 1) - 1) * ((log?.pagination.limit) ?? limit) + i + 1}
+        </span>
+      ),
+    },
+    { id: 'date', label: rtl ? 'التاريخ' : 'Date', value: (r) => formatDate(String(r.check_in_time)) },
+    {
+      id: 'member',
+      label: rtl ? 'العضو' : 'Member',
+      sortable: true,
+      sortDescFirst: SORTABLE.member.def === 'desc',
+      cell: (r) => (
+        <div className="min-w-0">
+          <p className="font-semibold text-gray-900 leading-tight whitespace-nowrap">{r.full_name}</p>
+          <p dir="ltr" className={`text-xs text-gray-500 whitespace-nowrap ${rtl ? 'text-right' : 'text-left'}`}>{r.card_code ?? '—'}</p>
+        </div>
+      ),
+    },
+    {
+      id: 'time',
+      label: rtl ? 'الدخول' : 'In',
+      sortable: true,
+      sortDescFirst: SORTABLE.time.def === 'desc',
+      value: (r) => (r.check_in_time ? formatTime(String(r.check_in_time)) : '—'),
+      cell: (r) => (
+        <span dir="ltr" className={`font-semibold tabular-nums text-emerald-600 ${rtl ? 'text-right' : 'text-left'}`}>
+          {r.check_in_time ? formatTime(String(r.check_in_time)) : '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'out',
+      label: rtl ? 'الخروج' : 'Out',
+      value: (r) => (r.check_out_time ? formatTime(String(r.check_out_time)) : '—'),
+      cell: (r) => (
+        <span dir="ltr" className={`text-gray-500 tabular-nums ${rtl ? 'text-right' : 'text-left'}`}>
+          {r.check_out_time ? formatTime(String(r.check_out_time)) : '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'dur',
+      label: rtl ? 'المدة' : 'Duration',
+      cell: (r) => (
+        <span className={`text-xs font-bold tabular-nums ${r.duration_min == null ? 'text-emerald-600' : 'text-gray-600'}`}>
+          {durationAr(r.duration_min, rtl)}
+        </span>
+      ),
+    },
+  ];
 
   // أيام الذروة: تجميع الترند اليومي حسب يوم الأسبوع.
   const busyDays = (() => {
@@ -221,7 +258,21 @@ export default function AttendanceReport() {
       </div>
 
       {isLoading || !k ? (
-        <div className="py-16 flex justify-center"><Spinner /></div>
+        /* موجة 4 / دفعة ج — الفانطازة بنفس هندسة الشاشة النهائية: 4 كروت ←
+           ترند + أيام ذروة ← توزيع ساعات ← السجل. صف السجل سطران (اسم فوق
+           الكود) فـ`rowHeight={58}` قياس حي على 1440 و390 (الصف طلع 58–59 لأن
+           خلية العضو مكدّسة: الاسم فوق كود الكارت، 34px + حواشي px-4 py-3). */
+        <div className="flex flex-col gap-5">
+          <SkeletonStats columns={4} gridClassName="grid-cols-2 lg:grid-cols-4 gap-4" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <SkeletonPanel><SkeletonChart height={260} /></SkeletonPanel>
+            <SkeletonPanel><SkeletonChart height={260} /></SkeletonPanel>
+          </div>
+          <SkeletonPanel><SkeletonChart height={260} /></SkeletonPanel>
+          {/* جدول بقشرة كاملة (مش `bare`): الرأس عند الفانطازة لازم ياف نفس
+              ارتفاع رأس الحقيقي وإلا الصفحة بتقفز وقت التحميل. */}
+          <SkeletonTable rows={6} cols={columns.length} rowHeight={58} />
+        </div>
       ) : isError ? (
         <EmptyState title={rtl ? 'تعذّر تحميل التقرير' : 'Failed to load report'} />
       ) : (
@@ -286,89 +337,62 @@ export default function AttendanceReport() {
             )}
           </Panel>
 
-          {/* 5) سجل الحضور بإعدادات جدول المشتركين */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100 text-start">
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 w-10">#</th>
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'التاريخ' : 'Date'}</th>
-                    {sortTh('member', rtl ? 'العضو' : 'Member')}
-                    {sortTh('time', rtl ? 'الدخول' : 'In')}
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'الخروج' : 'Out'}</th>
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'المدة' : 'Duration'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(log?.rows ?? []).length === 0 && (
-                    <tr><td colSpan={7} className="p-10 text-center text-gray-400 text-sm">
-                      {rtl ? 'لا سجلات في هذا النطاق' : 'No records in this range'}
-                    </td></tr>
+          {/* 5) سجل الحضور على صدفة `ui/DataTable` — القشرة نفسها (مش كارت
+             `bg-white rounded-3xl` يدوي)، والترقيم جوّه نفس القشرة في `footer`. */}
+          <DataTable
+            columns={columns}
+            data={log?.rows ?? []}
+            minWidth="760px"
+            caption={rtl ? 'سجل الحضور' : 'Attendance log'}
+            manualSorting
+            sorting={[{ id: sort, desc: order === 'desc' }]}
+            onSortingChange={(next) => {
+              const picked = next[0];
+              if (!picked) return;
+              setSort(picked.id);
+              setOrder(picked.desc ? 'desc' : 'asc');
+              setPage(1);
+            }}
+            empty={<EmptyState title={rtl ? 'لا سجلات في هذا النطاق' : 'No records in this range'} />}
+            footer={
+              (log?.rows ?? []).length > 0 && log?.pagination ? (
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <label className="flex items-center gap-1.5 text-sm text-gray-500">
+                    {rtl ? 'عرض' : 'Show'}
+                    <select
+                      className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm min-h-[40px]"
+                      value={limit}
+                      onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={300}>300</option>
+                    </select>
+                  </label>
+                  {log.pagination.total_pages > 1 && (
+                    <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
+                      {Array.from({ length: Math.min(log.pagination.total_pages, 5) }, (_, i) => {
+                        const start = log.pagination.total_pages <= 5 ? 1 : Math.max(1, Math.min(page - 2, log.pagination.total_pages - 4));
+                        const p = start + i;
+                        if (p > log.pagination.total_pages) return null;
+                        return (
+                          <button
+                            key={p}
+                            onClick={() => setPage(p)}
+                            aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
+                            className={`w-9 h-9 rounded-xl text-sm font-medium transition min-w-[44px] touch-auto ${page === p ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                          >
+                            {p}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
-                  {(log?.rows ?? []).map((r, idx) => (
-                    <tr key={`${r.check_in_time}-${idx}`} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-                      <td className="py-3 px-3 text-start text-gray-400 tabular-nums text-xs">
-                        {((log?.pagination.page ?? 1) - 1) * ((log?.pagination.limit) ?? limit) + idx + 1}
-                      </td>
-                      <td className="py-3 px-3 text-gray-700 text-start whitespace-nowrap">{formatDate(String(r.check_in_time))}</td>
-                      <td className="py-3 px-3 text-start">
-                        <p className="font-semibold text-gray-900 leading-tight whitespace-nowrap">{r.full_name}</p>
-                        <p dir="ltr" className={`text-xs text-gray-500 whitespace-nowrap ${rtl ? 'text-right' : 'text-left'}`}>{r.card_code ?? '—'}</p>
-                      </td>
-                      <td className={`py-3 px-3 font-semibold tabular-nums whitespace-nowrap text-emerald-600 ${rtl ? 'text-right' : 'text-left'}`} dir="ltr">
-                        {r.check_in_time ? formatTime(String(r.check_in_time)) : '—'}
-                      </td>
-                      <td className={`py-3 px-3 text-gray-500 tabular-nums whitespace-nowrap ${rtl ? 'text-right' : 'text-left'}`} dir="ltr">
-                        {r.check_out_time ? formatTime(String(r.check_out_time)) : '—'}
-                      </td>
-                      <td className="py-3 px-3 text-start whitespace-nowrap">
-                        <span className={`text-xs font-bold tabular-nums ${r.duration_min == null ? 'text-emerald-600' : 'text-gray-600'}`}>
-                          {durationAr(r.duration_min, rtl)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {(log?.rows ?? []).length > 0 && log?.pagination && (
-              <div className="flex items-center justify-between gap-3 p-4 border-t border-gray-100 flex-wrap">
-                <label className="flex items-center gap-1.5 text-sm text-gray-500">
-                  {rtl ? 'عرض' : 'Show'}
-                  <select
-                    className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm min-h-[40px]"
-                    value={limit}
-                    onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-                  >
-                    <option value={10}>10</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                    <option value={300}>300</option>
-                  </select>
-                </label>
-                {log.pagination.total_pages > 1 && (
-                  <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
-                    {Array.from({ length: Math.min(log.pagination.total_pages, 5) }, (_, i) => {
-                      const start = log.pagination.total_pages <= 5 ? 1 : Math.max(1, Math.min(page - 2, log.pagination.total_pages - 4));
-                      const p = start + i;
-                      if (p > log.pagination.total_pages) return null;
-                      return (
-                        <button
-                          key={p}
-                          onClick={() => setPage(p)}
-                          aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
-                          className={`w-9 h-9 rounded-xl text-sm font-medium transition min-w-[44px] ${page === p ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                        >
-                          {p}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              ) : undefined
+            }
+          />
         </>
       )}
     </div>

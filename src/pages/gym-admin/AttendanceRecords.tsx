@@ -6,7 +6,8 @@ import { useToast } from '../../context/ToastContext';
 import { getTodayAttendance, checkOutAttendance } from '../../services/api';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { useMutation } from '@tanstack/react-query';
-import Spinner from '../../components/ui/Spinner';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
+import { SkeletonTable } from '../../components/shared/Skeleton';
 import CheckInCard from '../../components/attendance/CheckInCard';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
 import { escapeHtml, printDocument } from '../../utils/print';
@@ -116,6 +117,59 @@ export default function AttendanceRecords() {
     qr: 'QR', qr_code: 'QR', manual: rtl ? 'يدوي' : 'Manual', manual_phone: rtl ? 'يدوي' : 'Manual',
   };
 
+  // موجة 4 / دفعة ج — لا فرز على أي من الجدولين: GET /api/attendance/today
+  // (`attendance.ts`) بلا whitelist ترتيب عند السيرفر، فمسموح عمود `sortable`
+  // واحد (القاعدة: عدد الرؤوس المتفرزات = عدد مفاتيح السيرفر حرفيًا).
+  const presentCols: TableColumn<AttendanceRow>[] = [
+    { id: 'full_name', label: rtl ? 'الاسم' : 'Member', value: (r) => r.full_name, cell: (r) => <span className="font-medium whitespace-nowrap">{r.full_name}</span> },
+    {
+      id: 'since',
+      label: rtl ? 'منذ' : 'Since',
+      value: (r) => formatTime(r.check_in_time),
+      cell: (r) => <span dir="ltr" className="text-emerald-600 font-medium">{formatTime(r.check_in_time)}</span>,
+    },
+    { id: 'method', label: rtl ? 'الطريقة' : 'Method', value: (r) => typeLabels[r.entry_method] || r.entry_method },
+    ...(canManage
+      ? [{
+          id: 'exit',
+          label: rtl ? 'خروج' : 'Exit',
+          cell: (r: AttendanceRow) => (
+            <button
+              onClick={() => checkOutMutation.mutate(r.id)}
+              disabled={checkOutMutation.isPending}
+              className="px-3 py-1.5 rounded-xl bg-sky-50 text-sky-700 text-xs font-semibold hover:bg-sky-100 transition disabled:opacity-50 min-h-[36px]"
+            >
+              {rtl ? 'تسجيل خروج' : 'Check out'}
+            </button>
+          ),
+        } as TableColumn<AttendanceRow>]
+      : []),
+  ];
+
+  const logCols: TableColumn<AttendanceRow>[] = [
+    { id: '__n', label: '#', width: '2.5rem', cell: (_r, i) => <span className="text-gray-500 tabular-nums">{i + 1}</span> },
+    { id: 'full_name', label: rtl ? 'الاسم' : 'Member', value: (r) => r.full_name, cell: (r) => <span className="font-medium whitespace-nowrap">{r.full_name}</span> },
+    {
+      id: 'check_in',
+      label: rtl ? 'دخول' : 'Check-in',
+      value: (r) => formatTime(r.check_in_time),
+      cell: (r) => <span dir="ltr" className="text-emerald-600 font-medium">{formatTime(r.check_in_time)}</span>,
+    },
+    { id: 'method', label: rtl ? 'الطريقة' : 'Method', value: (r) => typeLabels[r.entry_method] || r.entry_method },
+    { id: 'verified_by_name', label: rtl ? 'سجّله' : 'Recorded by', value: (r) => r.verified_by_name || '—' },
+    {
+      id: 'check_out',
+      label: rtl ? 'خروج' : 'Check-out',
+      value: (r) => (r.check_out_time ? formatTime(r.check_out_time) : rtl ? 'بالداخل' : 'inside'),
+      cell: (r) =>
+        r.check_out_time ? (
+          <span dir="ltr" className="text-gray-500 font-medium">{formatTime(r.check_out_time)}</span>
+        ) : (
+          <span className="text-emerald-600 font-semibold text-xs">{rtl ? 'بالداخل' : 'inside'}</span>
+        ),
+    },
+  ];
+
   // §35ب — PDF = print dialog of exactly the sheet currently displayed.
   const exportPdf = () => {
     const rows = logRows;
@@ -211,7 +265,13 @@ export default function AttendanceRecords() {
       {/* Table 1 — who is inside right now (open sessions, today only) */}
       <Panel icon={Activity} accent="emerald" title={rtl ? 'متواجدون الآن' : 'Present now'}>
         {todayLoading ? (
-          <div className="py-8 flex justify-center"><Spinner /></div>
+          /* موجة 4 / دفعة ج — الجدول جوّه Panel بقشرة كاملة، فالـ`bare` لازم
+             على الفانطازة كمان وإلا القشرة بتتضاعف وقت التحميل.
+             `rowHeight={61}` قياس حي على 1440: الصف سطر واحد لكن زرار «تسجيل
+             خروج» (36px) أطول من النص، فالفانطازة بلا رقم كانت تعمل 45 وتقفز
+             الصفحة عند نزول البيانات. عند 390 الأرضية اللمسية بتخلي الزرار 48
+             فالصف 73 — فرق عرض مش قفز داخل نفس العرض. */
+          <SkeletonTable bare rows={5} cols={presentCols.length} rowHeight={61} />
         ) : presentRows.length === 0 ? (
           <EmptyState
             icon={DoorOpen}
@@ -220,45 +280,27 @@ export default function AttendanceRecords() {
             description={rtl ? 'كل الجلسات المفتوحة أُغلقت (خروج يدوي أو تلقائي بعد ساعة).' : 'All sessions are closed (manual exit or the one-hour auto check-out).'}
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-gray-900">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الاسم' : 'Member'}</th>
-                  <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'منذ' : 'Since'}</th>
-                  <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الطريقة' : 'Method'}</th>
-                  {canManage && <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'خروج' : 'Exit'}</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {presentRows.map((r) => (
-                  <tr key={r.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-medium">{r.full_name}</td>
-                    <td className="px-4 py-3 text-emerald-600 font-medium" dir="ltr">{formatTime(r.check_in_time)}</td>
-                    <td className="px-4 py-3 text-gray-500">{typeLabels[r.entry_method] || r.entry_method}</td>
-                    {canManage && (
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => checkOutMutation.mutate(r.id)}
-                          disabled={checkOutMutation.isPending}
-                          className="px-3 py-1.5 rounded-xl bg-sky-50 text-sky-700 text-xs font-semibold hover:bg-sky-100 transition disabled:opacity-50 min-h-[36px]"
-                        >
-                          {rtl ? 'تسجيل خروج' : 'Check out'}
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            bare
+            // موجة 4 / دفعة ج — الأرضية دي من القياس الحي: بلا minWidth كان عمود
+            // الاسم يلتف لأربعة أسطر عند 390 (الصف 105px) ولو بعد nowrap فضل
+            // 85px. مع 760 الصف سطر واحد = 45px على العرضين.
+            minWidth="760px"
+            columns={presentCols}
+            data={presentRows}
+            rowKey={(r) => r.id}
+            caption={rtl ? 'متواجدون الآن' : 'Present now'}
+          />
         )}
       </Panel>
 
       {/* Table 2 — the full log of the selected day */}
       <Panel icon={Calendar} accent="violet" title={selectedDate === todayStr ? (rtl ? 'سجل اليوم' : "Today's log") : (rtl ? `سجل ${selectedDate}` : `Log ${selectedDate}`)}>
         {logLoading ? (
-          <div className="py-8 flex justify-center"><Spinner /></div>
+          /* موجة 4 / دفعة ج — جدول السجل = الإيقاع الأساسي حرفيًا: 45px على 1440
+             و390 (قياس حي بعد nowrap + minWidth="760px")، فالفانطازة بلا rowHeight
+             لأن افتراضي المكوّن 45 مطابق. */
+          <SkeletonTable bare rows={6} cols={logCols.length} />
         ) : logRows.length === 0 ? (
           <EmptyState
             icon={Calendar}
@@ -267,38 +309,14 @@ export default function AttendanceRecords() {
             description={rtl ? 'اختر يومًا آخر أو سجّل حضورًا من الكارت بالأعلى.' : 'Pick another day, or check someone in with the card above.'}
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-gray-900">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">#</th>
-                  <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الاسم' : 'Member'}</th>
-                  <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'دخول' : 'Check-in'}</th>
-                  <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الطريقة' : 'Method'}</th>
-                  <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'سجّله' : 'Recorded by'}</th>
-                  <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'خروج' : 'Check-out'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logRows.map((r, i) => (
-                  <tr key={r.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-gray-500">{i + 1}</td>
-                    <td className="px-4 py-3 font-medium">{r.full_name}</td>
-                    <td className="px-4 py-3 text-emerald-600 font-medium" dir="ltr">{formatTime(r.check_in_time)}</td>
-                    <td className="px-4 py-3 text-gray-500">{typeLabels[r.entry_method] || r.entry_method}</td>
-                    <td className="px-4 py-3 text-gray-500">{r.verified_by_name || '—'}</td>
-                    <td className="px-4 py-3">
-                      {r.check_out_time ? (
-                        <span className="text-gray-500 font-medium" dir="ltr">{formatTime(r.check_out_time)}</span>
-                      ) : (
-                        <span className="text-emerald-600 font-semibold text-xs">{rtl ? 'بالداخل' : 'inside'}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            bare
+            minWidth="760px"
+            columns={logCols}
+            data={logRows}
+            rowKey={(r) => r.id}
+            caption={rtl ? `سجل الحضور ${selectedDate}` : `Attendance log ${selectedDate}`}
+          />
         )}
       </Panel>
     </div>

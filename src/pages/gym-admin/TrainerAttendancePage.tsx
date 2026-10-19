@@ -12,7 +12,8 @@ import {
   type CoachAttendanceRow,
 } from '../../services/api';
 import { DashboardPage, StatCard, Panel, EmptyState } from '../../components/dashboard';
-import PageLoader from '../../components/shared/PageLoader';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
+import { SkeletonStats, SkeletonTable } from '../../components/shared/Skeleton';
 import Modal from '../../components/shared/Modal';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { sportName, useSportsCatalog } from './subscriptions/shared';
@@ -111,6 +112,52 @@ export default function TrainerAttendancePage() {
     setEditOut(toLocal(r.clock_out));
   };
 
+  // موجة 4 / دفعة ج — لا رؤوس متفرزات: `listCoachAttendance` (`staff.ts:375`)
+  // بيرتّب ثابت ORDER BY ss.clock_in ASC وقايمة السيرفر بلا whitelist ترتيب،
+  // فعدد الرؤوس المتفرزات على الشاشة = 0 حرفيًا.
+  const columns: TableColumn<CoachAttendanceRow>[] = [
+    {
+      id: 'coach',
+      label: rtl ? 'المدرب' : 'Coach',
+      value: (r) => r.full_name,
+      cell: (r) => (
+        <div className="flex items-center gap-3">
+          <span className="w-9 h-9 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center font-bold shrink-0">
+            {r.full_name.charAt(0)}
+          </span>
+          <div>
+            <p className="font-medium whitespace-nowrap">{r.full_name}</p>
+            {r.phone && <p className="text-xs text-gray-500" dir="ltr">{r.phone}</p>}
+          </div>
+        </div>
+      ),
+    },
+    { id: 'sport_mode', label: rtl ? 'التخصص' : 'Specialty', value: (r) => (r.sport_mode ? sportName(r.sport_mode, catalogSports, rtl) : rtl ? 'عام' : 'General') },
+    { id: 'clock_in', label: rtl ? 'وقت الحضور' : 'In', value: (r) => formatDateTime(r.clock_in) },
+    { id: 'clock_out', label: rtl ? 'وقت الانصراف' : 'Out', value: (r) => (r.clock_out ? formatDateTime(r.clock_out) : '—') },
+    { id: 'duration_min', label: rtl ? 'المدة' : 'Duration', value: (r) => fmtDur(r.duration_min) },
+    {
+      id: 'status',
+      label: rtl ? 'الحالة' : 'Status',
+      value: (r) => (r.clock_out ? (rtl ? 'انصرف' : 'Left') : (rtl ? 'متواجد' : 'Present')),
+      cell: (r) => <StatusBadge status={r.clock_out ? (rtl ? 'انصرف' : 'Left') : (rtl ? 'متواجد' : 'Present')} variant={r.clock_out ? 'neutral' : 'success'} />,
+    },
+    {
+      id: 'edit',
+      label: rtl ? 'تعديل' : 'Edit',
+      cell: (r) => (
+        <button
+          type="button"
+          onClick={() => openEdit(r)}
+          title={rtl ? 'تعديل الأوقات' : 'Edit times'}
+          className="w-10 min-h-[40px] inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 touch-auto"
+        >
+          <Pencil size={15} />
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="bg-gray-50 min-h-screen -m-6 p-6">
       <DashboardPage
@@ -136,6 +183,17 @@ export default function TrainerAttendancePage() {
         }
       >
         {/* ── الكروت الأربعة ── */}
+        {isLoading ? (
+          /* موجة 4 / دفعة ج — الفانطازة بنفس هندسة الشاشة النهائية: 4 كروت ← جدول.
+             `rowHeight={64}` قياس حي على 1440 و390 (الصف سطران: أفاتار 36px فوقه
+             الاسم/التليفون، وزرار تعديل 40px): الاسم عنده nowrap فالرقم ثابت على
+             العرضين — نفس الرقم طلع في القياسين. */
+          <>
+            <SkeletonStats columns={4} gridClassName="grid-cols-2 lg:grid-cols-4 gap-5" />
+            <SkeletonTable rows={5} cols={columns.length} rowHeight={64} />
+          </>
+        ) : (
+          <>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
           <StatCard icon={Users} label={rtl ? 'إجمالي المدربين' : 'Total coaches'} value={fmtNum(stats?.total ?? 0)} accent="violet" onClick={() => navigate('/admin/trainers')} />
           <StatCard icon={UserCheck} label={rtl ? 'حضروا اليوم' : 'Present today'} value={fmtNum(stats?.present ?? 0)} accent="emerald" />
@@ -186,9 +244,7 @@ export default function TrainerAttendancePage() {
             </button>
           }
         >
-          {isLoading ? (
-            <PageLoader variant="skeleton" rows={5} />
-          ) : isError ? (
+          {isError ? (
             <p className="text-sm text-red-500 text-center py-8">{rtl ? 'فشل التحميل' : 'Failed to load'}</p>
           ) : rows.length === 0 ? (
             <EmptyState
@@ -198,62 +254,12 @@ export default function TrainerAttendancePage() {
               description={rtl ? 'سجّل حضور مدرب أو استخدم «تسجيل الكل».' : 'Clock in a coach or use bulk check-in.'}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-gray-900">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'المدرب' : 'Coach'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'التخصص' : 'Specialty'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'وقت الحضور' : 'In'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'وقت الانصراف' : 'Out'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'المدة' : 'Duration'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'الحالة' : 'Status'}</th>
-                    <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'تعديل' : 'Edit'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.shift_id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <span className="w-9 h-9 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center font-bold shrink-0">
-                            {r.full_name.charAt(0)}
-                          </span>
-                          <div>
-                            <p className="font-medium whitespace-nowrap">{r.full_name}</p>
-                            {r.phone && <p className="text-xs text-gray-500" dir="ltr">{r.phone}</p>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                        {r.sport_mode ? sportName(r.sport_mode, catalogSports, rtl) : (rtl ? 'عام' : 'General')}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDateTime(r.clock_in)}</td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.clock_out ? formatDateTime(r.clock_out) : '—'}</td>
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDur(r.duration_min)}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge
-                          status={r.clock_out ? (rtl ? 'انصرف' : 'Left') : (rtl ? 'متواجد' : 'Present')}
-                          variant={r.clock_out ? 'neutral' : 'success'}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(r)}
-                          title={rtl ? 'تعديل الأوقات' : 'Edit times'}
-                          className="w-10 min-h-[40px] inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            /* الجدول على صدفة `ui/DataTable` — جوّه Panel بقشرة كاملة فالـ`bare` لازم. */
+            <DataTable bare columns={columns} data={rows} rowKey={(r) => r.shift_id} caption={rtl ? 'سجل حضور المدربين' : 'Coach attendance log'} />
           )}
         </Panel>
+          </>
+        )}
       </DashboardPage>
 
       {/* تعديل صف */}

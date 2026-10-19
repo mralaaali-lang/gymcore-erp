@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/GymBrandContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { getAbsentReport, getSettings } from '../../services/api';
+import { getAbsentReport, getSettings, type AbsentMemberRow } from '../../services/api';
 import { formatDate, fmtNum } from '../../utils/date';
 import { StatCard, EmptyState } from '../../components/dashboard';
-import Spinner from '../../components/ui/Spinner';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
+import { SkeletonStats, SkeletonTable } from '../../components/shared/Skeleton';
 import { Users, UserMinus as UserX, Clock } from '@phosphor-icons/react';
 import MemberContactButtons from '../../components/members/MemberContact';
 
@@ -62,30 +63,63 @@ export default function AbsentMembers() {
   const pagination = data?.pagination;
   const pages = pagination ? pagination.total_pages : 0;
 
-  const toggleSort = (key: string) => {
-    if (sort === key) setOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
-    else { setSort(key); setOrder(SORTABLE[key].def); }
-    setPage(1);
-  };
-  const sortTh = (key: string) => {
-    const cfg = SORTABLE[key];
-    const active = sort === key;
-    return (
-      <th key={key} className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">
-        <button
-          type="button"
-          onClick={() => toggleSort(key)}
-          title={rtl ? 'اضغط للترتيب' : 'Click to sort'}
-          className={`inline-flex items-center gap-1 hover:text-gray-900 ${active ? 'text-emerald-700' : ''}`}
+  // موجة 4 / دفعة ج — عمودان قابلان للفرز فقط، وهما حرفيًا whitelist السيرفر
+  // (`analytics.ts:974-976` = ['absence','member_name']، الافتراضي absence).
+  const columns: TableColumn<AbsentMemberRow>[] = [
+    {
+      id: '__n',
+      label: rtl ? 'م' : '#',
+      width: '2.5rem',
+      cell: (_r, i) => (
+        <span className="text-xs text-gray-400 tabular-nums">
+          {((pagination?.page ?? 1) - 1) * ((pagination?.limit) ?? limit) + i + 1}
+        </span>
+      ),
+    },
+    {
+      id: 'member_name',
+      label: rtl ? 'الاسم' : 'Name',
+      sortable: true,
+      sortDescFirst: SORTABLE.member_name.def === 'desc',
+      value: (r) => r.full_name,
+      cell: (r) => <span className="font-semibold text-gray-900 whitespace-nowrap">{r.full_name}</span>,
+    },
+    {
+      id: 'card_code',
+      label: rtl ? 'الكود' : 'Code',
+      value: (r) => r.card_code ?? '—',
+      cell: (r) => <span dir="ltr" className={rtl ? 'text-right' : 'text-left'}>{r.card_code ?? '—'}</span>,
+    },
+    {
+      id: 'phone_number',
+      label: rtl ? 'الهاتف' : 'Phone',
+      value: (r) => r.phone_number || '—',
+      cell: (r) => <span dir="ltr" className={`text-gray-500 ${rtl ? 'text-right' : 'text-left'}`}>{r.phone_number || '—'}</span>,
+    },
+    { id: 'plan_name', label: rtl ? 'الباقة' : 'Plan', value: (r) => r.plan_name || '—' },
+    { id: 'sub_end', label: rtl ? 'انتهاء الاشتراك' : 'Sub ends', value: (r) => (r.sub_end ? formatDate(r.sub_end) : '—') },
+    { id: 'last_visit', label: rtl ? 'آخر زيارة' : 'Last visit', value: (r) => (r.last_visit ? formatDate(String(r.last_visit)) : '—') },
+    {
+      id: 'absence',
+      label: rtl ? 'أيام الغياب' : 'Absent days',
+      sortable: true,
+      sortDescFirst: SORTABLE.absence.def === 'desc',
+      value: (r) => r.days_absent,
+      cell: (r) => (
+        <span
+          title={r.has_active ? (rtl ? 'غائب نشط — اشتراكه سارٍ' : 'Active absentee — subscription running') : (rtl ? 'منقطع — بلا اشتراك سارٍ' : 'Lapsed — no active subscription')}
+          className={`inline-flex items-center justify-center min-w-8 h-7 px-2 rounded-full text-xs font-bold tabular-nums ${r.has_active ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'}`}
         >
-          {rtl ? cfg.labelAr : cfg.labelEn}
-          <span className="material-symbols-outlined text-base">
-            {active ? (order === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more'}
-          </span>
-        </button>
-      </th>
-    );
-  };
+          {fmtNum(r.days_absent)} {rtl ? 'يوم' : 'd'}
+        </span>
+      ),
+    },
+    {
+      id: 'contact',
+      label: rtl ? 'التواصل' : 'Contact',
+      cell: (r) => <MemberContactButtons phone={r.phone_number} rtl={rtl} message={winBack(r.full_name, r.days_absent)} />,
+    },
+  ];
 
   const winBack = (name: string, days: number) =>
     rtl
@@ -131,7 +165,16 @@ export default function AbsentMembers() {
       </div>
 
       {isLoading ? (
-        <div className="py-16 flex justify-center"><Spinner /></div>
+        /* موجة 4 / دفعة ج — الفانطازة بنفس هندسة الشاشة النهائية: 3 كروت ← جدول
+           بقشرة كاملة. `rowHeight={45}` مش مقيس حيًا على هذه البيانات: الصالة دي
+           كل أعضاءها حضروا اليوم، فالسيرفر بيرجع صفر غائبين عند أي عتبة (حتى
+           days_min=0 — `analytics.ts:1008` بيشترط days_absent > العتبة) والقايمة
+           بتطرح المحظورين. الرقم من حساب المكوّن نفسه: خلية الاسم سطر واحد بـnowrap
+           + حواشي px-4 py-3 = 45، وهو نفس رقم جدول سجل الحضور المقيس في §68. */
+        <div className="flex flex-col gap-5">
+          <SkeletonStats columns={3} gridClassName="grid-cols-1 sm:grid-cols-3 gap-4" />
+          <SkeletonTable rows={6} cols={columns.length} rowHeight={45} />
+        </div>
       ) : isError ? (
         <EmptyState title={rtl ? 'تعذّر تحميل التقرير' : 'Failed to load report'} />
       ) : (
@@ -143,102 +186,67 @@ export default function AbsentMembers() {
             <StatCard icon={UserX} label={rtl ? 'غائب أكثر من شهر' : 'Absent 30+ days'} value={fmtNum(stats?.over_month ?? 0)} accent="rose" />
           </div>
 
-          {/* 4) جدول الغائبين بإعدادات جدول المشتركين */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100 text-start">
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 w-10">#</th>
-                    {sortTh('member_name')}
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'الكود' : 'Code'}</th>
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'الهاتف' : 'Phone'}</th>
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'الباقة' : 'Plan'}</th>
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'انتهاء الاشتراك' : 'Sub ends'}</th>
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'آخر زيارة' : 'Last visit'}</th>
-                    {sortTh('absence')}
-                    <th className="py-3 px-3 font-semibold text-start text-xs text-gray-500 whitespace-nowrap">{rtl ? 'التواصل' : 'Contact'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.length === 0 && (
-                    <tr><td colSpan={10} className="p-10 text-center text-gray-400 text-sm">
-                      {rtl ? 'لا غائبين بهذا الفلتر' : 'Nobody matches this filter'}
-                    </td></tr>
-                  )}
-                  {rows.map((r, idx) => (
-                    <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-                      <td className="py-3 px-3 text-start text-gray-400 tabular-nums text-xs">
-                        {((pagination?.page ?? 1) - 1) * ((pagination?.limit) ?? limit) + idx + 1}
-                      </td>
-                      <td className="py-3 px-3 font-semibold text-gray-900 text-start whitespace-nowrap">{r.full_name}</td>
-                      <td className={`py-3 px-3 tabular-nums whitespace-nowrap font-semibold ${rtl ? 'text-right' : 'text-left'}`} dir="ltr">{r.card_code ?? '—'}</td>
-                      <td className={`py-3 px-3 text-gray-500 whitespace-nowrap ${rtl ? 'text-right' : 'text-left'}`} dir="ltr">{r.phone_number || '—'}</td>
-                      <td className="py-3 px-3 text-gray-600 text-start whitespace-nowrap">{r.plan_name || '—'}</td>
-                      <td className="py-3 px-3 text-gray-500 text-start tabular-nums whitespace-nowrap">{r.sub_end ? formatDate(r.sub_end) : '—'}</td>
-                      <td className="py-3 px-3 text-gray-500 text-start tabular-nums whitespace-nowrap">{r.last_visit ? formatDate(String(r.last_visit)) : '—'}</td>
-                      <td className="py-3 px-3 text-start">
-                        <span
-                          title={r.has_active ? (rtl ? 'غائب نشط — اشتراكه سارٍ' : 'Active absentee — subscription running') : (rtl ? 'منقطع — بلا اشتراك سارٍ' : 'Lapsed — no active subscription')}
-                          className={`inline-flex items-center justify-center min-w-8 h-7 px-2 rounded-full text-xs font-bold tabular-nums ${r.has_active ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'}`}
-                        >
-                          {fmtNum(r.days_absent)} {rtl ? 'يوم' : 'd'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-start">
-                        <MemberContactButtons
-                          phone={r.phone_number}
-                          rtl={rtl}
-                          message={winBack(r.full_name, r.days_absent)}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {rows.length > 0 && pagination && (
-              <div className="flex items-center justify-between gap-3 p-4 border-t border-gray-100 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500 tabular-nums">
-                    {rtl ? `الفلتر: غياب أكثر من ${daysMin} يوم` : `Filter: absent ${daysMin}+ days`} · {pagination.total} {rtl ? 'عضو' : 'members'}
-                  </span>
-                  <label className="flex items-center gap-1.5 text-sm text-gray-500">
-                    {rtl ? 'عرض' : 'Show'}
-                    <select
-                      className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm min-h-[40px]"
-                      value={limit}
-                      onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                      <option value={300}>300</option>
-                    </select>
-                  </label>
-                </div>
-                {pages > 1 && (
-                  <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
-                    {Array.from({ length: Math.min(pages, 5) }, (_, i) => {
-                      const start = pages <= 5 ? 1 : Math.max(1, Math.min(page - 2, pages - 4));
-                      const p = start + i;
-                      if (p > pages) return null;
-                      return (
-                        <button
-                          key={p}
-                          onClick={() => setPage(p)}
-                          aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
-                          className={`w-9 h-9 rounded-xl text-sm font-medium transition min-w-[44px] ${page === p ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                        >
-                          {p}
-                        </button>
-                      );
-                    })}
+          {/* 4) جدول الغائبين على صدفة `ui/DataTable` — القشرة نفسها والترقيم
+              جوّه نفس القشرة في `footer`. */}
+          <DataTable
+            columns={columns}
+            data={rows}
+            minWidth="980px"
+            caption={rtl ? 'الأعضاء الغائبون' : 'Absent members'}
+            manualSorting
+            sorting={[{ id: sort, desc: order === 'desc' }]}
+            onSortingChange={(next) => {
+              const picked = next[0];
+              if (!picked) return;
+              setSort(picked.id);
+              setOrder(picked.desc ? 'desc' : 'asc');
+              setPage(1);
+            }}
+            empty={<EmptyState title={rtl ? 'لا غائبين بهذا الفلتر' : 'Nobody matches this filter'} />}
+            footer={
+              rows.length > 0 && pagination ? (
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500 tabular-nums">
+                      {rtl ? `الفلتر: غياب أكثر من ${daysMin} يوم` : `Filter: absent ${daysMin}+ days`} · {pagination.total} {rtl ? 'عضو' : 'members'}
+                    </span>
+                    <label className="flex items-center gap-1.5 text-sm text-gray-500">
+                      {rtl ? 'عرض' : 'Show'}
+                      <select
+                        className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm min-h-[40px]"
+                        value={limit}
+                        onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                      >
+                        <option value={10}>10</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value={300}>300</option>
+                      </select>
+                    </label>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                  {pages > 1 && (
+                    <div className="flex items-center gap-2" dir={rtl ? 'rtl' : 'ltr'}>
+                      {Array.from({ length: Math.min(pages, 5) }, (_, i) => {
+                        const start = pages <= 5 ? 1 : Math.max(1, Math.min(page - 2, pages - 4));
+                        const p = start + i;
+                        if (p > pages) return null;
+                        return (
+                          <button
+                            key={p}
+                            onClick={() => setPage(p)}
+                            aria-label={rtl ? `الصفحة ${p}` : `Page ${p}`}
+                            className={`w-9 h-9 rounded-xl text-sm font-medium transition min-w-[44px] touch-auto ${page === p ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                          >
+                            {p}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : undefined
+            }
+          />
         </>
       )}
     </div>

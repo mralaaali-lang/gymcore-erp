@@ -7,8 +7,9 @@ import { fmtNum } from '../../utils/date';
 import { printDocument, escapeHtml } from '../../utils/print';
 import { coachAttendanceReport, listCoachesSummary } from '../../services/api';
 import { StatCard, Panel, EmptyState } from '../../components/dashboard';
+import DataTable, { type TableColumn } from '../../components/ui/DataTable';
+import { SkeletonStats, SkeletonTable } from '../../components/shared/Skeleton';
 import { TrendUp as TrendingUp, TrendDown as TrendingDown, Users, ArrowRight } from '@phosphor-icons/react';
-import PageLoader from '../../components/shared/PageLoader';
 import { sportName, useSportsCatalog } from './subscriptions/shared';
 
 // ====================================================================
@@ -51,6 +52,21 @@ export default function CoachAttendanceReportPage() {
     const r = m % 60;
     return r === 0 ? `${fmtNum(h)} ${rtl ? 'ساعة' : 'h'}` : `${fmtNum(h)} ${rtl ? 'ساعة' : 'h'} ${fmtNum(r)} ${rtl ? 'د' : 'm'}`;
   };
+
+  type CoachReportRow = Awaited<ReturnType<typeof coachAttendanceReport>>['data'][number];
+
+  // موجة 4 / دفعة ج — لا رؤوس متفرزات: `coachAttendanceReport` (`staff.ts:439`)
+  // بيرتّب ثابت ORDER BY days_present DESC, full_name ASC وقايمة السيرفر بلا
+  // whitelist ترتيب، فعدد الرؤوس المتفرزات على الشاشة = 0 حرفيًا.
+  const columns: TableColumn<CoachReportRow>[] = [
+    { id: 'full_name', label: rtl ? 'المدرب' : 'Coach', value: (r) => r.full_name, cell: (r) => <span className="font-medium whitespace-nowrap">{r.full_name}</span> },
+    { id: 'sport_mode', label: rtl ? 'التخصص' : 'Specialty', value: (r) => (r.sport_mode ? sportName(r.sport_mode, catalogSports, rtl) : rtl ? 'عام' : 'General') },
+    { id: 'days_present', label: rtl ? 'أيام الحضور' : 'Days', numeric: true, value: (r) => r.days_present, cell: (r) => <span className="tabular-nums font-semibold">{fmtNum(r.days_present)}</span> },
+    { id: 'total_min', label: rtl ? 'ساعات العمل' : 'Hours', numeric: true, value: (r) => hoursOf(Number(r.total_min ?? 0)) },
+    { id: 'attendance_pct', label: rtl ? 'نسبة الحضور' : 'Rate', numeric: true, value: (r) => `${fmtNum(r.attendance_pct)}%`, cell: (r) => <span className="tabular-nums font-semibold text-sky-600">{fmtNum(r.attendance_pct)}%</span> },
+    { id: 'earliest_in', label: rtl ? 'أبكر حضور' : 'Earliest', value: (r) => r.earliest_in ?? '—', cell: (r) => <span dir="ltr" className="text-gray-500 tabular-nums">{r.earliest_in ?? '—'}</span> },
+    { id: 'latest_out', label: rtl ? 'آخر انصراف' : 'Latest', value: (r) => r.latest_out ?? '—', cell: (r) => <span dir="ltr" className="text-gray-500 tabular-nums">{r.latest_out ?? '—'}</span> },
+  ];
 
   const print = () => {
     const ok = printDocument({
@@ -116,6 +132,17 @@ export default function CoachAttendanceReportPage() {
         </Panel>
 
         {/* كروت الملخص */}
+        {isLoading ? (
+          /* موجة 4 / دفعة ج — الفانطازة بنفس هندسة الشاشة النهائية: 3 كروت ← جدول.
+             القياس الحي على العرضين: الصف سطر واحد = 44px (الإيقاع الأساسي 45 ناقص
+             حدود border-collapse)، والرأس 41 ثابت لأن الأرضية اللمسية مستثناة منه
+             بـtouch-auto. بنكتب 44 حرفيًا عشان الفانطازة ما تقفّزش عند نزول البيانات. */
+          <>
+            <SkeletonStats columns={3} gridClassName="grid-cols-2 lg:grid-cols-3 gap-5" />
+            <SkeletonTable rows={6} cols={columns.length} rowHeight={44} />
+          </>
+        ) : (
+          <>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-5">
           <StatCard icon={Users} label={rtl ? 'متوسط أيام الحضور' : 'Avg days'} value={avgDays.toFixed(1)} accent="sky" />
           <StatCard
@@ -138,44 +165,15 @@ export default function CoachAttendanceReportPage() {
           accent="emerald"
           title={`${rtl ? 'ملخص الحضور' : 'Attendance summary'} - ${applied.month} (${fmtNum(rows.length)})`}
         >
-          {isLoading ? (
-            <PageLoader variant="skeleton" rows={6} />
-          ) : isError ? (
+          {isError ? (
             <p className="text-sm text-red-500 text-center py-8">{rtl ? 'فشل التحميل' : 'Failed to load'}</p>
           ) : rows.length === 0 ? (
             <EmptyState icon={Users} accent="gray" title={rtl ? 'لا مدربين' : 'No coaches'} />
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-gray-900">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'المدرب' : 'Coach'}</th>
-                      <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'التخصص' : 'Specialty'}</th>
-                      <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'أيام الحضور' : 'Days'}</th>
-                      <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'ساعات العمل' : 'Hours'}</th>
-                      <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'نسبة الحضور' : 'Rate'}</th>
-                      <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'أبكر حضور' : 'Earliest'}</th>
-                      <th className="text-start px-4 py-3 text-xs font-semibold text-gray-500">{rtl ? 'آخر انصراف' : 'Latest'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r) => (
-                      <tr key={r.id} className="border-t border-gray-100 hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium whitespace-nowrap">{r.full_name}</td>
-                        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                          {r.sport_mode ? sportName(r.sport_mode, catalogSports, rtl) : (rtl ? 'عام' : 'General')}
-                        </td>
-                        <td className="px-4 py-3 tabular-nums font-semibold">{fmtNum(r.days_present)}</td>
-                        <td className="px-4 py-3 tabular-nums">{hoursOf(Number(r.total_min ?? 0))}</td>
-                        <td className="px-4 py-3 tabular-nums font-semibold text-sky-600">{fmtNum(r.attendance_pct)}%</td>
-                        <td className="px-4 py-3 text-gray-500 tabular-nums" dir="ltr">{r.earliest_in ?? '—'}</td>
-                        <td className="px-4 py-3 text-gray-500 tabular-nums" dir="ltr">{r.latest_out ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {/* الجدول على صدفة `ui/DataTable` — جوّه Panel بقشرة كاملة فالـ`bare`
+                  لازم، والفرز المعروض هو فرز السيرفر الثابت نفسه. */}
+              <DataTable bare columns={columns} data={rows} rowKey={(r) => r.id} caption={rtl ? 'ملخص حضور المدربين' : 'Coach attendance summary'} />
               <p className="mt-3 text-xs text-gray-400">
                 {rtl
                   ? `المقام: ${fmtNum(workingDays)} يوم عمل في ${applied.month} (أيام الشهر ناقص الجمعات، وبحد أقصى المنقضي للشهر الجاري).`
@@ -184,6 +182,8 @@ export default function CoachAttendanceReportPage() {
             </>
           )}
         </Panel>
+          </>
+        )}
       </div>
     </div>
   );
