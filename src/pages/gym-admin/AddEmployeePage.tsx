@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, FloppyDisk as Save, Key, WhatsappLogo } from '@phosphor-icons/react';
+import { ArrowRight, FloppyDisk as Save, Key } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -153,20 +153,16 @@ export default function AddEmployeePage() {
   /** The staff row as saved on the server — the reset reads the stored phone. */
   const savedPhone = (existing?.data?.phone || '').trim();
 
-  const issueCode = async (send: boolean) => {
+  /**
+   * Mint a fresh code. Delivery happens from the dialog (Click-to-Chat on
+   * WhatsApp Web) because that is the only place the plaintext exists.
+   */
+  const issueCode = async () => {
     if (!editId) return;
     setCodeBusy(true);
     try {
-      const res = await resetStaffLoginCode(editId, send);
+      const res = await resetStaffLoginCode(editId);
       setIssuedCode({ code: res.data.code, name: res.data.full_name || f.name, phone: res.data.phone });
-      if (send && (res.data.channel === 'console' || !res.data.sent)) {
-        showToast(
-          rtl
-            ? 'الإرسال بالواتساب مش متفعّل دلوقتي — الكود ظاهر، اكتبه للموظف بنفسك.'
-            : 'WhatsApp sending is not configured — relay the code shown here.',
-          'warning',
-        );
-      }
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
       showToast(msg || (rtl ? 'فشل توليد الكود' : 'Code generation failed'), 'error');
@@ -283,15 +279,10 @@ export default function AddEmployeePage() {
                 <label className={labelCls}>{rtl ? 'كود الدخول (شاشة فريق العمل)' : 'Login code (staff portal)'}</label>
                 {savedPhone ? (
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" disabled={codeBusy} onClick={() => issueCode(false)}
+                    <button type="button" disabled={codeBusy} onClick={issueCode}
                       className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl bg-white border border-gray-200 text-gray-800 text-sm font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50">
                       <Key size={15} />
                       {codeBusy ? (rtl ? 'جارٍ…' : '…') : (rtl ? 'توليد كود جديد' : 'Generate new code')}
-                    </button>
-                    <button type="button" disabled={codeBusy} onClick={() => issueCode(true)}
-                      className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl bg-white border border-gray-200 text-gray-800 text-sm font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50">
-                      <WhatsappLogo size={15} weight="fill" className="text-emerald-500" />
-                      {rtl ? 'ولّد وابعته واتساب' : 'Issue & send on WhatsApp'}
                     </button>
                   </div>
                 ) : (
@@ -302,7 +293,9 @@ export default function AddEmployeePage() {
                   </p>
                 )}
                 <p className="mt-1 text-[11px] text-gray-400">
-                  {rtl ? 'الكود بيتخزن مشفّرًا — أي توليد جديد بيلغي القديم فورًا.' : 'Stored hashed — issuing a new one kills the old one immediately.'}
+                  {rtl
+                    ? 'الكود بيتخزن مشفّرًا — أي توليد جديد بيلغي القديم فورًا. وبعد التوليد تقدر تبعته واتساب من نفس الشاشة.'
+                    : 'Stored hashed — issuing a new one kills the old one immediately. The dialog then offers to send it on WhatsApp.'}
                 </p>
               </div>
             ) : null}
@@ -397,6 +390,7 @@ export default function AddEmployeePage() {
         subject={issuedCode ? (rtl ? `كود دخول ${issuedCode.name}` : `${issuedCode.name}'s login code`) : undefined}
         code={issuedCode?.code || ''}
         phone={issuedCode?.phone}
+        name={issuedCode?.name}
       />
     </div>
   );

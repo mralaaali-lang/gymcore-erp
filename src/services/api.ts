@@ -867,8 +867,8 @@ export async function blacklistMember(id: string, reason: string) {
 
 // توليد رمز دخول جديد (يُعرض مرة واحدة — لا يُسترجع بعدها).
 // `send` يبعته كمان واتساب على رقم العضو المسجَّل.
-export async function resetMemberPin(id: string, send = false): Promise<{ data: { pin: string; sent?: boolean; phone?: string | null; channel?: WhatsAppChannel } }> {
-  const res = await api.post(`/api/members/${id}/pin-reset${send ? '?send=whatsapp' : ''}`);
+export async function resetMemberPin(id: string): Promise<{ data: { pin: string; sent?: boolean; phone?: string | null; channel?: WhatsAppChannel } }> {
+  const res = await api.post(`/api/members/${id}/pin-reset`);
   return res.data;
 }
 
@@ -2073,18 +2073,20 @@ export interface BulkLoginCodesResult {
 }
 
 /** Issue a new code for one staff member. `send` also pushes it over WhatsApp. */
-export async function resetStaffLoginCode(id: string, send = false) {
-  const res = await api.post(`/api/staff/${id}/login-code-reset${send ? '?send=whatsapp' : ''}`);
+export async function resetStaffLoginCode(id: string) {
+  const res = await api.post(`/api/staff/${id}/login-code-reset`);
   return res.data as { data: { code: string; sent: boolean; phone: string | null; full_name: string; channel: WhatsAppChannel } };
 }
 
-export async function bulkStaffLoginCodes(limit = 100, send = false) {
-  const res = await api.post('/api/staff/login-codes/bulk', { limit, send });
+// Delivery of a login code is Click-to-Chat from the dialog that shows it
+// (wa.me), so the bulk endpoints are only ever asked to mint.
+export async function bulkStaffLoginCodes(limit = 100) {
+  const res = await api.post('/api/staff/login-codes/bulk', { limit });
   return res.data as { data: BulkLoginCodesResult };
 }
 
-export async function bulkMemberLoginCodes(limit = 100, send = false) {
-  const res = await api.post('/api/members/login-codes/bulk', { limit, send });
+export async function bulkMemberLoginCodes(limit = 100) {
+  const res = await api.post('/api/members/login-codes/bulk', { limit });
   return res.data as { data: BulkLoginCodesResult };
 }
 export async function listTrainers() {

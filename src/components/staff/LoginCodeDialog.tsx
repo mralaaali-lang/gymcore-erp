@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Check, CopySimple } from '@phosphor-icons/react';
+import { Check, CopySimple, WhatsappLogo } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import Modal from '../shared/Modal';
 import { useApp } from '../../context/GymBrandContext';
+import { toWhatsAppNumber } from '../members/MemberContact';
 
 interface LoginCodeDialogProps {
   open: boolean;
@@ -15,6 +16,8 @@ interface LoginCodeDialogProps {
   code: string;
   /** Phone the code was issued against, shown so the manager can check it. */
   phone?: string | null;
+  /** Who the code is for — quoted in the WhatsApp message. */
+  name?: string;
 }
 
 /**
@@ -26,9 +29,11 @@ interface LoginCodeDialogProps {
  * the digits, keeps the copy button beside them, and makes the closing action an
  * acknowledgement rather than a silent X.
  *
- * There is deliberately no "send it" action here: sending issues a *new* code
- * (only a hash is stored, so an existing one cannot be re-sent), and callers
- * that offer that offer it as its own button before the code ever exists.
+ * The WhatsApp action is Click-to-Chat (wa.me), not a server-side send: only a
+ * hash is stored, so a provider could only ever deliver a *second* code — the
+ * one on screen here is the one that works. Opening WhatsApp Web with the code
+ * already typed keeps both the same, and it claims nothing about delivery (the
+ * desk's own WhatsApp session is the sender, so "sent" is not ours to report).
  */
 export default function LoginCodeDialog({
   open,
@@ -37,11 +42,22 @@ export default function LoginCodeDialog({
   subject,
   code,
   phone,
+  name,
 }: LoginCodeDialogProps) {
   const { t } = useTranslation();
   const { language } = useApp();
   const rtl = language === 'ar';
   const [copied, setCopied] = useState(false);
+
+  // wa.me needs international digits; the app's single normalizer handles the
+  // local 01… / 00… / +20… shapes. An empty result means there is no usable
+  // number at all, so there is nothing to open a chat with.
+  const intl = toWhatsAppNumber(phone || '');
+  const waHref = intl
+    ? `https://wa.me/${intl}?text=${encodeURIComponent(
+        t('staff.waMessage', { name: name || '', code }),
+      )}`
+    : '';
 
   const copy = async () => {
     try {
@@ -92,6 +108,22 @@ export default function LoginCodeDialog({
             {phone}
           </p>
         ) : null}
+
+        {waHref ? (
+          <a
+            href={waHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-600"
+          >
+            <WhatsappLogo size={18} weight="fill" />
+            {t('staff.sendWhatsapp')}
+          </a>
+        ) : (
+          <p className="text-center text-[11px] leading-relaxed text-brass">
+            {t('staff.loginCodeNoPhone')}
+          </p>
+        )}
 
         <p className="text-center text-xs leading-relaxed text-muted-foreground">
           {t('staff.loginCodeBody')}

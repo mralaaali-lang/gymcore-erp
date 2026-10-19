@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
@@ -35,6 +36,7 @@ function toWhatsApp(phone: string): string {
 
 export default function MemberProfileView() {
   const { language, gymProfile, role } = useApp();
+  const { t } = useTranslation();
   // §30: money() — gym currency symbol everywhere on this page
   const money = (v: number | string | null | undefined) =>
     v == null || v === '' ? '—' : formatMoney(Number(v), gymProfile?.currency);
@@ -65,35 +67,19 @@ export default function MemberProfileView() {
 
   /**
    * Issue a fresh login code for this member — shown once, never recoverable.
-   * `send` also pushes it on WhatsApp in the same call (the code has to be
-   * generated first, so "send the old one" is not a thing).
+   * The code is minted here; sending is Click-to-Chat from the code panel right
+   * below (that panel is the only place the plaintext ever exists).
    */
-  const regenerate = async (send: boolean) => {
+  const regenerate = async () => {
     if (!id) return;
     setPinBusy(true);
     try {
-      const res = await resetMemberPin(id, send);
+      const res = await resetMemberPin(id);
       setFreshPin(res.data.pin);
-      // `sent` is the provider's word; `channel: 'console'` means no provider is
-      // configured at all (whatsapp.ts logs the message and returns true), so a
-      // "sent" claim would be a lie. And no phone on file is the third case.
-      if (send && (res.data.channel === 'console' || res.data.sent === false)) {
-        // Nothing actually left the building: no phone on file, or WhatsApp
-        // is not configured yet (the backend uses the console provider).
-        showToast(
-          rtl
-            ? 'الإرسال بالواتساب مش متفعّل أو مفيش رقم محفوظ — أبلغه للعضو بنفسك.'
-            : 'WhatsApp sending is unavailable, or there is no phone on file — relay the code yourself.',
-          'warning',
-        );
-      } else {
-        showToast(
-          send
-            ? (rtl ? 'تم توليد رمز جديد وإرساله على واتساب' : 'New code generated and sent on WhatsApp')
-            : (rtl ? 'تم توليد رمز جديد — أبلغه للعضو فورًا' : 'New PIN generated — relay it now'),
-          'success',
-        );
-      }
+      showToast(
+        rtl ? 'تم توليد رمز جديد — أبلغه للعضو فورًا' : 'New PIN generated — relay it now',
+        'success',
+      );
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
       showToast(msg || (rtl ? 'فشل توليد الرمز' : 'PIN generation failed'), 'error');
@@ -292,28 +278,37 @@ export default function MemberProfileView() {
                 {freshPin ?? pinCode}
               </p>
               {freshPin ? (
-                <p className="text-[11px] text-amber-700 mt-1 px-2">
-                  {rtl ? 'جديد — أبلغه للعضو الآن، لن يظهر مجددًا' : 'New — relay it to the member now, it will not show again'}
-                </p>
+                <>
+                  <p className="text-[11px] text-amber-700 mt-1 px-2">
+                    {rtl ? 'جديد — أبلغه للعضو الآن، لن يظهر مجددًا' : 'New — relay it to the member now, it will not show again'}
+                  </p>
+                  {/* Click-to-Chat: this panel is the only place the code ever
+                      exists in plain text, so it is the only place a link can
+                      carry it. WhatsApp Web opens with the message typed. */}
+                  {hasPhone ? (
+                    <a
+                      href={`https://wa.me/${toWhatsApp(phone)}?text=${encodeURIComponent(
+                        t('staff.waMessage', { name: fullName, code: freshPin }),
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1.5 inline-flex min-h-[32px] items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline"
+                    >
+                      <span className="material-symbols-outlined text-sm">chat</span>
+                      {rtl ? 'ابعته واتساب' : 'Send on WhatsApp'}
+                    </a>
+                  ) : null}
+                </>
               ) : (
                 role === 'gym-admin' && (
                   <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
                     <button
                       type="button"
                       disabled={pinBusy}
-                      onClick={() => regenerate(false)}
+                      onClick={regenerate}
                       className="text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 min-h-[32px]"
                     >
                       {pinBusy ? (rtl ? 'جارٍ…' : '…') : (rtl ? 'توليد رمز جديد' : 'Generate new PIN')}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pinBusy}
-                      onClick={() => regenerate(true)}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 min-h-[32px]"
-                    >
-                      <span className="material-symbols-outlined text-sm">chat</span>
-                      {rtl ? 'ولّد وابعته واتساب' : 'Issue & send on WhatsApp'}
                     </button>
                   </div>
                 )
