@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, FloppyDisk as Save } from '@phosphor-icons/react';
+import { ArrowRight, FloppyDisk as Save, Key, WhatsappLogo } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { formatMoney } from '../../utils/currency';
-import { createStaff, updateStaff, getStaff } from '../../services/api';
+import { createStaff, updateStaff, getStaff, resetStaffLoginCode } from '../../services/api';
+import LoginCodeDialog from '../../components/staff/LoginCodeDialog';
 import { WEEK_DAYS } from './subscriptions/shared';
 
 // ====================================================================
@@ -44,6 +45,11 @@ export default function AddEmployeePage() {
   const editId = params.get('edit');
   const isEdit = !!editId;
 
+  // The login code (phone + code sign-in) shown exactly once, right after it is
+  // created: only a bcrypt hash is stored, so this dialog is the only copy.
+  const [issuedCode, setIssuedCode] = useState<{ code: string; name: string; phone: string | null } | null>(null);
+  const [codeBusy, setCodeBusy] = useState(false);
+
   const [f, setF] = useState(empty);
   const set = (k: keyof typeof empty, v: any) => setF((p) => ({ ...p, [k]: v }));
   const toggleOff = (c: string) =>
@@ -77,7 +83,9 @@ export default function AddEmployeePage() {
 
   const totalSalary = Number(f.salary || 0) + Number(f.housing || 0) + Number(f.transport || 0) + Number(f.other || 0);
   const emailOk = /.+@.+\..+/.test(f.email.trim());
-  const valid = f.name.trim().length >= 2 && emailOk && (!isEdit ? f.password.length >= 6 : true)
+  // سياسة الموظف الموحّدة (§5 P2#13): ≥8 + حرف كبير/صغير/رقم — نفس createStaffSchemaV2.
+  const strongPw = /^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9]).{8,}$/;
+  const valid = f.name.trim().length >= 2 && emailOk && (!isEdit ? strongPw.test(f.password) : true)
     && (!f.pin || /^\d{4,8}$/.test(f.pin));
 
   const save = useMutation({
@@ -118,8 +126,21 @@ export default function AddEmployeePage() {
         ...(f.pin ? { pin: f.pin } : {}),
       });
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['staff'] });
+      const created = (res as { data?: { full_name?: string; phone?: string; login_code?: string | null } })?.data;
+
+      // A brand-new staff account comes back with its login code in plain text,
+      // once. Show it before leaving — navigate away and it is unrecoverable.
+      if (!isEdit && created?.login_code) {
+        setIssuedCode({
+          code: created.login_code,
+          name: created.full_name || f.name,
+          phone: created.phone || f.phone || null,
+        });
+        return;
+      }
+
       showToast(rtl ? (isEdit ? 'تم حفظ التعديل' : 'تمت إضافة الموظف') : 'Saved', 'success');
       navigate('/admin/hr');
     },
@@ -128,6 +149,31 @@ export default function AddEmployeePage() {
       showToast(msg || (rtl ? 'فشل الحفظ' : 'Save failed'), 'error');
     },
   });
+
+  /** The staff row as saved on the server — the reset reads the stored phone. */
+  const savedPhone = (existing?.data?.phone || '').trim();
+
+  const issueCode = async (send: boolean) => {
+    if (!editId) return;
+    setCodeBusy(true);
+    try {
+      const res = await resetStaffLoginCode(editId, send);
+      setIssuedCode({ code: res.data.code, name: res.data.full_name || f.name, phone: res.data.phone });
+      if (send && (res.data.channel === 'console' || !res.data.sent)) {
+        showToast(
+          rtl
+            ? 'الإرسال بالواتساب مش متفعّل دلوقتي — الكود ظاهر، اكتبه للموظف بنفسك.'
+            : 'WhatsApp sending is not configured — relay the code shown here.',
+          'warning',
+        );
+      }
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      showToast(msg || (rtl ? 'فشل توليد الكود' : 'Code generation failed'), 'error');
+    } finally {
+      setCodeBusy(false);
+    }
+  };
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="bg-gray-50 min-h-screen -m-6 p-6">
@@ -228,6 +274,38 @@ export default function AddEmployeePage() {
               <input type="password" inputMode="numeric" dir="ltr" value={f.pin} onChange={(e) => set('pin', e.target.value.replace(/\D/g, '').slice(0, 8))}
                 placeholder={isEdit ? (rtl ? 'فارغ = إبقاء الحالي' : 'Empty = keep current') : '••••'} className={inputCls} />
             </div>
+
+            {/* كود الدخول (شاشة /team-login) — غير الـPIN اللي فوق تمامًا:
+                ده اللي الموظف بيدخل بيه من موبايله مع رقمه، واللي فوق للحضور
+                على الجهاز المشترك في الاستقبال. */}
+            {isEdit && f.role !== 'manager' ? (
+              <div>
+                <label className={labelCls}>{rtl ? 'كود الدخول (شاشة فريق العمل)' : 'Login code (staff portal)'}</label>
+                {savedPhone ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" disabled={codeBusy} onClick={() => issueCode(false)}
+                      className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl bg-white border border-gray-200 text-gray-800 text-sm font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50">
+                      <Key size={15} />
+                      {codeBusy ? (rtl ? 'جارٍ…' : '…') : (rtl ? 'توليد كود جديد' : 'Generate new code')}
+                    </button>
+                    <button type="button" disabled={codeBusy} onClick={() => issueCode(true)}
+                      className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl bg-white border border-gray-200 text-gray-800 text-sm font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50">
+                      <WhatsappLogo size={15} weight="fill" className="text-emerald-500" />
+                      {rtl ? 'ولّد وابعته واتساب' : 'Issue & send on WhatsApp'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[11px] leading-relaxed text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                    {rtl
+                      ? 'الموظف ده لسه من غير رقم موبايل محفوظ، وكود الدخول بيتكتب مع الرقم. احفظ رقمه الأول وبعدين ولّد الكود.'
+                      : 'This staff member has no saved phone number, and the code is typed together with it. Save the number first, then issue the code.'}
+                  </p>
+                )}
+                <p className="mt-1 text-[11px] text-gray-400">
+                  {rtl ? 'الكود بيتخزن مشفّرًا — أي توليد جديد بيلغي القديم فورًا.' : 'Stored hashed — issuing a new one kills the old one immediately.'}
+                </p>
+              </div>
+            ) : null}
             <div>
               <label className={labelCls}>{rtl ? 'بداية الدوام' : 'Shift start'}</label>
               <input type="time" value={f.shiftStart} onChange={(e) => set('shiftStart', e.target.value)} className={inputCls} dir="ltr" />
@@ -307,6 +385,19 @@ export default function AddEmployeePage() {
           </button>
         </div>
       </div>
+
+      <LoginCodeDialog
+        open={!!issuedCode}
+        onClose={() => {
+          setIssuedCode(null);
+          showToast(rtl ? (isEdit ? 'تم حفظ التعديل' : 'تمت إضافة الموظف') : 'Saved', 'success');
+          navigate('/admin/hr');
+        }}
+        title={rtl ? 'كود الدخول' : 'Login code'}
+        subject={issuedCode ? (rtl ? `كود دخول ${issuedCode.name}` : `${issuedCode.name}'s login code`) : undefined}
+        code={issuedCode?.code || ''}
+        phone={issuedCode?.phone}
+      />
     </div>
   );
 }

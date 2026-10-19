@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { query } from '../config/database';
 import logger from '../config/logger';
 import bcrypt from 'bcrypt';
+import { generateLoginCode, hashLoginCode, issueLoginCode, issueLoginCodes, sendLoginCode } from '../services/loginCode';
+import { whatsapp } from '../services/whatsapp';
 
 // === STAFF / USERS ===
 export const listStaff = async (req: Request, res: Response) => {
@@ -52,6 +54,12 @@ export const createStaff = async (req: Request, res: Response) => {
     const salt = await bcrypt.genSalt(12);
     const password_hash = await bcrypt.hash(password, salt);
     const pinHash = pin ? await bcrypt.hash(String(pin), 12) : null;
+    // Login code (083_staff_login_code.sql): receptionists and coaches sign in
+    // with phone + code. Only issued when there IS a phone to sign in with — a
+    // code nobody can use looks issued and never arrives. Managers are
+    // excluded on purpose: they keep email + password on /login.
+    const loginCode = phone && role !== 'manager' ? generateLoginCode() : null;
+    const loginCodeHash = loginCode ? await hashLoginCode(loginCode) : null;
     // كود مسلسل لا يُعاد (EMP0001…) — الفجوات طبيعية بعد الحذف
     const codeRes = await query(
       `SELECT COALESCE(MAX(CASE WHEN employee_code ~ '^EMP[0-9]+$'
@@ -66,16 +74,18 @@ export const createStaff = async (req: Request, res: Response) => {
         employee_code, department, job_title, national_id, birth_date, gender, address, hire_date,
         shift_start, shift_end, late_allowance_min, weekly_off, pin_hash,
         housing_allowance, transport_allowance, other_allowance,
-        annual_leave_days, sick_leave_days, monthly_leave_days)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+        annual_leave_days, sick_leave_days, monthly_leave_days, login_code_hash)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
        RETURNING id, full_name, email, role, phone, salary, commission_pct, employee_code`,
       [gym_id, full_name, email, password_hash, role, phone || null, salary || null, commission_pct ?? 0, code,
         p.department, p.job_title, p.national_id, p.birth_date, p.gender, p.address, p.hire_date,
         p.shift_start, p.shift_end, p.late_allowance_min ?? 0, p.weekly_off, pinHash,
         p.housing_allowance ?? 0, p.transport_allowance ?? 0, p.other_allowance ?? 0,
-        p.annual_leave_days ?? 21, p.sick_leave_days ?? 7, p.monthly_leave_days ?? 2]
+        p.annual_leave_days ?? 21, p.sick_leave_days ?? 7, p.monthly_leave_days ?? 2, loginCodeHash]
     );
-    res.status(201).json({ data: r.rows[0] });
+    // `login_code` is the only time this code exists in plaintext — the caller
+    // has to show it to the manager right now or it is gone for good.
+    res.status(201).json({ data: { ...r.rows[0], login_code: loginCode } });
   } catch (e: any) {
     if (e.code === '23505') { res.status(400).json({ error: 'Email already exists in this gym' }); return; }
     logger.error('createStaff failed', { error: e.message }); res.status(500).json({ error: 'Internal error' });
@@ -481,4 +491,122 @@ export const getStaffAttendanceSummary = async (req: Request, res: Response) => 
     const r = await query(`SELECT su.id, su.full_name, su.role, COUNT(ss.id) FILTER (WHERE ss.clock_in >= DATE_TRUNC('month', CURRENT_DATE)) AS monthly_shifts, COUNT(ss.id) FILTER (WHERE ss.clock_in >= CURRENT_DATE) AS today_clocked FROM staff_users su LEFT JOIN staff_shifts ss ON ss.staff_user_id=su.id AND ss.gym_id=su.gym_id WHERE su.gym_id=$1 AND su.is_active=true GROUP BY su.id, su.full_name, su.role ORDER BY su.full_name`, [gym_id]);
     res.json({ data: r.rows });
   } catch (e: any) { logger.error('getStaffAttendanceSummary failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
+};
+
+// ====================================================================
+// LOGIN CODES — receptionist/coach phone + code sign-in
+// (083_staff_login_code.sql; the credential itself lives in loginCode.ts)
+// ====================================================================
+
+/** Roles that sign in with a phone + code. Managers keep email + password. */
+const CODE_LOGIN_ROLE_FILTER = `role <> 'manager'`;
+
+/**
+ * POST /api/staff/:id/login-code-reset
+ * Issues a new code for one staff member and returns it ONCE (same contract as
+ * the member PIN reset). `?send=whatsapp` also pushes it to the staff phone.
+ */
+export const resetStaffLoginCode = async (req: Request, res: Response) => {
+  const gym_id = req.staff?.gym_id;
+  const staff_user_id = req.staff?.staff_user_id;
+  const { id } = req.params;
+  const wantsSend = req.query.send === 'whatsapp' || req.body?.send === 'whatsapp';
+  try {
+    const r = await query(
+      `SELECT id, full_name, phone, role FROM staff_users
+        WHERE id = $1 AND gym_id = $2 AND deleted_at IS NULL`,
+      [id, gym_id]
+    );
+    if (r.rows.length === 0) { res.status(404).json({ error: 'Staff not found' }); return; }
+
+    const staff = r.rows[0];
+    if (staff.role === 'manager') {
+      res.status(400).json({
+        error: 'MANAGER_ACCOUNT',
+        message: 'حساب الإدارة بيدخل بالإيميل وكلمة المرور — مش بالكود.',
+      });
+      return;
+    }
+    if (!staff.phone) {
+      res.status(400).json({
+        error: 'NO_PHONE',
+        message: 'ضيف رقم موبايل للموظف الأول — الكود بيتكتب مع الرقم.',
+      });
+      return;
+    }
+
+    const code = await issueLoginCode('staff', id, gym_id);
+    const sent = wantsSend ? await sendLoginCode(staff.phone, code, staff.full_name) : false;
+
+    await query(
+      `INSERT INTO activity_logs (gym_id, staff_user_id, action_description, ip_address)
+       VALUES ($1, $2, $3, $4)`,
+      [gym_id, staff_user_id, `Issued a login code for ${staff.full_name}`, req.ip]
+    );
+
+    // `sent` says the provider accepted it; `channel` says whether a provider
+    // exists at all — `console` only writes a log line (see whatsapp.ts), so the
+    // UI must not claim a message was delivered.
+    res.status(200).json({ data: { code, sent, phone: staff.phone, full_name: staff.full_name, channel: whatsapp.getProvider() } });
+  } catch (e: any) { logger.error('resetStaffLoginCode failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
+};
+
+/**
+ * POST /api/staff/login-codes/bulk  { limit?, send? }
+ *
+ * Issues a code for every receptionist/coach that has a phone and none yet —
+ * the cut-over path for accounts created before 083. Chunked on purpose: see
+ * issueLoginCodes() for the measured bcrypt budget, and note the response's
+ * `remaining`, which the client loops on (no long-lived request).
+ *
+ * `skipped_no_phone` is reported rather than hidden: a staff account without a
+ * phone can never sign in this way, and the manager has to fix the profile.
+ */
+export const staffLoginCodesBulk = async (req: Request, res: Response) => {
+  const gym_id = req.staff?.gym_id;
+  const staff_user_id = req.staff?.staff_user_id;
+  const limit = Math.min(Math.max(Number(req.body?.limit) || 100, 1), 200);
+  const wantsSend = req.body?.send === true || req.body?.send === 'whatsapp';
+  try {
+    const r = await query(
+      `SELECT id, full_name, phone FROM staff_users
+        WHERE gym_id = $1 AND deleted_at IS NULL AND is_active
+          AND ${CODE_LOGIN_ROLE_FILTER}
+          AND phone IS NOT NULL AND BTRIM(phone) <> ''
+          AND login_code_hash IS NULL
+        ORDER BY employee_code NULLS LAST, full_name
+        LIMIT $2`,
+      [gym_id, limit]
+    );
+
+    const codes = await issueLoginCodes('staff', r.rows.map((s: any) => s.id), gym_id);
+    const generated = r.rows.map((s: any, i: number) => ({ id: s.id, name: s.full_name, phone: s.phone, code: codes[i] }));
+
+    if (wantsSend && generated.length) {
+      // Sequential: each send is a network round trip to the provider.
+      for (const g of generated) await sendLoginCode(g.phone, g.code, g.name);
+    }
+
+    const rest = await query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM staff_users
+           WHERE gym_id = $1 AND deleted_at IS NULL AND is_active AND ${CODE_LOGIN_ROLE_FILTER}
+             AND phone IS NOT NULL AND BTRIM(phone) <> '' AND login_code_hash IS NULL) AS remaining,
+         (SELECT COUNT(*)::int FROM staff_users
+           WHERE gym_id = $1 AND deleted_at IS NULL AND is_active AND ${CODE_LOGIN_ROLE_FILTER}
+             AND (phone IS NULL OR BTRIM(phone) = '')) AS skipped_no_phone`,
+      [gym_id]
+    );
+
+    const summary = rest.rows[0] || { remaining: 0, skipped_no_phone: 0 };
+    if (generated.length) {
+      await query(
+        `INSERT INTO activity_logs (gym_id, staff_user_id, action_description, ip_address)
+         VALUES ($1, $2, $3, $4)`,
+        [gym_id, staff_user_id, `Issued login codes for ${generated.length} staff member(s)`, req.ip]
+      );
+    }
+
+    res.status(200).json({ data: { generated, ...summary, sent: wantsSend, channel: whatsapp.getProvider() } });
+  } catch (e: any) { logger.error('staffLoginCodesBulk failed', { error: e.message }); res.status(500).json({ error: 'Internal error' }); }
 };

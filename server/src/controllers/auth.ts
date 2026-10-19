@@ -7,6 +7,8 @@ import { setTenantGymId } from '../config/tenantContext';
 import logger from '../config/logger';
 import { getFrontendUrl } from '../config/frontendUrl';
 import { sendPasswordResetEmail } from '../services/email';
+import { issueLoginCode, sendLoginCode } from '../services/loginCode';
+import { whatsapp } from '../services/whatsapp';
 import type { TokenPayload } from '../middleware/auth';
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
@@ -228,6 +230,211 @@ export const staffLogin = async (req: Request, res: Response): Promise<void> => 
   } catch (error) {
     logger.error('Staff login failed', { requestId: (req as any).requestId, error: (error as Error).message });
     res.status(500).json({ error: 'Internal server error.' });
+  }
+};
+
+// ====================================================================
+// PHONE + CODE SIGN-IN (members and non-manager staff)
+// ====================================================================
+
+/**
+ * POST /auth/staff-login — receptionist/coach sign-in with phone + code.
+ *
+ * Same token/cookie/session chain as staffLogin above; only the credential
+ * check differs. Manager accounts are refused on purpose: the console keeps
+ * email + password (see /login) and this must never become a second door into
+ * a management account.
+ */
+export const staffLoginByCode = async (req: Request, res: Response): Promise<void> => {
+  const phone = String(req.body.phone || '').trim();
+  const code = String(req.body.code || '').trim();
+
+  try {
+    // Cross-tenant lookup by phone on the RLS-bypass connection — gym_id is not
+    // known yet. Staff phones are free text typed by a manager, so both sides
+    // are reduced to digits: "+20 100 123 4567" must find "0100-123-4567".
+    const adminClient = await getAdminClient();
+    let rows: Array<Record<string, string>> = [];
+    try {
+      const result = await adminClient.query(
+        `SELECT id, gym_id, email, full_name, role, is_active, login_code_hash
+           FROM staff_users
+          WHERE deleted_at IS NULL
+            AND regexp_replace(COALESCE(phone, ''), '\\D', '', 'g')
+              = regexp_replace($1, '\\D', '', 'g')`,
+        [phone]
+      );
+      await adminClient.query('COMMIT');
+      rows = result.rows;
+    } catch (e) {
+      await adminClient.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      adminClient.release();
+    }
+
+    // An account with no code set simply never matches — the same answer as a
+    // wrong code, so the response cannot be used to probe for accounts.
+    let staff: Record<string, string> | null = null;
+    for (const candidate of rows) {
+      if (candidate.login_code_hash && (await bcrypt.compare(code, candidate.login_code_hash))) {
+        staff = candidate;
+        break;
+      }
+    }
+
+    if (!staff) {
+      res.status(401).json({
+        error: 'INVALID_CODE',
+        message: 'رقم الهاتف أو كود الدخول غير صحيح',
+      });
+      return;
+    }
+
+    if (staff.role === 'manager') {
+      res.status(403).json({
+        error: 'MANAGER_ACCOUNT',
+        message: 'هذا حساب إدارة — استخدم شاشة دخول الإدارة.',
+      });
+      return;
+    }
+
+    if (!staff.is_active) {
+      logger.warn('Deactivated staff code login attempt', { staffId: staff.id });
+      res.status(401).json({
+        error: 'INACTIVE_ACCOUNT',
+        message: 'هذا الحساب موقوف — تواصل مع إدارة الصالة.',
+      });
+      return;
+    }
+
+    setTenantGymId(staff.gym_id);
+
+    const gymResult = await query(`SELECT is_active FROM gyms WHERE id = $1`, [staff.gym_id]);
+    if (gymResult.rows.length === 0 || !gymResult.rows[0].is_active) {
+      // Same 14-day grace policy as the password path.
+      logger.warn('Suspended gym staff code login attempt', { staffId: staff.id, gymId: staff.gym_id });
+      res.status(403).json({
+        error: 'GYM_SUSPENDED',
+        message: 'تم إيقاف حساب الصالة مؤقتًا — يرجى تجديد الاشتراك أو التواصل مع إدارة المنصة.',
+      });
+      return;
+    }
+
+    const jti = crypto.randomUUID();
+    const tokenPayload: TokenPayload = {
+      staff_user_id: staff.id,
+      gym_id: staff.gym_id,
+      // The row is looked up by phone across tenants, so the role arrives as a
+      // plain string; the DB CHECK constraint guarantees the union.
+      role: staff.role as TokenPayload['role'],
+      jti,
+    };
+
+    const accessToken = generateAccessToken(tokenPayload);
+    const refreshToken = generateRefreshToken({ staff_user_id: staff.id, gym_id: staff.gym_id }, jti);
+
+    res.cookie('access_token', accessToken, cookieOptions(5 * 60 * 1000));
+    res.cookie('refresh_token', refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
+
+    await query(
+      `INSERT INTO refresh_tokens (staff_user_id, gym_id, token_jti, expires_at)
+       VALUES ($1, $2, $3, NOW() + INTERVAL '7 days')`,
+      [staff.id, staff.gym_id, jti]
+    );
+
+    await query(
+      `INSERT INTO user_sessions (staff_user_id, gym_id, token_jti, user_agent, ip_address, device_name)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [staff.id, staff.gym_id, jti, req.headers['user-agent'] || null, req.ip, req.headers['sec-ch-ua-platform'] || null]
+    );
+
+    await query(
+      `INSERT INTO activity_logs (gym_id, staff_user_id, action_description, ip_address)
+       VALUES ($1, $2, $3, $4)`,
+      [staff.gym_id, staff.id, `Staff login by code: ${staff.full_name} (${staff.role})`, req.ip]
+    );
+
+    res.status(200).json({
+      expires_in: 300,
+      user: {
+        id: staff.id,
+        full_name: staff.full_name,
+        email: staff.email,
+        role: staff.role,
+        gym_id: staff.gym_id,
+      },
+    });
+  } catch (error) {
+    logger.error('Staff code login failed', { requestId: (req as any).requestId, error: (error as Error).message });
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+};
+
+/**
+ * POST /auth/forgot-code — "أرسل لي الكود" from the member or staff sign-in.
+ *
+ * Issuing a code replaces whatever was stored, so this is also the onboarding
+ * path: an account that never had a code (most of the member table) can
+ * self-serve one. The answer is identical whether or not the phone is
+ * registered, and the only thing echoed back is the delivery channel — the
+ * endpoint must not become an oracle for which numbers belong to the club.
+ */
+export const forgotLoginCode = async (req: Request, res: Response): Promise<void> => {
+  const phone = String(req.body.phone || '').trim();
+  const area: 'member' | 'staff' = req.body.area === 'staff' ? 'staff' : 'member';
+  const channel = whatsapp.getProvider();
+
+  try {
+    const adminClient = await getAdminClient();
+    let holder: { id: string; gym_id: string; full_name: string } | null = null;
+    try {
+      const result = area === 'member'
+        // Exact hash, like /auth/member-login: member phones are stored
+        // canonical (05xxxxxxxx) by the registration form and hashed on insert.
+        ? await adminClient.query(
+          `SELECT id, gym_id, full_name FROM members
+            WHERE phone_hash = phone_hash($1) OR phone_number = $1
+            ORDER BY created_at
+            LIMIT 1`,
+          [phone]
+        )
+        : await adminClient.query(
+          `SELECT id, gym_id, full_name FROM staff_users
+            WHERE deleted_at IS NULL AND is_active AND role <> 'manager'
+              AND regexp_replace(COALESCE(phone, ''), '\\D', '', 'g')
+                = regexp_replace($1, '\\D', '', 'g')
+            ORDER BY created_at
+            LIMIT 1`,
+          [phone]
+        );
+      await adminClient.query('COMMIT');
+      holder = result.rows[0] || null;
+    } catch (e) {
+      await adminClient.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      adminClient.release();
+    }
+
+    if (holder) {
+      const code = await issueLoginCode(area, holder.id);
+      const gym = await query(`SELECT name FROM gyms WHERE id = $1`, [holder.gym_id]).catch(() => null);
+      const sent = await sendLoginCode(phone, code, holder.full_name, gym?.rows?.[0]?.name);
+      // The code itself is never logged — only that one was issued and whether
+      // the provider accepted it (the `console` provider only logs, and says so).
+      logger.info('Login code reissued on request', {
+        area, holderId: holder.id, sent, channel, requestId: (req as any).requestId,
+      });
+    } else {
+      logger.info('Login code requested for an unregistered phone', { area, channel });
+    }
+
+    res.status(200).json({ ok: true, channel });
+  } catch (error) {
+    logger.error('forgotLoginCode failed', { requestId: (req as any).requestId, error: (error as Error).message });
+    // Still a generic 200: a 500 here would leak that the lookup ran at all.
+    res.status(200).json({ ok: true, channel });
   }
 };
 

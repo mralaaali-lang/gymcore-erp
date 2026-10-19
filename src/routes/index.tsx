@@ -2,7 +2,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import AdminLoginPage from '../pages/auth/AdminLoginPage';
-import StaffMemberLoginPage from '../pages/auth/StaffMemberLoginPage';
+import StaffLoginPage from '../pages/auth/StaffLoginPage';
+import PlayerLoginPage from '../pages/auth/PlayerLoginPage';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
 import PageTransition from '../components/ui/PageTransition';
@@ -37,10 +38,13 @@ export default function AppRouter() {
       <Routes>
 
         {/* Public */}
-        {/* /login: Super Admin + Gym Manager only. /team-login: Trainer, Reception & Member. */}
+        {/* Three separate credential spaces: /login (manager + super admin: email
+            or phone + password), /team-login (receptionist + coach: phone + code),
+            /player-login (members: phone + code). */}
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<SuspenseWrapper><AdminLoginPage /></SuspenseWrapper>} />
-        <Route path="/team-login" element={<SuspenseWrapper><StaffMemberLoginPage /></SuspenseWrapper>} />
+        <Route path="/team-login" element={<SuspenseWrapper><StaffLoginPage /></SuspenseWrapper>} />
+        <Route path="/player-login" element={<SuspenseWrapper><PlayerLoginPage /></SuspenseWrapper>} />
         <Route path="/forgot-password" element={<SuspenseWrapper><ForgotPasswordPage /></SuspenseWrapper>} />
         <Route path="/reset-password" element={<SuspenseWrapper><ResetPasswordPage /></SuspenseWrapper>} />
 
@@ -104,9 +108,11 @@ export default function AppRouter() {
         <Route path="/admin/reports/subscriptions" element={lazyLoad(() => import('../pages/gym-admin/SubscriptionsReport'), ['gym-admin'])} />
         <Route path="/admin/reports/absent" element={lazyLoad(() => import('../pages/gym-admin/AbsentMembers'), ['gym-admin'])} />
         <Route path="/admin/reports/employee-sales" element={lazyLoad(() => import('../pages/gym-admin/EmployeeSales'), ['gym-admin'])} />
-        <Route path="/admin/reports/subscriptions" element={lazyLoad(() => import('../pages/gym-admin/SubscriptionsReport'), ['gym-admin'])} />
+        {/* Duplicate /admin/reports/subscriptions removed — first declaration above wins in React Router */}
         <Route path="/admin/analytics" element={lazyLoad(() => import('../pages/gym-admin/BranchAnalytics'), ['gym-admin'])} />
-        <Route path="/admin/hr" element={<Navigate to="/admin/users?tab=hr" replace />} />
+        {/* /admin/hr renders HrMainPage directly; the old Navigate to /admin/users?tab=hr
+            was shadowing the real page — React Router takes the first match, making HrMainPage
+            permanently unreachable.  The HrMainPage link lower in this file is the canonical entry. */}
         <Route path="/admin/crm" element={lazyLoad(() => import('../pages/gym-admin/CrmPage'), ['gym-admin'])} />
         <Route path="/admin/customer360/:id" element={lazyLoad(() => import('../pages/gym-admin/Customer360Page'), ['gym-admin'])} />
         <Route path="/admin/settings" element={lazyLoad(() => import('../pages/settings/SettingsPage'), ['gym-admin'])} />

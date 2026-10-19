@@ -1,6 +1,6 @@
 import logger from '../config/logger';
 
-type NotificationType = 'renewal_reminder' | 'attendance' | 'promotion' | 'payment_receipt' | 'class_reminder' | 'freeze_confirmation';
+type NotificationType = 'renewal_reminder' | 'attendance' | 'promotion' | 'payment_receipt' | 'class_reminder' | 'freeze_confirmation' | 'login_code';
 
 interface NotificationPayload {
   to: string;
@@ -31,6 +31,10 @@ class WhatsAppService {
       payment_receipt: `مرحباً ${payload.memberName}، تم استلام دفعتك بقيمة ${payload.data?.amount || ''} بنجاح. رقم العملية: ${payload.data?.transactionId || ''}`,
       class_reminder: `تذكير: حصة ${payload.data?.className || ''} ستبدأ قريباً في ${payload.data?.startTime || ''}. نراكم في ${payload.gymName || 'النادي'}!`,
       freeze_confirmation: `مرحباً ${payload.memberName}، تم تجميد اشتراكك لمدة ${payload.data?.days || ''} يوماً. سيعود الاشتراك نشطاً في ${payload.data?.reactivateDate || ''}.`,
+      // The only template that carries a credential. It is sent on request
+      // (member/staff tapped "أرسل لي الكود"), never on a schedule, and it
+      // replaces the previous code — the old one stops working immediately.
+      login_code: `مرحباً ${payload.memberName}، كود الدخول الخاص بك في ${payload.gymName || 'النادي'} هو: ${payload.data?.code || ''}\nلا تشارك هذا الكود مع أي شخص.`,
     };
 
     const message = templates[payload.type] || 'مرحباً! شكراً لكونك معنا.';

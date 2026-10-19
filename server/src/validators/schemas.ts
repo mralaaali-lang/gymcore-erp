@@ -477,6 +477,21 @@ export const memberLoginSchema = z.object({
   pin: z.string().min(4).max(6).regex(/^\d+$/, 'PIN must be numeric'),
 });
 
+// Receptionist/coach sign-in: phone + the 4-digit code issued from the
+// dashboard (083_staff_login_code.sql). Managers keep /auth/login.
+export const staffLoginByCodeSchema = z.object({
+  phone: z.string().min(7).max(50).regex(/^\+?[\d\s\-()]+$/, 'Invalid phone number format'),
+  code: z.string().min(4).max(6).regex(/^\d+$/, 'Login code must be numeric'),
+});
+
+// "أرسل لي الكود" — public, rate-limited, and answered identically whether or
+// not the number is registered (the response must not become an oracle for
+// which phone numbers belong to the gym).
+export const forgotLoginCodeSchema = z.object({
+  phone: z.string().min(7).max(50).regex(/^\+?[\d\s\-()]+$/, 'Invalid phone number format'),
+  area: z.enum(['member', 'staff']).optional(),
+});
+
 export const unregisterPushSchema = z.object({
   token: z.string().min(1, 'Push token is required'),
 });

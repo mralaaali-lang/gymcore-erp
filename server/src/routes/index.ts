@@ -52,9 +52,12 @@ import {
   blacklistMember,
   resetMemberPin,
   cancelSubscription,
+  memberLoginCodesBulk,
 } from '../controllers/members';
 import {
   staffLogin,
+  staffLoginByCode,
+  forgotLoginCode,
   refreshAccessToken,
   staffLogout,
   createStaffAccount,
@@ -129,6 +132,8 @@ import {
   cancelSubscriptionSchema,
   sendBulkNotificationSchema,
   memberLoginSchema,
+  staffLoginByCodeSchema,
+  forgotLoginCodeSchema,
   createSubscriptionPaymentSchema,
   unregisterPushSchema,
 } from '../validators/schemas';
@@ -185,6 +190,7 @@ import {
   listShifts, clockIn, clockOut, bulkClockInCoaches, updateShift,
   listCoachAttendance, coachAttendanceReport,
   listPayroll, processPayroll, getStaffAttendanceSummary,
+  resetStaffLoginCode, staffLoginCodesBulk,
 } from '../controllers/staff';
 import {
   listPtPackages, createPtPackage,
@@ -224,6 +230,12 @@ router.post('/auth/logout', staffLogout);
 router.post('/auth/register', authRateLimit, validate(createStaffSchema), authenticateAndIsolateTenant, createStaffAccount);
 router.post('/auth/forgot-password', authRateLimit, validate(forgotPasswordSchema), forgotPassword);
 router.post('/auth/reset-password', authRateLimit, validate(resetPasswordSchema), resetPassword);
+// Phone + code sign-in for receptionist/coach accounts, and the self-service
+// recovery both code screens use ("أرسل لي الكود"). Rate-limited like the rest
+// of this block: the code space is 4 digits, so the limiter is the only thing
+// standing between an attacker and a brute-forced login.
+router.post('/auth/staff-login', authRateLimit, validate(staffLoginByCodeSchema), staffLoginByCode);
+router.post('/auth/forgot-code', authRateLimit, validate(forgotLoginCodeSchema), forgotLoginCode);
 
 // ====================================================================
 // PAYMENT WEBHOOKS — Public (signed by payment providers)
@@ -264,6 +276,9 @@ router.put('/api/members/:id', requireRole('manager', 'receptionist'), validate(
 router.put('/api/members/:id/blacklist', requireRole('manager'), validate(blacklistMemberSchema), blacklistMember);
 // رمز الدخول غير قابل للاسترجاع (هاش فقط) — التوليد من جديد هو الطريق الصادق الوحيد.
 router.post('/api/members/:id/pin-reset', requireRole('manager'), resetMemberPin);
+// الحشد: توليد أكواد الدخول الناقصة على دفعات (bcrypt مقيس 157ms/كود)، أي
+// عميل يعيد النداء على `remaining` حتى الصفر — لا طلب طويل العمر.
+router.post('/api/members/login-codes/bulk', requireRole('manager'), memberLoginCodesBulk);
 // §34ج — استيراد CSV الحقيقي (tabs/Settings→MigrationTab) — كل صف يُكتب فعلًا
 // أو يُرفض برسالة صادقة، بلا أي توست وهمي.
 router.post('/api/import/:type', requireRole('manager'), importData);
@@ -518,6 +533,9 @@ router.get('/api/billing/subscription', getGymSubscription);
 // STAFF / USERS / TRAINERS / SHIFTS / HR
 // ====================================================================
 router.get('/api/staff', requireRole('manager'), listStaff);
+// أكواد الدخول (083) — قبل /api/staff/:id حتى لا يُقرأ المسار كمعرّف موظف.
+router.post('/api/staff/login-codes/bulk', requireRole('manager'), staffLoginCodesBulk);
+router.post('/api/staff/:id/login-code-reset', requireRole('manager'), resetStaffLoginCode);
 router.get('/api/staff/:id', requireRole('manager'), getStaff);
 router.post('/api/staff', requireRole('manager'), planGuard({ checkStaff: true }), validate(createStaffSchemaV2), createStaff);
 router.put('/api/staff/:id', requireRole('manager'), validate(updateStaffSchema), updateStaff);

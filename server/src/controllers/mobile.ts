@@ -2,20 +2,26 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { query, getAdminClient } from '../config/database';
 import logger from '../config/logger';
+import { normalizePhone } from '../services/loginCode';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
 
 export async function memberLogin(req: Request, res: Response): Promise<void> {
   const { phone, pin } = req.body;
+  // Members type their number with spaces or a country code as often as not;
+  // stored phones are canonical 05xxxxxxxx, so the digits-only form is hashed
+  // alongside the raw input (same trick staff code sign-in uses).
+  const phoneDigits = normalizePhone(String(phone || ''));
   try {
     const adminClient = await getAdminClient();
     let candidates;
     try {
       const result = await adminClient.query(
         `SELECT m.id, m.full_name, m.phone_number, m.email, m.photo_url, m.gym_id, m.pin_code_hash
-         FROM members m WHERE m.phone_number = $1 OR m.phone_hash = phone_hash($1)`,
-        [phone]
+         FROM members m
+         WHERE m.phone_number = $1 OR m.phone_hash = phone_hash($1) OR m.phone_hash = phone_hash($2)`,
+        [phone, phoneDigits]
       );
       await adminClient.query('COMMIT');
       candidates = result.rows;

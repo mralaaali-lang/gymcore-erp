@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, UserCheck, UserMinus as UserX, Wallet, Plus, Clock, Trash as Trash2, Pencil, Eye, FileText, Bank as Banknote } from '@phosphor-icons/react';
+import { Users, UserCheck, UserMinus as UserX, Wallet, Plus, Clock, Trash as Trash2, Pencil, Eye, FileText, Bank as Banknote, Key } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
@@ -15,6 +15,7 @@ import {
 import { DashboardPage, StatCard, Panel, EmptyState } from '../../components/dashboard';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Modal from '../../components/shared/Modal';
+import BulkLoginCodesDialog from '../../components/staff/BulkLoginCodesDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,6 +65,7 @@ export default function HrMainPage() {
   const [selfId, setSelfId] = useState('');
   const [selfPin, setSelfPin] = useState('');
   const [showSummary, setShowSummary] = useState(false);
+  const [showCodes, setShowCodes] = useState(false);
 
   const { data, isLoading, isError } = useApiQuery(['staff'], listStaff, { staleTime: 30_000 });
   const all = useMemo(() => (data?.data ?? []) as StaffData[], [data]);
@@ -141,6 +143,10 @@ export default function HrMainPage() {
             <button type="button" onClick={() => setShowSelf(true)}
               className="inline-flex items-center gap-1.5 text-sm font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 rounded-2xl px-4 py-2.5 min-h-[44px]">
               {rtl ? 'حضور ذاتي' : 'Self check-in'}
+            </button>
+            <button type="button" onClick={() => setShowCodes(true)}
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 hover:bg-gray-50 min-h-[44px]">
+              <Key size={16} />{rtl ? 'أكواد الدخول' : 'Login codes'}
             </button>
           </>
         }
@@ -377,6 +383,10 @@ export default function HrMainPage() {
             <div className="flex justify-between"><dt className="text-gray-500">{rtl ? 'موظفون نشطون' : 'Active staff'}</dt><dd className="font-bold">{fmtNum(activeList.length)}</dd></div>
           </dl>
         </Modal>
+      )}
+
+      {showCodes && (
+        <BulkLoginCodesDialog open onClose={() => setShowCodes(false)} scope="staff" />
       )}
     </div>
   );

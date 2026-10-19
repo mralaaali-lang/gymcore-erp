@@ -14,6 +14,7 @@ import { Plus } from '@phosphor-icons/react';
 import { DashboardPage, PrimaryAction } from '../../components/dashboard';
 import EditMemberModal from './EditMemberModal';
 import ImportMembersModal from './ImportMembersModal';
+import BulkLoginCodesDialog from '../../components/staff/BulkLoginCodesDialog';
 
 // §34د-1 — ONE truth per member: the subscription status from the server
 // (`subscription_status`, LEFT JOIN on the latest member_subscriptions row).
@@ -73,6 +74,7 @@ export default function MembersPage() {
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [editing, setEditing] = useState<MemberResponse | null>(null);
   const [showImport, setShowImport] = useState(false);
+  const [showCodes, setShowCodes] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -384,6 +386,16 @@ export default function MembersPage() {
               <span className="material-symbols-outlined text-lg">grid_on</span>
               <span>{exporting ? '…' : 'Excel'}</span>
             </button>
+            {/* The cut-over: 2 463 of the members here still have no login code.
+                Opens the chunked generator (and its one-time CSV). */}
+            <button
+              type="button"
+              onClick={() => setShowCodes(true)}
+              className="flex items-center gap-1.5 h-10 px-3 border rounded-lg text-label-sm transition-colors bg-surface-container-low text-on-surface-variant border-outline-variant hover:bg-surface-container-high"
+            >
+              <span className="material-symbols-outlined text-lg">key</span>
+              <span>{rtl ? 'أكواد الدخول' : 'Login codes'}</span>
+            </button>
           </>
         }
       />
@@ -520,6 +532,9 @@ export default function MembersPage() {
           onClose={() => setShowImport(false)}
           onImported={() => fetchMembers()}
         />
+      )}
+      {showCodes && (
+        <BulkLoginCodesDialog open onClose={() => setShowCodes(false)} scope="members" />
       )}
     </DashboardPage>
   );

@@ -63,6 +63,45 @@ export default function MemberProfileView() {
   const photoRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => { setImgOk(true); setFreshPin(null); }, [id]);
 
+  /**
+   * Issue a fresh login code for this member — shown once, never recoverable.
+   * `send` also pushes it on WhatsApp in the same call (the code has to be
+   * generated first, so "send the old one" is not a thing).
+   */
+  const regenerate = async (send: boolean) => {
+    if (!id) return;
+    setPinBusy(true);
+    try {
+      const res = await resetMemberPin(id, send);
+      setFreshPin(res.data.pin);
+      // `sent` is the provider's word; `channel: 'console'` means no provider is
+      // configured at all (whatsapp.ts logs the message and returns true), so a
+      // "sent" claim would be a lie. And no phone on file is the third case.
+      if (send && (res.data.channel === 'console' || res.data.sent === false)) {
+        // Nothing actually left the building: no phone on file, or WhatsApp
+        // is not configured yet (the backend uses the console provider).
+        showToast(
+          rtl
+            ? 'الإرسال بالواتساب مش متفعّل أو مفيش رقم محفوظ — أبلغه للعضو بنفسك.'
+            : 'WhatsApp sending is unavailable, or there is no phone on file — relay the code yourself.',
+          'warning',
+        );
+      } else {
+        showToast(
+          send
+            ? (rtl ? 'تم توليد رمز جديد وإرساله على واتساب' : 'New code generated and sent on WhatsApp')
+            : (rtl ? 'تم توليد رمز جديد — أبلغه للعضو فورًا' : 'New PIN generated — relay it now'),
+          'success',
+        );
+      }
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      showToast(msg || (rtl ? 'فشل توليد الرمز' : 'PIN generation failed'), 'error');
+    } finally {
+      setPinBusy(false);
+    }
+  };
+
   // الضغط على الصورة/الأحرف يفتح اختيار صورة → رفع → حفظ في الملف.
   const changePhoto = async (file: File | undefined) => {
     if (!file || !id) return;
@@ -258,26 +297,25 @@ export default function MemberProfileView() {
                 </p>
               ) : (
                 role === 'gym-admin' && (
-                  <button
-                    type="button"
-                    disabled={pinBusy}
-                    onClick={async () => {
-                      setPinBusy(true);
-                      try {
-                        const res = await resetMemberPin(id!);
-                        setFreshPin(res.data.pin);
-                        showToast(rtl ? 'تم توليد رمز جديد — أبلغه للعضو فورًا' : 'New PIN generated — relay it now', 'success');
-                      } catch (e: unknown) {
-                        const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-                        showToast(msg || (rtl ? 'فشل توليد الرمز' : 'PIN generation failed'), 'error');
-                      } finally {
-                        setPinBusy(false);
-                      }
-                    }}
-                    className="mt-1.5 text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 min-h-[32px]"
-                  >
-                    {pinBusy ? (rtl ? 'جارٍ…' : '…') : (rtl ? 'توليد رمز جديد' : 'Generate new PIN')}
-                  </button>
+                  <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+                    <button
+                      type="button"
+                      disabled={pinBusy}
+                      onClick={() => regenerate(false)}
+                      className="text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 min-h-[32px]"
+                    >
+                      {pinBusy ? (rtl ? 'جارٍ…' : '…') : (rtl ? 'توليد رمز جديد' : 'Generate new PIN')}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pinBusy}
+                      onClick={() => regenerate(true)}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 min-h-[32px]"
+                    >
+                      <span className="material-symbols-outlined text-sm">chat</span>
+                      {rtl ? 'ولّد وابعته واتساب' : 'Issue & send on WhatsApp'}
+                    </button>
+                  </div>
                 )
               )}
             </div>

@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import crypto from 'crypto';
 import { query, getClient } from '../config/database';
 import logger from '../config/logger';
 import { closeStaleSessions } from './attendance';
+import { issueLoginCode, issueLoginCodes, sendLoginCode } from '../services/loginCode';
+import { whatsapp } from '../services/whatsapp';
 
 // ====================================================================
 // §34ح — MEMBERS STATS CARDS (the five numbers above the members tab)
@@ -546,32 +547,102 @@ export const updateMember = async (req: Request, res: Response): Promise<void> =
 // الـPIN القديم غير قابل للاسترجاع (مخزن هاش فقط)، لذا خانة «رمز الدخول»
 // في البروفايل كانت تعرض ---- دائمًا. الجديد يُعرض مرة واحدة في الاستجابة
 // ويجب على الموظف إبلاغه للعضو فورًا — لا يُخزَّن نصًا في أي مكان.
+// `?send=whatsapp` يبعته كمان على موبايل العضو (نفس قالب كود الدخول).
 export const resetMemberPin = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
   const gym_id = req.staff?.gym_id;
   const staff_user_id = req.staff?.staff_user_id;
+  const wantsSend = req.query.send === 'whatsapp' || req.body?.send === 'whatsapp';
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '')) {
     res.status(400).json({ error: 'Invalid member id.' });
     return;
   }
   try {
     const exists = await query(
-      `SELECT id, full_name FROM members WHERE id = $1 AND gym_id = $2 AND deleted_at IS NULL`,
+      `SELECT id, full_name, COALESCE(decrypt_sensitive(phone_encrypted), phone_number) AS phone
+         FROM members WHERE id = $1 AND gym_id = $2 AND deleted_at IS NULL`,
       [id, gym_id]);
     if (exists.rows.length === 0) {
       res.status(404).json({ error: 'Member not found.' });
       return;
     }
-    const pin = String(1000 + crypto.randomInt(9000));
-    const pinHash = await bcrypt.hash(pin, 12);
-    await query(`UPDATE members SET pin_code_hash = $1 WHERE id = $2 AND gym_id = $3`, [pinHash, id, gym_id]);
+    const member = exists.rows[0];
+    const pin = await issueLoginCode('member', id, gym_id);
+    const sent = wantsSend && member.phone ? await sendLoginCode(member.phone, pin, member.full_name) : false;
     await query(
       `INSERT INTO activity_logs (gym_id, staff_user_id, action_description, ip_address)
         VALUES ($1,$2,$3,$4)`,
-      [gym_id, staff_user_id, `Reset entry PIN for member ${exists.rows[0].full_name}`, req.ip]);
-    res.status(200).json({ data: { pin } });
+      [gym_id, staff_user_id, `Reset entry PIN for member ${member.full_name}`, req.ip]);
+    // `sent` says the provider accepted it; `channel` says whether a provider
+    // exists at all — `console` only writes a log line, so the desk must read
+    // the code out loud and the UI has to say so.
+    res.status(200).json({ data: { pin, sent, phone: member.phone, channel: whatsapp.getProvider() } });
   } catch (error) {
     logger.error('Failed to reset member PIN', { requestId: (req as any).requestId, memberId: id, error: (error as Error).message });
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+};
+
+/**
+ * POST /api/members/login-codes/bulk  { limit?, send? }
+ *
+ * Issues a login code for every member that has none — the cut-over path for
+ * the 2 463 members who predate the code. Chunked: bcrypt at cost 12 measured
+ * 157ms/hash, so the client loops on `remaining` with a progress toast instead
+ * of holding one long request open.
+ *
+ * Deliberately NOT filtered on a readable phone: the plaintext phone lives in
+ * phone_encrypted (encrypted at insert), and rows imported while no encryption
+ * key was configured kept only the irreversible phone_hash — 2 463 of 2 504
+ * members here. Their names + codes are still exactly what the front desk
+ * needs to hand the code out, so the CSV carries a blank phone for them and
+ * `skipped_no_phone` reports how many can't be reached on WhatsApp directly
+ * (they can always ask from the sign-in screen, which uses the number they
+ * type rather than the one on file).
+ */
+export const memberLoginCodesBulk = async (req: Request, res: Response): Promise<void> => {
+  const gym_id = req.staff?.gym_id;
+  const staff_user_id = req.staff?.staff_user_id;
+  const limit = Math.min(Math.max(Number(req.body?.limit) || 100, 1), 200);
+  const wantsSend = req.body?.send === true || req.body?.send === 'whatsapp';
+  try {
+    const r = await query(
+      `SELECT id, full_name, COALESCE(decrypt_sensitive(phone_encrypted), phone_number) AS phone
+         FROM members
+        WHERE gym_id = $1 AND deleted_at IS NULL AND pin_code_hash IS NULL
+        ORDER BY created_at
+        LIMIT $2`,
+      [gym_id, limit]);
+
+    const codes = await issueLoginCodes('member', r.rows.map((m: any) => m.id), gym_id);
+    const generated = r.rows.map((m: any, i: number) => ({ id: m.id, name: m.full_name, phone: m.phone, code: codes[i] }));
+
+    if (wantsSend) {
+      // Sequential: each send is a provider round trip, and this can be
+      // hundreds of messages — do not open a socket per member in parallel.
+      for (const g of generated) if (g.phone) await sendLoginCode(g.phone, g.code, g.name);
+    }
+
+    const rest = await query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM members
+           WHERE gym_id = $1 AND deleted_at IS NULL AND pin_code_hash IS NULL) AS remaining,
+         (SELECT COUNT(*)::int FROM members
+           WHERE gym_id = $1 AND deleted_at IS NULL AND pin_code_hash IS NULL
+             AND phone_encrypted IS NULL AND phone_number IS NULL) AS skipped_no_phone`,
+      [gym_id]);
+    const summary = rest.rows[0] || { remaining: 0, skipped_no_phone: 0 };
+
+    if (generated.length) {
+      await query(
+        `INSERT INTO activity_logs (gym_id, staff_user_id, action_description, ip_address)
+          VALUES ($1,$2,$3,$4)`,
+        [gym_id, staff_user_id, `Issued login codes for ${generated.length} member(s)`, req.ip]);
+    }
+
+    res.status(200).json({ data: { generated, ...summary, sent: wantsSend, channel: whatsapp.getProvider() } });
+  } catch (error) {
+    logger.error('Failed to bulk-issue member login codes', { requestId: (req as any).requestId, error: (error as Error).message });
     res.status(500).json({ error: 'Internal server error.' });
   }
 };

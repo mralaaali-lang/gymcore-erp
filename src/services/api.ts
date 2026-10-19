@@ -183,8 +183,11 @@ api.interceptors.response.use(
             return api(originalRequest);
           } catch (refreshErr) {
             processQueue(refreshErr, null);
+            // Read the role before clearing it — a member belongs on
+            // /player-login, not on the management console.
+            const destination = loginRoute();
             clearTokens();
-            window.location.href = '/login';
+            window.location.href = destination;
             return Promise.reject(error);
           } finally {
             isRefreshing = false;
@@ -224,8 +227,9 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
+        const destination = loginRoute();
         clearTokens();
-        window.location.href = '/login';
+        window.location.href = destination;
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
@@ -635,6 +639,39 @@ export async function memberLogin(phone: string, pin: string, loginType?: string
   return data;
 }
 
+// ====================================================================
+// STAFF SIGN-IN BY PHONE + CODE (083_staff_login_code.sql)
+// ====================================================================
+export interface StaffCodeLoginResponse {
+  expires_in: number;
+  user: { id: string; full_name: string; email: string; role: string; gym_id: string };
+}
+
+/**
+ * Receptionist/coach sign-in with phone + code. Cookie-based exactly like
+ * login(): the server sets HttpOnly cookies and returns no tokens, so there is
+ * nothing to persist here — the app context owns the authenticated flag.
+ */
+export async function staffLoginByCode(phone: string, code: string): Promise<StaffCodeLoginResponse> {
+  const res = await api.post('/auth/staff-login', { phone, code });
+  return res.data as StaffCodeLoginResponse;
+}
+
+export type LoginCodeArea = 'member' | 'staff';
+export type WhatsAppChannel = 'console' | 'twilio' | 'cloud_api';
+
+/**
+ * "أرسل لي الكود" from either sign-in screen: issues a NEW code (the old one
+ * stops working) and sends it over WhatsApp. The answer is deliberately generic
+ * — it never reveals whether the number is registered — so the only thing worth
+ * reading is `channel`: `console` means no WhatsApp provider is configured and
+ * nothing actually left the building.
+ */
+export async function forgotLoginCode(phone: string, area: LoginCodeArea): Promise<{ ok: boolean; channel: WhatsAppChannel }> {
+  const res = await api.post('/auth/forgot-code', { phone, area });
+  return res.data as { ok: boolean; channel: WhatsAppChannel };
+}
+
 export async function refreshToken(): Promise<LoginResponse> {
   const token = getRefreshToken();
   if (!token) throw new Error('No refresh token');
@@ -673,18 +710,33 @@ export async function revokeAllOtherSessions(): Promise<{ revoked: number }> {
 
 const TEAM_ROLES = new Set(['coach', 'receptionist', 'member']);
 
+/**
+ * The sign-in screen that belongs to the stored role — used on logout and when
+ * a session dies mid-request. Members have their own portal now (/player-login),
+ * so dropping them on the management console would be wrong (and confusing).
+ */
+export function loginRoute(): string {
+  const role = getStoredRole();
+  if (role === 'member') return '/player-login';
+  if (role === 'coach' || role === 'receptionist') return '/team-login';
+  return '/login';
+}
+
 export function logout() {
   const wasPlatformAdmin = getStoredRole() === 'super-admin';
   const currentToken = getAccessToken();
   const decoded = currentToken ? decodeJWT(currentToken) : null;
   const wasTeamAccount = decoded ? TEAM_ROLES.has(decoded.role) : false;
 
+  // The role marker survives clearTokens() only if we read it first.
+  const destination = wasPlatformAdmin ? '/login' : wasTeamAccount ? loginRoute() : '/login';
+
   if (wasPlatformAdmin) {
     void axios.post(`${API_BASE}/platform/auth/logout`, {}, { withCredentials: true }).catch(() => {});
   }
   clearTokens();
   platformCsrfTokenRequest = null;
-  window.location.href = wasTeamAccount ? '/team-login' : '/login';
+  window.location.href = destination;
 }
 
 // ====================================================================
@@ -781,8 +833,9 @@ export async function blacklistMember(id: string, reason: string) {
 }
 
 // توليد رمز دخول جديد (يُعرض مرة واحدة — لا يُسترجع بعدها).
-export async function resetMemberPin(id: string): Promise<{ data: { pin: string } }> {
-  const res = await api.post(`/api/members/${id}/pin-reset`);
+// `send` يبعته كمان واتساب على رقم العضو المسجَّل.
+export async function resetMemberPin(id: string, send = false): Promise<{ data: { pin: string; sent?: boolean; phone?: string | null; channel?: WhatsAppChannel } }> {
+  const res = await api.post(`/api/members/${id}/pin-reset${send ? '?send=whatsapp' : ''}`);
   return res.data;
 }
 
@@ -1931,6 +1984,9 @@ export interface StaffData {
   phone?: string; salary?: number; commission_pct?: number | string | null;
   is_active: boolean; created_at: string;
   employee_code?: string | null;
+  /** Raw login code — only present in the createStaff response (083); the row
+   *  itself keeps nothing but a bcrypt hash, so this is the one chance to see it. */
+  login_code?: string | null;
   department?: string | null;
   job_title?: string | null;
   national_id?: string | null;
@@ -1968,6 +2024,35 @@ export async function updateStaff(id: string, data: Partial<StaffData> & { pin?:
 export async function deleteStaff(id: string): Promise<{ data: { id: string; deleted: boolean } }> {
   const res = await api.delete(`/api/staff/${id}`);
   return res.data;
+}
+
+// ── Login codes (083) — receptionist/coach phone + code credentials ──
+export interface IssuedLoginCode { id: string; name: string; phone: string | null; code: string }
+export interface BulkLoginCodesResult {
+  generated: IssuedLoginCode[];
+  /** Still missing a code — the caller loops until this is 0 (bcrypt is slow). */
+  remaining: number;
+  /** Accounts left out entirely (staff: no phone on file). */
+  skipped_no_phone: number;
+  sent: boolean;
+  /** Delivery channel: `console` means nothing actually left the building. */
+  channel: WhatsAppChannel;
+}
+
+/** Issue a new code for one staff member. `send` also pushes it over WhatsApp. */
+export async function resetStaffLoginCode(id: string, send = false) {
+  const res = await api.post(`/api/staff/${id}/login-code-reset${send ? '?send=whatsapp' : ''}`);
+  return res.data as { data: { code: string; sent: boolean; phone: string | null; full_name: string; channel: WhatsAppChannel } };
+}
+
+export async function bulkStaffLoginCodes(limit = 100, send = false) {
+  const res = await api.post('/api/staff/login-codes/bulk', { limit, send });
+  return res.data as { data: BulkLoginCodesResult };
+}
+
+export async function bulkMemberLoginCodes(limit = 100, send = false) {
+  const res = await api.post('/api/members/login-codes/bulk', { limit, send });
+  return res.data as { data: BulkLoginCodesResult };
 }
 export async function listTrainers() {
   const res = await api.get('/api/trainers');

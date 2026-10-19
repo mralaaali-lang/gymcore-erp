@@ -3,8 +3,11 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, CheckCircle as CheckCircle2, XCircle, ArrowLeft, ArrowRight } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import Spinner from '../../components/ui/Spinner';
-import AuthAmbience, { AUTH_ACCENT, AUTH_ROOT_BG } from '../../components/auth/AuthAmbience';
+import AuthAmbience, { AUTH_ROOT_BG } from '../../components/auth/AuthAmbience';
+import AuthCard from '../../components/auth/AuthCard';
+import AuthBrandMark from '../../components/auth/AuthBrandMark';
 import { resetPassword, type AccountType } from '../../services/api';
+import { useTranslation } from 'react-i18next';
 
 export default function ResetPasswordPage() {
   const { language } = useApp();
@@ -12,6 +15,7 @@ export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const isRtl = language === 'ar';
   const ArrowIcon = isRtl ? ArrowLeft : ArrowRight;
+  const { t } = useTranslation();
 
   const token = searchParams.get('token') || '';
   const type = (searchParams.get('type') as AccountType) || 'staff';
@@ -25,7 +29,6 @@ export default function ResetPasswordPage() {
 
   // Same identity as every other unauthenticated screen — `type` only picks
   // the endpoint and where to send the user afterwards.
-  const accent = AUTH_ACCENT;
   const loginLink = isPlatform ? '/login' : '/team-login';
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,15 +36,15 @@ export default function ResetPasswordPage() {
     setError(null);
 
     if (!token) {
-      setError(isRtl ? 'رابط إعادة التعيين غير صالح.' : 'Invalid reset link.');
+      setError(t('auth.invalidResetLink'));
       return;
     }
     if (password.length < 8) {
-      setError(isRtl ? 'يجب أن تكون كلمة المرور 8 أحرف على الأقل.' : 'Password must be at least 8 characters.');
+      setError(t('auth.passwordTooShort'));
       return;
     }
     if (password !== confirmPassword) {
-      setError(isRtl ? 'كلمتا المرور غير متطابقتين.' : 'Passwords do not match.');
+      setError(t('auth.passwordsDontMatch'));
       return;
     }
 
@@ -52,7 +55,7 @@ export default function ResetPasswordPage() {
       setTimeout(() => navigate(loginLink), 2500);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
-      setError(axiosErr?.response?.data?.error || (isRtl ? 'رابط إعادة التعيين غير صالح أو منتهي الصلاحية.' : 'Invalid or expired reset link.'));
+      setError(axiosErr?.response?.data?.error || t('auth.invalidResetLinkExpired'));
     } finally {
       setLoading(false);
     }
@@ -62,20 +65,20 @@ export default function ResetPasswordPage() {
     return (
       <div className="auth-fx relative min-h-[100dvh] flex items-center justify-center overflow-hidden p-margin-mobile" style={{ background: AUTH_ROOT_BG }} dir={isRtl ? 'rtl' : 'ltr'}>
         <AuthAmbience />
-        <div className="relative w-full max-w-md z-10 backdrop-blur-2xl rounded-3xl border border-white/10 p-8 text-center"
-          style={{
-            background: 'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)',
-            boxShadow: '0 25px 60px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)',
-          }}>
-          <XCircle size={40} className="text-rose-400 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-white">{isRtl ? 'رابط غير صالح' : 'Invalid link'}</h1>
-          <p className="text-sm text-white/50 mt-2">
-            {isRtl ? 'رابط إعادة تعيين كلمة المرور غير صالح أو ناقص.' : 'This password reset link is invalid or incomplete.'}
-          </p>
-          <Link to={loginLink} className="inline-flex items-center gap-1.5 text-sm mt-6" style={{ color: accent }}>
-            <ArrowIcon size={14} />
-            {isRtl ? 'العودة لتسجيل الدخول' : 'Back to sign in'}
-          </Link>
+        <div className="relative w-full max-w-[440px] z-10">
+          <AuthCard className="text-center">
+            <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center border bg-white/[0.06] border-white/10">
+              <XCircle size={30} className="text-rose-400" strokeWidth={1.5} />
+            </div>
+            <h1 className="text-xl font-bold text-white">{t('auth.invalidLinkTitle')}</h1>
+            <p className="text-sm text-white/50 mt-2">
+              {t('auth.invalidLinkBody')}
+            </p>
+            <Link to={loginLink} className="inline-flex items-center gap-1.5 text-sm mt-6 text-auth-accent hover:text-auth-accent/80 transition-colors">
+              <ArrowIcon size={14} />
+              {t('auth.backToSignIn')}
+            </Link>
+          </AuthCard>
         </div>
       </div>
     );
@@ -85,38 +88,24 @@ export default function ResetPasswordPage() {
     <div className="auth-fx relative min-h-[100dvh] flex items-center justify-center overflow-hidden p-margin-mobile" style={{ background: AUTH_ROOT_BG }} dir={isRtl ? 'rtl' : 'ltr'}>
       <AuthAmbience />
 
-      <div className="relative w-full max-w-md z-10">
-        {/* Animated border glow behind card */}
-        <div className="absolute -inset-[2px] rounded-3xl bg-gradient-to-br from-auth-accent/40 via-auth-amber/20 to-auth-accent/40 blur-sm" />
-
-        <div
-          className="relative backdrop-blur-2xl rounded-3xl border border-white/10 p-8"
-          style={{
-            background: 'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)',
-            boxShadow: '0 25px 60px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)',
-          }}
-        >
+      <div className="relative w-full max-w-[440px] z-10">
+        <AuthCard>
         {!success ? (
           <>
-            <div className="text-center mb-8">
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border"
-                style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(245,158,11,0.1) 100%)', border: '1px solid rgba(6,182,212,0.25)' }}
-              >
-                <Lock size={28} style={{ color: accent }} strokeWidth={1.75} />
-              </div>
-              <h1 className="text-2xl font-bold text-white">
-                {isRtl ? 'كلمة مرور جديدة' : 'Set a new password'}
+            <div className="text-center mb-7">
+              <AuthBrandMark fallback={<Lock size={30} className="text-auth-accent" strokeWidth={1.5} />} />
+              <h1 className="text-2xl sm:text-[28px] font-extrabold text-white leading-snug">
+                {t('auth.setNewPasswordTitle')}
               </h1>
               <p className="text-sm text-white/50 mt-2">
-                {isRtl ? 'اختر كلمة مرور قوية لحسابك' : 'Choose a strong password for your account'}
+                {t('auth.setNewPasswordSubtitle')}
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-stack-md">
               <div>
                 <label className="block text-sm font-semibold text-white/70 mb-2">
-                  {isRtl ? 'كلمة المرور الجديدة' : 'New password'}
+                  {t('auth.newPassword')}
                 </label>
                 <div className="group flex items-center gap-3 px-4 py-3.5 rounded-xl border border-white/10 bg-white/5 transition-all duration-200 hover:border-white/20 focus-within:border-auth-accent focus-within:bg-auth-accent/5 focus-within:ring-1 focus-within:ring-auth-accent/30">
                   <Lock size={18} className="text-white/30 transition-colors duration-200 group-focus-within:text-auth-accent" />
@@ -136,7 +125,7 @@ export default function ResetPasswordPage() {
 
               <div>
                 <label className="block text-sm font-semibold text-white/70 mb-2">
-                  {isRtl ? 'تأكيد كلمة المرور' : 'Confirm password'}
+                  {t('auth.confirmPassword')}
                 </label>
                 <div className="group flex items-center gap-3 px-4 py-3.5 rounded-xl border border-white/10 bg-white/5 transition-all duration-200 hover:border-white/20 focus-within:border-auth-accent focus-within:bg-auth-accent/5 focus-within:ring-1 focus-within:ring-auth-accent/30">
                   <Lock size={18} className="text-white/30 transition-colors duration-200 group-focus-within:text-auth-accent" />
@@ -167,28 +156,25 @@ export default function ResetPasswordPage() {
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                 <span className="relative flex items-center justify-center gap-2">
                   {loading && <Spinner size="sm" />}
-                  {loading ? (isRtl ? 'جاري الحفظ...' : 'Saving...') : (isRtl ? 'حفظ كلمة المرور' : 'Save password')}
+                  {loading ? t('auth.saving') : t('auth.savePassword')}
                 </span>
               </button>
             </form>
           </>
         ) : (
           <div className="text-center py-4">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border"
-              style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(245,158,11,0.1) 100%)', border: '1px solid rgba(6,182,212,0.25)' }}
-            >
-              <CheckCircle2 size={28} style={{ color: accent }} strokeWidth={1.75} />
+            <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center border bg-white/[0.06] border-white/10">
+              <CheckCircle2 size={30} className="text-auth-accent" strokeWidth={1.5} />
             </div>
             <h1 className="text-xl font-bold text-white">
-              {isRtl ? 'تم تغيير كلمة المرور بنجاح' : 'Password changed successfully'}
+              {t('auth.passwordChangedTitle')}
             </h1>
             <p className="text-sm text-white/50 mt-2">
-              {isRtl ? 'جاري تحويلك لصفحة تسجيل الدخول...' : 'Redirecting you to sign in...'}
+              {t('auth.passwordChangedBody')}
             </p>
           </div>
         )}
-        </div>
+        </AuthCard>
       </div>
     </div>
   );

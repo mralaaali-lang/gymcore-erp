@@ -2,11 +2,13 @@ import { useMemo } from 'react';
 import { Barbell as Dumbbell, ActivityIcon as Activity, Lightning as Zap, Target } from '@phosphor-icons/react';
 
 // ─── Ambient background shared by every unauthenticated GymCore screen ───
-// These values are copied verbatim from AdminLoginPage. Keeping them in one
-// place is what stops the auth screens drifting apart again: the member portal
-// and the password screens used to carry their own orange/cyan split.
+// Every unauthenticated route renders <AuthAmbience /> (the admin console, the
+// member/team portal and both password screens), so the wallpaper is tuned in
+// one place instead of being retyped per page. It is deliberately sparse and
+// faint: the card is the focal point, and the animation is there only to stop
+// the page reading as a flat navy rectangle.
 const BG_ICONS = [Dumbbell, Activity, Zap, Target];
-const PARTICLE_COUNT = 8;
+const PARTICLE_COUNT = 5;
 
 function randomBetween(min: number, max: number) { return Math.random() * (max - min) + min; }
 
@@ -27,10 +29,10 @@ export default function AuthAmbience() {
       Icon: BG_ICONS[i % BG_ICONS.length],
       x: randomBetween(5, 95),
       y: randomBetween(5, 95),
-      size: randomBetween(28, 64),
+      size: randomBetween(24, 48),
       delay: randomBetween(0, 8),
-      duration: randomBetween(12, 20),
-      opacity: randomBetween(0.03, 0.08),
+      duration: randomBetween(14, 22),
+      opacity: randomBetween(0.02, 0.05),
       rotation: randomBetween(-20, 20),
     })), []);
 
@@ -57,10 +59,10 @@ export default function AuthAmbience() {
         }}
       />
 
-      {/* 3. Animated glow orbs */}
-      <div className="absolute top-[15%] right-[20%] w-[500px] h-[500px] rounded-full bg-auth-accent/8 blur-[120px] animate-pulse" style={{ animationDuration: '6s' }} />
-      <div className="absolute bottom-[20%] left-[10%] w-[400px] h-[400px] rounded-full bg-auth-amber/6 blur-[100px] animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
-      <div className="absolute top-[40%] left-[40%] w-[300px] h-[300px] rounded-full bg-auth-accent/5 blur-[90px] animate-pulse" style={{ animationDuration: '10s', animationDelay: '4s' }} />
+      {/* 3. Animated glow orbs — two only. A third one sat right behind the card
+             and muddied the glass, so the header glow belongs to the card now. */}
+      <div className="absolute top-[15%] right-[20%] w-[460px] h-[460px] rounded-full bg-auth-accent/6 blur-[130px] animate-pulse" style={{ animationDuration: '9s' }} />
+      <div className="absolute bottom-[18%] left-[12%] w-[380px] h-[380px] rounded-full bg-auth-amber/5 blur-[110px] animate-pulse" style={{ animationDuration: '11s', animationDelay: '2s' }} />
 
       {/* 4. Floating sport icons */}
       {particles.map((p) => (

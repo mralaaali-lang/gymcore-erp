@@ -3,14 +3,18 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Envelope as Mail, ArrowLeft, ArrowRight, Key as KeyRound, CheckCircle as CheckCircle2 } from '@phosphor-icons/react';
 import { useApp } from '../../context/GymBrandContext';
 import Spinner from '../../components/ui/Spinner';
-import AuthAmbience, { AUTH_ACCENT, AUTH_ROOT_BG } from '../../components/auth/AuthAmbience';
+import AuthAmbience, { AUTH_ROOT_BG } from '../../components/auth/AuthAmbience';
+import AuthCard from '../../components/auth/AuthCard';
+import AuthBrandMark from '../../components/auth/AuthBrandMark';
 import { forgotPassword } from '../../services/api';
+import { useTranslation } from 'react-i18next';
 
 export default function ForgotPasswordPage() {
   const { language } = useApp();
   const [searchParams] = useSearchParams();
   const isRtl = language === 'ar';
   const ArrowIcon = isRtl ? ArrowLeft : ArrowRight;
+  const { t } = useTranslation();
 
   // ?area=admin (Super Admin + Gym Manager screen) vs ?area=team (Trainer/
   // Reception screen). This only decides the THEME and which account
@@ -29,7 +33,6 @@ export default function ForgotPasswordPage() {
   // One identity for the whole unauthenticated area: the admin console's
   // navy + cyan. `area` only decides which endpoint we call and where the
   // back link goes — it no longer changes the theme.
-  const accent = AUTH_ACCENT;
   const backLink = isPlatform ? '/login' : '/team-login';
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,7 +52,7 @@ export default function ForgotPasswordPage() {
       }
       setSubmitted(true);
     } catch {
-      setError(isRtl ? 'حدث خطأ، حاول مرة أخرى.' : 'Something went wrong, please try again.');
+      setError(t('common.somethingWentWrong'));
     } finally {
       setLoading(false);
     }
@@ -59,33 +62,17 @@ export default function ForgotPasswordPage() {
     <div className="auth-fx relative min-h-[100dvh] flex items-center justify-center overflow-hidden p-margin-mobile" style={{ background: AUTH_ROOT_BG }} dir={isRtl ? 'rtl' : 'ltr'}>
       <AuthAmbience />
 
-      <div className="relative w-full max-w-md z-10">
-        {/* Animated border glow behind card */}
-        <div className="absolute -inset-[2px] rounded-3xl bg-gradient-to-br from-auth-accent/40 via-auth-amber/20 to-auth-accent/40 blur-sm" />
-
-        <div
-          className="relative backdrop-blur-2xl rounded-3xl border border-white/10 p-8"
-          style={{
-            background: 'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)',
-            boxShadow: '0 25px 60px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)',
-          }}
-        >
+      <div className="relative w-full max-w-[440px] z-10">
+        <AuthCard>
         {!submitted ? (
           <>
-            <div className="text-center mb-8">
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border"
-                style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(245,158,11,0.1) 100%)', border: '1px solid rgba(6,182,212,0.25)' }}
-              >
-                <KeyRound size={28} style={{ color: accent }} strokeWidth={1.75} />
-              </div>
-              <h1 className="text-2xl font-bold text-white">
-                {isRtl ? 'نسيت كلمة المرور؟' : 'Forgot your password?'}
+            <div className="text-center mb-7">
+              <AuthBrandMark fallback={<KeyRound size={30} className="text-auth-accent" strokeWidth={1.5} />} />
+              <h1 className="text-2xl sm:text-[28px] font-extrabold text-white leading-snug">
+                {t('auth.forgotTitle')}
               </h1>
               <p className="text-sm text-white/50 mt-2">
-                {isRtl
-                  ? 'أدخل بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور'
-                  : "Enter your email and we'll send you a reset link"}
+                {t('auth.forgotSubtitle')}
               </p>
             </div>
 
@@ -99,7 +86,7 @@ export default function ForgotPasswordPage() {
                   autoComplete="username email"
                   enterKeyHint="send"
                   className="flex-1 min-w-0 bg-transparent text-white text-base outline-none no-focus-floor placeholder-white/25"
-                  placeholder={isRtl ? 'بريدك الإلكتروني' : 'Your email'}
+                  placeholder={t('auth.yourEmail')}
                   dir="ltr"
                   required
                   autoFocus
@@ -120,26 +107,21 @@ export default function ForgotPasswordPage() {
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                 <span className="relative flex items-center justify-center gap-2">
                   {loading && <Spinner size="sm" />}
-                  {loading ? (isRtl ? 'جاري الإرسال...' : 'Sending...') : (isRtl ? 'إرسال رابط إعادة التعيين' : 'Send reset link')}
+                  {loading ? t('auth.sending') : t('auth.sendResetLink')}
                 </span>
               </button>
             </form>
           </>
         ) : (
           <div className="text-center py-4">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border"
-              style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(245,158,11,0.1) 100%)', border: '1px solid rgba(6,182,212,0.25)' }}
-            >
-              <CheckCircle2 size={28} style={{ color: accent }} strokeWidth={1.75} />
+            <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center border bg-white/[0.06] border-white/10">
+              <CheckCircle2 size={30} className="text-auth-accent" strokeWidth={1.5} />
             </div>
             <h1 className="text-xl font-bold text-white">
-              {isRtl ? 'تحقق من بريدك الإلكتروني' : 'Check your email'}
+              {t('auth.checkYourEmail')}
             </h1>
             <p className="text-sm text-white/50 mt-2 leading-relaxed">
-              {isRtl
-                ? 'إذا كان البريد الإلكتروني مسجلاً لدينا، سيصلك رابط لإعادة تعيين كلمة المرور خلال دقائق.'
-                : "If that email is registered, you'll receive a reset link within a few minutes."}
+              {t('auth.checkYourEmailBody')}
             </p>
           </div>
         )}
@@ -147,10 +129,10 @@ export default function ForgotPasswordPage() {
         <div className="mt-6 pt-6 border-t border-white/5 text-center">
           <Link to={backLink} className="inline-flex items-center gap-1.5 text-sm text-white/50 hover:text-auth-accent transition-colors">
             <ArrowIcon size={14} />
-            {isRtl ? 'العودة لتسجيل الدخول' : 'Back to sign in'}
+            {t('auth.backToSignIn')}
           </Link>
         </div>
-        </div>
+        </AuthCard>
       </div>
     </div>
   );

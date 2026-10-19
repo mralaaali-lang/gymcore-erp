@@ -16,17 +16,21 @@ const ROLE_DASHBOARD: Record<UserRole, string> = {
   'player': '/player/dashboard',
 };
 
-// Trainer/reception/member routes use the Team login screen; super-admin
-// and gym-admin routes use the Admin login screen (see routes/index.tsx).
-const TEAM_AREA_PREFIXES = ['/trainer', '/reception', '/player'];
+// Receptionist/coach routes use the staff portal (/team-login) and member
+// routes the member portal (/player-login); super-admin and gym-admin routes
+// use the admin console (see routes/index.tsx).
+const TEAM_AREA_PREFIXES = ['/trainer', '/reception'];
+const PLAYER_AREA_PREFIXES = ['/player'];
 
 export default function ProtectedRoute({ roles, children }: ProtectedRouteProps) {
   const { isAuthenticated, role } = useApp();
   const location = useLocation();
 
   if (!isAuthenticated) {
+    const isPlayerArea = PLAYER_AREA_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
     const isTeamArea = TEAM_AREA_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
-    return <Navigate to={isTeamArea ? '/team-login' : '/login'} replace />;
+    const destination = isPlayerArea ? '/player-login' : isTeamArea ? '/team-login' : '/login';
+    return <Navigate to={destination} replace />;
   }
 
   if (!roles.includes(role)) {
