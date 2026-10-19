@@ -174,12 +174,39 @@ function processQueue(error: unknown, token: string | null = null) {
   failedQueue = [];
 }
 
+// A rejected credential is not an expired session. These entry points use 401
+// to mean "wrong password / wrong code / dead token", so the screen that called
+// them owns the explanation (INVALID_CODE, MANAGER_ACCOUNT, …). Without this
+// guard the refresh-and-bounce machinery below swallows that error and drops
+// the visitor on a login screen — and since a first-time visitor has no stored
+// role, loginRoute() sends them to the manager console, even from the trainee
+// portal.
+const AUTH_ENTRY_POINTS = [
+  '/auth/login',
+  '/auth/staff-login',
+  '/auth/member-login',
+  '/auth/forgot-code',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/refresh',
+  '/platform/auth/login',
+  '/platform/auth/forgot-password',
+  '/platform/auth/reset-password',
+];
+
+const isAuthEntryPoint = (url?: string) =>
+  !!url && AUTH_ENTRY_POINTS.some((path) => url.includes(path));
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthEntryPoint(originalRequest.url)
+    ) {
       // Re-attach the junk-token guard: a poisoned header must not ride on
       // the retry either.
       originalRequest.headers.delete?.('Authorization');
