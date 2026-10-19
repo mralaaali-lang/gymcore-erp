@@ -9,6 +9,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // 9000 is the project's one and only frontend port — `npm run dev` here, and
+  // the nginx container from docker-compose.yml (`9000:80`). `preview` is pinned
+  // to it too: left unset, Vite serves the static build on its own default 4173,
+  // which looks like a different app on a different port.
+  preview: {
+    host: '0.0.0.0',
+    port: 9000,
+  },
   server: {
     host: '0.0.0.0',
     port: 9000,
