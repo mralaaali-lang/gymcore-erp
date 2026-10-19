@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatDate } from '../../utils/date';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import {
   getPlatformGym,
   impersonateGym,
+  markImpersonatedSession,
 } from '../../services/api';
 import {
   ArrowRight,
@@ -38,6 +39,11 @@ interface ChecklistItem {
   labelEn: string;
   icon: React.ReactNode;
   completed: boolean;
+  /** §69 — بنود ملهاش مصدر حقيقة في السيرفر بتفضل معلّقة بوضوح (`unverified`)،
+   *  مش بتتعلّم نفسها. `email_sent` مثال: مفيش بريد ترحيبي في الكود خالص
+   *  (`services/email.ts` بيغزّي رابط إعادة تعيين الباسورد وبس)، فالعلامة كانت
+   *  `completed: true` مكتوبة يدًا وبتكذب على اللي بيسلّم الصالة. */
+  unverified?: boolean;
   descriptionAr: string;
   descriptionEn: string;
 }
@@ -51,6 +57,7 @@ export default function GymHandover() {
   const t = (ar: string, en: string) => (isRtl ? ar : en);
 
   const [copied, setCopied] = useState(false);
+  const [copiedCard, setCopiedCard] = useState(false);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['platform', 'gym', id],
@@ -60,117 +67,104 @@ export default function GymHandover() {
 
   const gym = data?.data;
 
-  // Upon success, auto-mark items as completed based on gym data
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([
-    {
-      key: 'account_created',
-      labelAr: 'تم إنشاء الحساب',
-      labelEn: 'Account Created',
-      icon: <UserCheck size={20} />,
-      completed: false,
-      descriptionAr: 'تم إنشاء حساب المدير وكلمة المرور المؤقتة',
-      descriptionEn: 'Manager account created with temporary password',
-    },
-    {
-      key: 'gym_active',
-      labelAr: 'الصالة نشطة',
-      labelEn: 'Gym Active',
-      icon: <Building2 size={20} />,
-      completed: false,
-      descriptionAr: 'حساب الصالة مفعل وجاهز للاستخدام',
-      descriptionEn: 'Gym account is active and ready',
-    },
-    {
-      key: 'plan_active',
-      labelAr: 'الباقة مفعلة',
-      labelEn: 'Plan Active',
-      icon: <CreditCard size={20} />,
-      completed: false,
-      descriptionAr: 'الباقة الحالية: قيد التفعيل',
-      descriptionEn: 'Current plan: pending activation',
-    },
-    {
-      key: 'email_sent',
-      labelAr: 'إرسال بريد الترحيب',
-      labelEn: 'Welcome Email',
-      icon: <Mail size={20} />,
-      completed: false,
-      descriptionAr: 'بريد إلكتروني ترحيبي للمدير مع بيانات الدخول',
-      descriptionEn: 'Welcome email sent to manager with login details',
-    },
-    {
-      key: 'gym_data',
-      labelAr: 'بيانات الصالة كاملة',
-      labelEn: 'Gym Data Complete',
-      icon: <Settings size={20} />,
-      completed: false,
-      descriptionAr: 'اسم الصالة، العنوان، المنطقة الزمنية، العملة',
-      descriptionEn: 'Gym name, address, timezone, currency configured',
-    },
-    {
-      key: 'website',
-      labelAr: 'الموقع الإلكتروني',
-      labelEn: 'Website',
-      icon: <Globe size={20} />,
-      completed: false,
-      descriptionAr: 'الموقع الإلكتروني التعريفي للصالة',
-      descriptionEn: 'Gym website generator',
-    },
-    {
-      key: 'mobile_app',
-      labelAr: 'التطبيق الجوال',
-      labelEn: 'Mobile App',
-      icon: <Smartphone size={20} />,
-      completed: false,
-      descriptionAr: 'تطبيق الأعضاء للهواتف المحمولة',
-      descriptionEn: 'Member mobile app',
-    },
-  ]);
-
-  // Update checklist based on gym data once loaded
-  useEffect(() => {
-    if (!gym) return;
-
-    setChecklist((prev) =>
-      prev.map((item) => {
-        switch (item.key) {
-          case 'account_created':
-            return { ...item, completed: true };
-          case 'gym_active':
-            return { ...item, completed: gym.is_active };
-          case 'plan_active':
-            return { ...item, completed: true };
-          case 'email_sent':
-            return { ...item, completed: true };
-          case 'gym_data':
-            return {
-              ...item,
-              completed: !!(gym.name && gym.subdomain && gym.currency),
-            };
-          case 'website':
-            return { ...item, completed: gym.website_enabled || false };
-          case 'mobile_app':
-            return { ...item, completed: gym.mobile_app_enabled || false };
-          default:
-            return item;
-        }
-      })
-    );
+  /**
+   * §69 — القائمة بتتشتق من بيانات السيرفر، مفيش بند بيتعلّم نفسه.
+   * المصادر: `owner_email` (موجود فعلًا في `/platform/gyms/:id`) للتأكيد إن
+   * المدير اتعمل، `is_active`، `subscription_expires_at` + `plan_id` للباقة،
+   * و`website_enabled`/`mobile_app_enabled` من `gym_config`.
+   */
+  const checklist: ChecklistItem[] = useMemo(() => {
+    const expiry = gym?.subscription_expires_at ? Date.parse(gym.subscription_expires_at) : null;
+    const planActive = !!gym?.plan_id && (expiry === null || Number.isNaN(expiry) || expiry > Date.now());
+    const managerEmail = gym?.owner_email || '';
+    return [
+      {
+        key: 'account_created',
+        labelAr: 'تم إنشاء الحساب',
+        labelEn: 'Account Created',
+        icon: <UserCheck size={20} />,
+        completed: !!managerEmail,
+        descriptionAr: managerEmail
+          ? `حساب المدير: ${managerEmail}`
+          : 'لا يوجد حساب مدير نشط لهذه الصالة',
+        descriptionEn: managerEmail
+          ? `Manager account: ${managerEmail}`
+          : 'No manager account on this gym yet',
+      },
+      {
+        key: 'gym_active',
+        labelAr: 'الصالة نشطة',
+        labelEn: 'Gym Active',
+        icon: <Building2 size={20} />,
+        completed: !!gym?.is_active,
+        descriptionAr: 'حساب الصالة مفعل وجاهز للاستخدام',
+        descriptionEn: 'Gym account is active and ready',
+      },
+      {
+        key: 'plan_active',
+        labelAr: 'الباقة مفعلة',
+        labelEn: 'Plan Active',
+        icon: <CreditCard size={20} />,
+        completed: planActive,
+        descriptionAr: planActive
+          ? `${gym?.plan_name || gym?.plan_tier} — ${expiry ? formatDate(gym!.subscription_expires_at as string) : 'بلا تاريخ انتهاء'}`
+          : 'اختر باقة من كتالوج الباقات لتتفعّل الحدود والسعر',
+        descriptionEn: planActive
+          ? `${gym?.plan_name || gym?.plan_tier} — ${expiry ? formatDate(gym!.subscription_expires_at as string) : 'no expiry'}`
+          : 'Pick a plan from the catalogue to activate limits and pricing',
+      },
+      {
+        key: 'email_sent',
+        labelAr: 'تسليم بيانات الدخول',
+        labelEn: 'Credentials Delivered',
+        icon: <Mail size={20} />,
+        completed: false,
+        unverified: true,
+        descriptionAr: 'مفيش بريد ترحيبي أوتوماتيكي — انسخ بطاقة التسليم تحت وابعتها للمدير',
+        descriptionEn: 'No automated welcome email — copy the handover card below and send it',
+      },
+      {
+        key: 'gym_data',
+        labelAr: 'بيانات الصالة كاملة',
+        labelEn: 'Gym Data Complete',
+        icon: <Settings size={20} />,
+        completed: !!(gym?.name && gym?.subdomain && gym?.currency),
+        descriptionAr: 'اسم الصالة، العنوان، المنطقة الزمنية، العملة',
+        descriptionEn: 'Gym name, address, timezone, currency configured',
+      },
+      {
+        key: 'website',
+        labelAr: 'الموقع الإلكتروني',
+        labelEn: 'Website',
+        icon: <Globe size={20} />,
+        completed: !!gym?.website_enabled,
+        descriptionAr: 'الموقع الإلكتروني التعريفي للصالة',
+        descriptionEn: 'Gym website generator',
+      },
+      {
+        key: 'mobile_app',
+        labelAr: 'التطبيق الجوال',
+        labelEn: 'Mobile App',
+        icon: <Smartphone size={20} />,
+        completed: !!gym?.mobile_app_enabled,
+        descriptionAr: 'تطبيق الأعضاء للهواتف المحمولة',
+        descriptionEn: 'Member mobile app',
+      },
+    ];
   }, [gym]);
 
   const completedCount = checklist.filter((c) => c.completed).length;
   const totalCount = checklist.length;
   const progressPercent = Math.round((completedCount / totalCount) * 100);
 
-  // Impersonation
+  // Impersonation — the server sets a staff HttpOnly cookie and returns no
+  // token in the body (§69), so the handoff is `markImpersonatedSession`, not
+  // copying `access_token` (which used to store the literal "undefined").
   const impersonateMutation = useMutation({
     mutationFn: () => impersonateGym(id!),
     onSuccess: (res) => {
-      const { access_token, gym_id, user } = res.data;
-      localStorage.setItem('auth_token', access_token);
-      localStorage.setItem('gym_id', gym_id);
-      localStorage.setItem('user_role', 'gym-admin');
-      localStorage.setItem('impersonated_by', 'super_admin');
+      const { user } = res.data;
+      markImpersonatedSession(user.role);
       showToast(
         t(`تم تسجيل الدخول كـ ${user.full_name}`, `Logged in as ${user.full_name}`),
         'success'
@@ -186,14 +180,54 @@ export default function GymHandover() {
       ),
   });
 
-  const handleCopySubdomain = () => {
-    if (gym?.subdomain) {
-      const domain = `${gym.subdomain}.gymcore.app`;
-      navigator.clipboard.writeText(domain).then(() => {
-        setCopied(true);
-        showToast(t('تم النسخ', 'Copied!'), 'success');
-        setTimeout(() => setCopied(false), 2000);
-      });
+  /** §69 — النسخ مش مضمون: المتصفح بيرفض صلاحية الحافظة (صفحة مش focused، أو
+   *  سياق بلا HTTPS). الصيغة القديمة كانت `.then()` بلا `.catch()` فالزر كان
+   *  يضغط ويصمت من غير أي رد. البطاقة على الشاشة فالنص بيفضل مقروء — والمطلوب
+   *  هو الإشارة الصادقة، مش آليّة نسخ بديلة. */
+  const copyToClipboard = async (text: string, okAr: string, okEn: string): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast(t(okAr, okEn), 'success');
+      return true;
+    } catch {
+      showToast(t('المتصفح مانع الوصول للحافظة — انسخ النص من الشاشة يدويًا', 'The browser blocked clipboard access — copy the text from the screen instead'), 'error');
+      return false;
+    }
+  };
+
+  const handleCopySubdomain = async () => {
+    if (!gym?.subdomain) return;
+    const domain = `${gym.subdomain}.gymcore.app`;
+    if (await copyToClipboard(domain, 'تم النسخ', 'Copied!')) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  /** عنوان الكونسول الحقيقي: الدومين المخصص لو موجود، وإلا السبادومين — و`/login`
+   *  بتappend على الاتنين بعد إزالة الشرطة المائلة الزايدة، عشان الرابط يوصل
+   *  لشاشة الدخول مباشرة بدل صفحة نائبة. */
+  const consoleUrl = `${(gym?.custom_domain || `https://${gym?.subdomain ?? 'gym'}.gymcore.app`).replace(/\/+$/, '')}/login`;
+
+  /** §69 — بطاقة التسليم: كل اللي المدير يحتاجه ليدخل، في نص واحد ينسخه.
+   *  الباسورد مش هنا عمدًا: السيرفر بيخزّن hash فقط (bcrypt cost 12) فمفيش
+   *  حاجة صحيحة نتلف عليها — والتعليق بيقول للمدير يفتح «نسيت كلمة المرور». */
+  const handleCopyHandoverCard = async () => {
+    if (!gym) return;
+    const text = [
+      t('بيانات دخول لوحة تحكم الصالة', 'Gym console sign-in'),
+      `${t('الصالة', 'Gym')}: ${gym.name}`,
+      `${t('المدير', 'Manager')}: ${gym.owner_full_name || '-'}`,
+      `${t('البريد', 'Email')}: ${gym.owner_email || '-'}`,
+      `${t('الرابط', 'URL')}: ${consoleUrl}`,
+      t(
+        'كلمة المرور: هي اللي اتكتبت وقت إنشاء الصالة. لو مش معروفة، افتح الرابط واضغط «نسيت كلمة المرور».',
+        'Password: the one set while creating this gym. If it is unknown, open the URL and use "Forgot password".'
+      ),
+    ].join('\n');
+    if (await copyToClipboard(text, 'تم نسخ بطاقة التسليم', 'Handover card copied')) {
+      setCopiedCard(true);
+      setTimeout(() => setCopiedCard(false), 2000);
     }
   };
 
@@ -376,7 +410,9 @@ export default function GymHandover() {
                 className={`relative flex items-start gap-4 p-4 rounded-xl border transition-all ${
                   item.completed
                     ? 'bg-green-50 border-green-200'
-                    : 'bg-gray-50 border-gray-100'
+                    : item.unverified
+                      ? 'bg-gray-50 border-dashed border-gray-200'
+                      : 'bg-gray-50 border-gray-100'
                 }`}
               >
                 {/* Icon */}
@@ -404,11 +440,17 @@ export default function GymHandover() {
                   </p>
                 </div>
 
-                {/* Status indicator */}
+                {/* Status indicator — §69: بند ملوش مصدر حقيقة بيقول «يدوي» صراحة،
+                    مش «قيد الانتظار» اللي بتوهم إن فيه حاجة هتخلص لوحدها. */}
                 {item.completed ? (
                   <span className="text-green-600 text-xs font-medium whitespace-nowrap flex items-center gap-1">
                     <CheckCircle2 size={14} />
                     {t('تم', 'Done')}
+                  </span>
+                ) : item.unverified ? (
+                  <span className="text-gray-500 text-xs font-medium whitespace-nowrap flex items-center gap-1">
+                    <Copy size={14} />
+                    {t('يدوي', 'Manual')}
                   </span>
                 ) : (
                   <span className="text-gray-500/50 text-xs whitespace-nowrap flex items-center gap-1">
@@ -419,6 +461,67 @@ export default function GymHandover() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* §69 — بطاقة تسليم بيانات الدخول. البند اللي فوقها في القائمة «يدوي»
+            لأن مفيش بريد ترحيبي في المنتج؛ البطاقة دي هي التسليم الحقيقي.
+            صدرت بتوكنات الصدفة (bg-card/border-hairline/rounded-shell) مش بألوان
+            حرفية — باقي الملفات دي لسه في موجة 5. */}
+        <div className="mt-6 bg-card border border-hairline rounded-shell p-6 md:p-8 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-5">
+            <div>
+              <h2 className="text-lg font-bold text-foreground">
+                {t('تسليم بيانات الدخول للمدير', 'Hand the manager their sign-in')}
+              </h2>
+              <p className="text-sm text-foreground/60 mt-1">
+                {t(
+                  'مفيش بريد ترحيبي أوتوماتيكي — انسخ البطاقة وابعتهها في القناة اللي بتتفق عليها مع المدير.',
+                  'There is no automated welcome email — copy this card and send it over the channel you agree with the manager.'
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyHandoverCard}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-petrol-light transition-colors whitespace-nowrap"
+            >
+              {copiedCard ? <CheckCircle2 size={16} /> : <Copy size={16} />}
+              {copiedCard ? t('اتنسخ', 'Copied') : t('نسخ البطاقة', 'Copy card')}
+            </button>
+          </div>
+
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div className="p-4 rounded-xl border border-hairline bg-card">
+              <dt className="text-xs font-medium uppercase tracking-wide text-foreground/50">
+                {t('المدير', 'Manager')}
+              </dt>
+              <dd className="mt-1 font-semibold text-foreground">
+                {gym.owner_full_name || t('لا يوجد حساب مدير', 'No manager account')}
+              </dd>
+            </div>
+            <div className="p-4 rounded-xl border border-hairline bg-card">
+              <dt className="text-xs font-medium uppercase tracking-wide text-foreground/50">
+                {t('بريد الدخول', 'Sign-in email')}
+              </dt>
+              <dd className="mt-1 font-semibold text-foreground font-mono" dir="ltr">
+                {gym.owner_email || '—'}
+              </dd>
+            </div>
+            <div className="p-4 rounded-xl border border-hairline bg-card sm:col-span-2">
+              <dt className="text-xs font-medium uppercase tracking-wide text-foreground/50">
+                {t('رابط لوحة التحكم', 'Console URL')}
+              </dt>
+              <dd className="mt-1 font-semibold text-foreground font-mono break-all" dir="ltr">
+                {consoleUrl}
+              </dd>
+              <p className="mt-2 text-xs text-foreground/50">
+                {t(
+                  'كلمة المرور مش معروضة: السيرفر بيخزّن hash فقط. هي اللي كتبتها في معالج الإنشاء — ولو مش موجودة، «نسيت كلمة المرور» في الرابط ده هيولّيد واحدة جديدة.',
+                  'The password is not shown: the server stores a hash only. It is the one you typed in the creation wizard — if it is lost, "Forgot password" at this URL issues a new one.'
+                )}
+              </p>
+            </div>
+          </dl>
         </div>
 
         {/* Actions Card */}

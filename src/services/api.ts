@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { ROLE_MAP } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -72,11 +73,35 @@ export function setTokens(access: string, refresh: string, persistent = false, r
   }
 }
 
-/** Mark a platform-admin session authenticated by the server's HttpOnly cookie. */
-export function setPlatformCookieSession(role = 'super-admin') {
+/** Mark a cookie-only session (the server owns the token, the body has none) as
+ *  authenticated under `role`. Both credential spaces are cookie-based, so this
+ *  is the single honest handoff — see `markImpersonatedSession`. */
+function markCookieSession(role: string) {
   clearTokens();
   platformCsrfTokenRequest = null;
   localStorage.setItem('app_role', role);
+}
+
+/** Mark a platform-admin session authenticated by the server's HttpOnly cookie. */
+export function setPlatformCookieSession(role = 'super-admin') {
+  markCookieSession(role);
+}
+
+/**
+ * §69 — hand the browser over to an impersonated **staff** session.
+ *
+ * `POST /platform/gyms/:id/impersonate` sets a staff `access_token` cookie and
+ * returns no token in the body (by design). The marker is what actually makes
+ * the handoff work: while `app_role` stays `'super-admin'`, `tryRestoreSession()`
+ * validates `/platform/auth/session`, `authenticatePlatformAdmin` rejects the
+ * staff JWT (`type !== 'platform_admin'` → 403), the catch clears the session and
+ * the manager console bounces to `/login`. The marker stores the mapped app role
+ * (`'manager'` → `ROLE_MAP` → `gym-admin`), exactly what `login()` writes for a
+ * normal manager sign-in, which sends the restore down the staff branch
+ * (`/auth/me`) — the branch the issued cookie actually belongs to.
+ */
+export function markImpersonatedSession(staffRole: string) {
+  markCookieSession(ROLE_MAP[staffRole] || 'gym-admin');
 }
 
 function clearTokens() {
@@ -468,6 +493,10 @@ export interface PlatformGymDetail extends PlatformGym {
   custom_domain?: string | null;
   mobile_app_enabled?: boolean;
   website_enabled?: boolean;
+  /** §69 — أسس صادقة لقائمة التسليم: أول مدير نشط في الصالة (الكونتروللر
+   *  `platformGyms.ts:300-306` بيرجّعهما فعليًا، والنوع كان مخبيهم). */
+  owner_full_name?: string | null;
+  owner_email?: string | null;
 }
 
 export async function getPlatformGym(id: string): Promise<{ data: PlatformGymDetail }> {
@@ -535,7 +564,11 @@ export async function deleteGym(id: string): Promise<{ data: { id: string; name:
 // ====================================================================
 // PLATFORM ADMIN — Impersonation (Super Admin → Gym Manager)
 // ====================================================================
-export async function impersonateGym(gymId: string): Promise<{ data: { access_token: string; gym_id: string; user: { id: string; email: string; full_name: string; role: string } } }> {
+export async function impersonateGym(gymId: string): Promise<{ data: { gym_id: string; user: { id: string; email: string; full_name: string; role: string } } }> {
+  // §69 — العقد الحقيقي: الكونترولر (platformGyms.ts:704-717) بيطبّق توكن المدير
+  // كـكوكي HttpOnly، ومالهاش نسخة في الـbody. النوع ده كان بيقول `access_token`
+  // ف callers كانت بتخزّن حرفية "undefined" في localStorage. التسليم بـ
+  // `markImpersonatedSession(user.role)` مش بالنسخ.
   const res = await api.post(`/platform/gyms/${gymId}/impersonate`);
   return res.data;
 }

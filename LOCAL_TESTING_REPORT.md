@@ -5796,3 +5796,144 @@ endpoint لوحده · باقي `gym-admin` + `trainer` · الجدول التا
 contracts · منصة `super-admin` لكل endpoint لوحده · باقي `gym-admin` 17 + `trainer` 3 · الجدول التاني
 في `Payments`/`Expenses`/`MembersReport`/`Cashbox`).
 **الجلسة دي: 16 دفعة متحقق عليها حيًا.**
+
+## §69 — دفعة إصلاح ١: مسار تسليم الصالة — القائمة بقت مشتقة، والبطاقة نسخة، وimpersonate أوصل (2026-10-19 — جلسة A+C)
+
+### ١) الحالة قبل: الشاشة كانت بتخدع صاحبها
+
+`GymHandover.tsx` كان بيفرّغ قائمة تسليم من `useState` ثابت و`useEffect` بيكتب
+`completed: true` **بلا مصدر** لبندين: «تم إنشاء الحساب» و«الباقة مفعلة»، و«إرسال
+بريد الترحيب» كمان. يعني الصالة اللي مالهاش مدير بتظهر كمُسلَّمة. الحقيقة المقاسة
+من `server/src/controllers/platformGyms.ts`:
+
+| البند | قبل | المصدر الحقيقي | بعد |
+|---|---|---|---|
+| تم إنشاء الحساب | `true` مكتوبة | `owner_full_name`/`owner_email` (`platformGyms.ts:300-306`) | `!!gym.owner_email` |
+| الصالة نشطة | `gym.is_active` (صح) | `gyms.is_active` | بلا تغيير |
+| الباقة مفعلة | `true` مكتوبة | `plan_id` + `subscription_expires_at` | `!!plan_id && (expires === null ‖ > now)` |
+| إرسال بريد الترحيب | `true` مكتوبة | **مفيش بريد ترحيبي في المنتج**: `server/src/services/email.ts` بيصدّر `sendPasswordResetEmail` بس (المناديين: `auth.ts:673`، `platformAdmin.ts:263`، و`sInvoice` بساء استخدامه في `invoice.service.ts:104`) | بند «تسليم بيانات الدخول» بحالة `unverified` = «يدوي» |
+| بيانات الصالة | `name && subdomain && currency` | زيها | بلا تغيير |
+| الموقع / التطبيق الجوال | `website_enabled` / `mobile_app_enabled` | `gym_config` — **الجدول مالوش migration أصلًا** (`grep gym_config server/migrations/ = 0`، والمرجع الوحيد `platformGyms.ts:325`) فالكونتروللر بيبلع البلوك وبيرجّع `false` دايماً | **بند مستحيل يطلع صحيح** — معلَن، مش متسوّى |
+
+### ٢) بطاقة الاعتماد + النسخ الصامت
+
+البند اللي بقى «يدوي» ملوش معنى من غير أداة، فاتعمل بطاقة `bg-card border-hairline
+rounded-shell` فيها المدير/البريد/رابط الكونسول، ورابط الكونسول بيتبنى من
+`custom_domain` وإلا السبادومين + `/login` (`GymHandover.tsx:210`) — والعرض في
+`<dd>` بقى بيقرأ نفس `consoleUrl` مش بناءً تاني من نفس السطر. **كلمة المرور مش
+موجودة عمدًا:** السيرفر بيخزّن hash بس، فالنص بيقول للمدير يفتح «نسيت كلمة المرور»
+بدل ما نخترع حقلًا كذابًا. **العيبة التانية اللي اتلمست:** `navigator.clipboard
+.writeText(...).then(...)` بلا `.catch` — لو المتصفح رفض الصلاحية الزرار بيسكت.
+اتحوّلت لـ`copyToClipboard` (`:187`) بتدي توست نجاح أو توست رفض صريح، بنفس convention
+`LoginCodeDialog.tsx:46-55` (اللي على الشاشة يفضل مقروء).
+
+### ٣) impersonate: الجذر كان في الفرع الغلط
+
+الملف كان بيقرا `res.data.access_token` — والكونترولر (`platformGyms.ts:704-717`)
+**مالوش access_token في الـbody** (التوكن كوكي HttpOnly بس)، يعني كان بيخزّن
+الحرفية `"undefined"`. لكن ده كان العرض بس: الجذر إن `app_role` كان بيفضل
+`'super-admin'`، فـ`tryRestoreSession()` بيروح على `/platform/auth/session`،
+و`authenticatePlatformAdmin` بيرفض توكن الموظف (`type !== 'platform_admin'`) بـ**403**،
+والـcatch بينضّف الجلسة → ارتداد على `/login`. الإصلاح: `markImpersonatedSession()`
+في `src/services/api.ts:103-105` بيخزّن الدور **المُعيَّن** عبر `ROLE_MAP`
+(`manager → gym-admin`) — نفس القيمة اللي `login()` بتكتبها عند دخول المانجر العادي
+(`GymBrandContext.tsx:84-86`) — و`impersonateGym` اتصحّح نوعه لـ`{data:{gym_id,user}}`
+بلا `access_token`، والاتصالات اتوحّدت في مكانين: `GymHandover.tsx:167`
+و`TenantDirectory.tsx:132`.
+
+### ٤) العلة اللي كانت خلف الستار: `ON CONFLICT` على عمود مش UNIQUE
+
+أول قياس حيّ طلع **impersonate بيردّ 500** على الصالتين — فالرحلة ما كانش ممكن
+تتم من الأساس، والتوست كان بيقول «فشل تسجيل الدخول» بس. المسبار (`node` + كوكيز
+الصالة نفسها): `POST /platform/gyms/:id/impersonate → 500`، و`/auth/me → 401
+"Session has been revoked"`. السبب اتقاس بإعادة تنفيذ نفس الإدراجين جوه معاملة
+**ROLLBACK** (صفر أثر):
+
+```
+activity_logs INSERT ok          ← النيّة الأولى سليمة
+user_sessions INSERT → ERROR 42P10
+  “there is no unique or exclusion constraint matching the ON CONFLICT specification”
+```
+
+`server/migrations/019_user_sessions.sql:15` بيعرّف `idx_user_sessions_jti` **عادي**،
+و`platformGyms.ts:691` بيزعم `ON CONFLICT (token_jti)`. الكونترولر بيلف الإدراج ده
+بـ`.catch(() => {})`، لكن في PostgreSQL المعاملة بتتلغى فور أي خطأ، فالإدراج اللي
+بعده بيفشل بـ25P02 وبلوك الـcatch الكبير بيرجع 500 عام. **نفس العيب موجود في
+`auth.ts:548`** (مسار الموظف — جلسة تانية، متلمّسش). العدّ قبل الإصلاح:
+`user_sessions = 40` صف، `COUNT(*) - COUNT(DISTINCT token_jti) = 0` ⇒ العمود عمليًا
+فريد (jti لكل توكن جديد). **الإجراء المحلي (قرار المالك للمشروع العام):** اتعمل
+`DROP INDEX idx_user_sessions_jti; CREATE UNIQUE INDEX user_sessions_token_jti_key
+ON user_sessions(token_jti)` على **قاعدة التطوير بس**، والدليل المرجوع:
+`node w4d-index.mjs --rollback` بي رجّع الفهرس العادي حرفيًا. الميجريشن الدائم
+**مش مكتوب** — أرقام الملفات في `server/migrations/` شغل الجلسة الموازية.
+
+### ٥) القياس الحيّ بعد الإصلاح (Chrome + CDP على `127.0.0.1:9110`)
+
+| ما قيس | `حامد جيم` (expires = null) | `MohGym` (expires = 2026-11-18) |
+|---|---|---|
+| بنود القائمة | **7** (4 «تم» · 1 «يدوي» · 2 «قيد الانتظار») | 7 (نفس التوزيع) |
+| النسبة المعلنة | **57%** | **57%** |
+| حالة بند البريد | `يدوي` + `border-style: dashed = true` | نفس |
+| المدير / البريد / الرابط | `Probe Owner UI` · `goda123@gmail.com` · `https://hamedgym.gymcore.app/login` | `محمود علاء` · `moh.alaaali@gmail.com` · `https://mohgym.gymcore.app/login` |
+| الحافظة (اتقرأت بـCDP) | النص سداسي السطور كامل زي ما بيتبني حرفيًا | نفس |
+| الزرار بعد الضغط | «اتنسخ» + توست «تم نسخ بطاقة التسليم» | نفس |
+| قشرة البطاقة بالتوكنات | `10px / rgb(255,255,255) / 1px` (`rounded-shell`/`bg-card`/`border-hairline`) | نفس |
+| على 390×844 | `docScrollW = 390 = innerW` · أصغر زرار **48px** · البنود **7** فضلوا | نفس |
+| impersonate (٣ مسارات: الشاشة ×2 + الدليل ×1) | `/admin/dashboard` · `app_role = gym-admin` · `auth_token = null` · `/platform/auth/session = 403` · `/auth/me = 200 (manager)` · الاسم في السايدبار | نفس لـMohGym |
+
+الـ403 ده **هو الدليل المطلوب** مش حادث جانبي: نفس الكوكي بتاع الموظف مرفوض من
+بوابة المنصة — وده بالضبط الفرع اللي كان بيرمي المستخدم على `/login` قبل
+`markImpersonatedSession`. ومعه طلع معلَن تاني: **مفيش خروج من وضع المحاكاة** —
+المحاكاة بتكتب على نفس اسم الكوكي `access_token`، فأي نداء منصة بعدها بيردّ 403
+(متقاس: محاولة impersonate تانية بعد الأولى = **403**)؛ الرجوع للمنصة محتاج تسجيل
+دخول من جديد.
+
+### ٦) الأثر والفَضَلات
+
+مفيش seed في الدفعة دي (القياس على صالتين موجودتين). الأثر الطبيعي لـ3 عمليات
+محاكاة حقيقية: `user_sessions` بصمة `device_name = 'SuperAdmin Impersonation'` من
+2 ← **9**، `activity_logs` الوصف `%impersonat%` من 2 ← **11**، `platform_audit_logs`
+`action_type = 'IMPERSONATE'` ← **10**. **ما اتحذفتش**: دي دفتر مراجعة من أعمال
+حصلت فعلًا، والتوكنات بتنتهي بعد 4 ساعات (`maxAge` في الكونتروللر). الفهرس
+اليونيك **فاضل مطبَّقًا على القاعدة المحلية** (مُعلَن فوق، و`--rollback` جاهز).
+المسارات: `w4d-handover.mjs` و`w4d-probe.mjs` و`w4d-why500.mjs` و`w4d-index.mjs`
+و`w4d-db.mjs` في مجلد الجلسة — **ما بتعملش commit**.
+
+### ٧) البوابات
+
+`npx tsc --noEmit` = **0** · `npm run build` = ✓ **7.30s** و`index-BTW8xHlV.js`
+**924.09 kB** · ESLint **معطّل** (مفيش flat config) · صفر ألوان حرفية في البطاقة
+الجديدة (توكنات الصدفة) · الملفات المتستّجة: `GymHandover.tsx` و`TenantDirectory.tsx`
+كاملين (نظيفين)، و`src/services/api.ts` **بالـhunks** — بلوكاتي الأربعة: استيراد
+`ROLE_MAP` + كتلة `markCookieSession`/`markImpersonatedSession` + حقلَا
+`owner_full_name`/`owner_email` في `PlatformGymDetail` (البلوك ده مشترك سطرًا بسطر مع
+أسطر `address_state`/`date_format`/… لسه ما اتعملهاش commit) + توقيع `impersonateGym`.
+من 13 بلوك مقابل `d10b3fa` فضل **4 بلوكات غادية** في شجرة العمل (feature-flags، أسطر
+العنوان/التنسيق، `plan_id` في `UpdateGymFullPayload`) ما اتلمستش — وبلوكات الجلسة
+الموازية (loginRoute، أكواد الدخول، resetMemberPin…) نزلت في `0f60dde`. ولا `push` ولا
+deploy ولا rebuild على `:9000`.
+
+**آلية الـcommit (مفروضة بالشجرة المشتركة):** وقت السيّج كان `index` فيه **31 ملف**
+مستّج للجلسة الموازية (دفعة أكواد الدخول)، وبلوك `api.ts` عندها مبني من **HEAD + بلوكاتها
+الـ7** — فما فيهوش بلوكاتي الأربعة. `git commit` عادي كان هيبلع شغلهم كله. التسليم تم
+بفهرس خاص: `GIT_INDEX_FILE` مؤقت ← `read-tree HEAD` ← بلوكاتي (الملفات النظيفة كاملة +
+الوثايق append-only) ← `git apply --cached --recount` لبلوكات `api.ts` ← `write-tree` ←
+`commit-tree` ← `update-ref` بشرط القيمة القديمة. قبل الـcommit اتأكد إن الشجرة فيها
+**6 ملفات بس** عن HEAD، وإن بلوك `GymHandover.tsx`/`TenantDirectory.tsx` في الشجرة =
+شجرة العمل حرفيًا، وإن `HEAD:<doc>` بيفضل بادئة النسخة المستّجة، وإن صفر أسطر غادية في
+`api.ts` المستّج. commitهم (`0f60dde`) نزل الأول و`api.ts` بتاعه مالوش بلوكاتي — فالـcommit
+ده رجّعهم فوقه. **القاعدة للجلسات التانية:** أي بلوك ملف مشترك متبني من `HEAD + بلوكاتك`
+لازم يعاد بناؤه بعد commit غادي على نفس الملف.
+
+### ٨) المفتوح بعد الدفعة
+
+قرار المالك: **(أ)** migration لليونيك على `token_jti` ولا تغيير `ON CONFLICT`
+لإدراج عادي في `platformGyms.ts:691` و`auth.ts:548` · **(ب)** جدول `gym_config`
+(مفيش migration) — من غيره بنداي «الموقع/التطبيق الجوال» مستحيل يطلع صحيح · **(ج)**
+`getGym` بياخد أول مدير **بلا فلتر `is_active`** (`:300-306`) بينما impersonate
+بيشتراط `is_active = true` (`:662`) ⇒ القائمة ممكن تقول «الحساب اتعمل» والمحاكاة
+تردّ 404 · **(د)** خروج من وضع المحاكاة · **(هـ)** بريد ترحيبي حقيقي أو آلية تسليم
+· **(و)** تغيير باسورد إجباري عند أول دخول · **(ز)** المعالج بينقل على
+`/super-admin/tenants` بعد الإنشاء مش على صفحة التسليم (`CreateGymWizard.tsx` —
+ملف عليه تعديلات الجلسة الموازية). المتبقي من موجة 4: **د ← ز**.
+**الجلسة دي: 17 دفعة متحقق عليها حيًا.**

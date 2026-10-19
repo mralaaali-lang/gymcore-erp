@@ -7,7 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import {
   listPlatformGymsFiltered, setPlatformGymActive, impersonateGym, deleteGym,
-  listBillingPlans,
+  listBillingPlans, markImpersonatedSession,
   type PlatformGym, type PlatformContract,
 } from '../../services/api';
 import {
@@ -125,11 +125,11 @@ export default function TenantDirectory() {
   const impersonateMutation = useMutation({
     mutationFn: (gymId: string) => impersonateGym(gymId),
     onSuccess: (res) => {
-      const { access_token, gym_id, user } = res.data;
-      localStorage.setItem('auth_token', access_token);
-      localStorage.setItem('gym_id', gym_id);
-      localStorage.setItem('user_role', 'gym-admin');
-      localStorage.setItem('impersonated_by', 'super_admin');
+      // §69 — نفس العلة في `GymHandover`: التوكن كوكي HttpOnly ملهاش نسخة في
+      // الـbody، فتحزين `access_token` كان بيحط حرفية "undefined" في
+      // localStorage. اللي بيسلّم الجلسة فعلًا هو ماركر الدور (`app_role`).
+      const { user } = res.data;
+      markImpersonatedSession(user.role);
       showToast(T(`Logged in as ${user.full_name}`, `تم تسجيل الدخول كـ ${user.full_name}`), 'success');
       setTimeout(() => { window.location.href = '/admin/dashboard'; }, 1000);
     },
